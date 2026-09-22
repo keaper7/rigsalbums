@@ -1,0 +1,513 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Открытие альбома</title>
+<style>
+  :root {
+    --ink: #08070a;
+    --ink-2: #100e12;
+    --cream: #efe9e0;
+    --cream-dim: #a39c93;
+    --gold: #c9a227;
+    --paper: #e8e1d6;
+    --edge: rgba(239, 233, 224, .14);
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Inter, system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--cream);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ---------- зерно: инлайн-SVG, ноль запросов ---------- */
+  .grain {
+    position: fixed; inset: -50%;
+    pointer-events: none; z-index: 9;
+    opacity: .16; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: grainShift 6s steps(6) infinite;
+  }
+  @keyframes grainShift {
+    0%,100% { transform: translate(0,0) }
+    20% { transform: translate(-3%, 2%) }
+    40% { transform: translate(2%, -3%) }
+    60% { transform: translate(-2%, -2%) }
+    80% { transform: translate(3%, 1%) }
+  }
+
+  /* ---------- бейдж веса ---------- */
+  .badge {
+    position: fixed; z-index: 20;
+    top: max(14px, env(safe-area-inset-top)); right: 14px;
+    font-family: var(--sans);
+    font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--cream-dim);
+    background: rgba(8,7,10,.72);
+    border: 1px solid var(--edge);
+    border-radius: 100px;
+    padding: 7px 13px;
+    backdrop-filter: blur(10px);
+    line-height: 1;
+  }
+  .badge b { color: var(--gold); font-weight: 600; }
+
+  /* ---------- общее ---------- */
+  .wrap { width: min(92vw, 1080px); margin-inline: auto; }
+
+  .eyebrow {
+    font-size: 10px; letter-spacing: .34em; text-transform: uppercase;
+    color: var(--cream-dim); margin: 0 0 22px;
+  }
+
+  h1, h2 { font-family: var(--serif); font-weight: 400; margin: 0; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    min-height: 100svh;
+    display: grid; align-content: center;
+    padding: 12svh 0 10svh;
+    position: relative;
+  }
+  .hero::after {
+    content: ""; position: absolute; inset: auto 0 0 0; height: 40svh;
+    background: linear-gradient(to top, var(--ink), transparent);
+    pointer-events: none;
+  }
+  .hero h1 {
+    font-size: clamp(3rem, 15vw, 9.5rem);
+    line-height: .86; letter-spacing: -.02em;
+  }
+  .hero h1 .thin { display: block; font-size: .3em; letter-spacing: .3em; color: var(--cream-dim); margin-top: 1.4em; }
+  .hero p {
+    max-width: 30ch; margin: 3.2em 0 0;
+    font-size: 15px; line-height: 1.6; color: var(--cream-dim);
+  }
+  .scrollcue {
+    position: absolute; bottom: 5svh; left: 50%; translate: -50% 0;
+    font-size: 9px; letter-spacing: .3em; text-transform: uppercase;
+    color: var(--cream-dim); display: grid; justify-items: center; gap: 10px;
+  }
+  .scrollcue i { display: block; width: 1px; height: 34px; background: linear-gradient(var(--gold), transparent); animation: cue 2s ease-in-out infinite; }
+  @keyframes cue { 0%,100% { opacity: .3; transform: scaleY(.5); transform-origin: top } 50% { opacity: 1; transform: scaleY(1) } }
+
+  /* ---------- сцена с альбомом ---------- */
+  .stage { height: 340svh; position: relative; }
+  .stage__pin {
+    position: sticky; top: 0; height: 100svh;
+    display: grid; place-items: center;
+    perspective: 1800px; perspective-origin: 50% 45%;
+  }
+  .stage__label {
+    position: absolute; top: 9svh; left: 50%; translate: -50% 0;
+    font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--cream-dim);
+    transition: opacity .4s;
+  }
+
+  .holder {
+    --p: 0;
+    --s: 1;                     /* во сколько ужать, чтобы открытый разворот влез */
+    transform-style: preserve-3d;
+    scale: calc(1 - var(--p) * (1 - var(--s)));
+  }
+
+  .book {
+    position: relative;
+    width: min(62vw, 300px);
+    aspect-ratio: 21 / 30;
+    transform-style: preserve-3d;
+    translate: calc(var(--p) * 50%) 0;
+    rotate: y calc(-14deg + var(--p) * 10deg);
+    transition: translate .1s linear;
+  }
+
+  /* страницы разворота — под обложкой */
+  .spread {
+    position: absolute; inset: 0;
+    background: linear-gradient(105deg, #ddd5c8, var(--paper) 42%, #f3ede3);
+    border-radius: 2px 5px 5px 2px;
+    box-shadow: inset 14px 0 26px -16px rgba(0,0,0,.5), 0 34px 70px -24px rgba(0,0,0,.85);
+    overflow: hidden;
+    display: grid; grid-template-rows: 1fr auto;
+    padding: 13% 11% 9%;
+    color: #1b1712;
+  }
+
+  /* изнанка обложки = левая страница первого разворота: цитата и подпись */
+  .cover__face--back .q {
+    font-family: var(--serif); font-size: clamp(22px, 7vw, 40px);
+    line-height: 0; color: #b6a894; margin-bottom: .35em;
+  }
+  .cover__face--back p {
+    font-family: var(--serif); font-style: italic;
+    font-size: clamp(7px, 2.3vw, 11px); line-height: 1.75;
+    color: #4c443b; margin: 0;
+  }
+  .cover__face--back .sign {
+    display: block; width: 46%; height: 1px; margin-top: 2.4em;
+    background: linear-gradient(90deg, transparent, #9b8e7c, transparent);
+  }
+  .spread__photo {
+    position: relative; border-radius: 1px; overflow: hidden;
+    background:
+      radial-gradient(120% 90% at 50% 12%, rgba(255,248,236,.5), transparent 55%),
+      linear-gradient(168deg, #6c5a48, #3a2f28 55%, #1d1814);
+    box-shadow: 0 10px 24px -12px rgba(0,0,0,.6);
+    opacity: 0; translate: 0 14px;
+    transition: opacity .5s ease, translate .6s cubic-bezier(.2,.7,.3,1);
+  }
+  /* силуэт — чистый CSS, без картинок */
+  .spread__photo::before {
+    content: ""; position: absolute; left: 50%; bottom: -6%;
+    width: 52%; aspect-ratio: 1/1.35; translate: -50% 0;
+    border-radius: 46% 46% 12% 12%;
+    background: linear-gradient(180deg, rgba(20,16,13,.9), rgba(12,10,8,.98));
+    filter: blur(.4px);
+  }
+  .spread__photo::after {
+    content: ""; position: absolute; left: 50%; top: 17%;
+    width: 22%; aspect-ratio: 1; translate: -50% 0;
+    border-radius: 50%;
+    background: linear-gradient(170deg, #4a3b30, #241d18);
+  }
+  .spread__cap {
+    text-align: center; padding-top: 7%;
+    opacity: 0; translate: 0 10px;
+    transition: opacity .5s .12s ease, translate .6s .12s cubic-bezier(.2,.7,.3,1);
+  }
+  .spread__cap b {
+    display: block; font-family: var(--serif); font-weight: 400;
+    font-size: clamp(11px, 3.4vw, 15px); letter-spacing: .16em;
+  }
+  .spread__cap span {
+    display: block; margin-top: .7em;
+    font-size: 6.5px; letter-spacing: .2em; color: #6d6156;
+  }
+  .book[data-open] .spread__photo,
+  .book[data-open] .spread__cap { opacity: 1; translate: 0 0; }
+
+  /* обложка */
+  .cover {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    transform-origin: left center;
+    rotate: y calc(var(--p) * -168deg);
+    will-change: rotate;
+  }
+  .cover__face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden;
+    border-radius: 2px 5px 5px 2px;
+    overflow: hidden;
+  }
+  .cover__face--front {
+    background:
+      radial-gradient(130% 80% at 50% 8%, rgba(214,196,168,.28), transparent 58%),
+      linear-gradient(162deg, #2a221c, #15110e 60%, #0c0908);
+    box-shadow: 0 40px 80px -28px rgba(0,0,0,.95), inset 0 0 0 1px rgba(233,220,198,.1);
+    display: grid; grid-template-rows: auto 1fr auto;
+    padding: 12% 10%;
+    text-align: center;
+  }
+  .cover__face--front .t {
+    font-family: var(--serif); font-size: clamp(13px, 4.4vw, 21px);
+    letter-spacing: .09em; color: #e7dcc7; line-height: 1.1;
+  }
+  .cover__face--front .t em { display: block; font-style: normal; font-size: .42em; letter-spacing: .34em; color: #8d8172; margin-top: .9em; }
+  .cover__face--front .y { font-family: var(--serif); font-size: 9px; letter-spacing: .3em; color: #8d8172; }
+  .cover__face--front .fig {
+    align-self: center; justify-self: center;
+    width: 58%; aspect-ratio: 1/1.3; border-radius: 44% 44% 10% 10%;
+    background: linear-gradient(175deg, rgba(150,127,99,.5), rgba(22,18,15,.9));
+    box-shadow: inset 0 -20px 30px -18px rgba(0,0,0,.9);
+  }
+  .cover__face--back {
+    rotate: y 180deg;
+    background: linear-gradient(200deg, #cdc3b4, #e3dbcf 55%, #d6cdbf);
+    box-shadow: inset -14px 0 26px -16px rgba(0,0,0,.45);
+    display: grid; align-content: center; justify-items: center;
+    padding: 0 16%; text-align: center;
+  }
+  /* корешок-тень у сгиба */
+  .cover::after {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 16%;
+    background: linear-gradient(to right, rgba(0,0,0,.55), transparent);
+    opacity: calc(1 - var(--p)); pointer-events: none;
+  }
+
+  /* блик, ползущий по обложке при открытии */
+  .cover__shine {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%, rgba(255,244,224,.22) 50%, transparent 62%);
+    background-size: 280% 100%;
+    background-position: calc(100% - var(--p) * 100%) 0;
+  }
+
+  /* ---------- вспышка ---------- */
+  .flash {
+    position: fixed; inset: 0; z-index: 30; pointer-events: none;
+    background: #fff; opacity: 0;
+  }
+  .flash.fire { animation: flash .52s ease-out; }
+  @keyframes flash {
+    0% { opacity: 0 } 6% { opacity: .92 } 14% { opacity: .5 } 22% { opacity: .85 } 100% { opacity: 0 }
+  }
+
+  /* ---------- секция «вспышка» ---------- */
+  .shoot { padding: 16svh 0; text-align: center; }
+  .shoot h2 { font-size: clamp(1.8rem, 7vw, 3.6rem); line-height: 1; }
+  .shoot p { color: var(--cream-dim); font-size: 14px; max-width: 34ch; margin: 1.6em auto 2.6em; line-height: 1.6; }
+  .shutter {
+    appearance: none; border: 1px solid var(--edge); background: transparent;
+    color: var(--cream); font-family: var(--sans);
+    font-size: 10px; letter-spacing: .26em; text-transform: uppercase;
+    padding: 17px 34px; border-radius: 100px; cursor: pointer;
+    transition: border-color .3s, color .3s, scale .12s;
+  }
+  .shutter:hover { border-color: var(--gold); color: var(--gold); }
+  .shutter:active { scale: .96; }
+
+  .frames { display: flex; gap: 12px; justify-content: center; margin-top: 46px; flex-wrap: wrap; }
+  .frame {
+    width: 86px; aspect-ratio: 3/4; border-radius: 2px;
+    background: linear-gradient(168deg, #5c4c3e, #241d18);
+    box-shadow: 0 14px 28px -14px rgba(0,0,0,.9), inset 0 0 0 1px rgba(233,220,198,.08);
+    opacity: 0; scale: .82; filter: blur(6px);
+    transition: opacity .45s, scale .5s cubic-bezier(.2,.8,.3,1), filter .45s;
+  }
+  .frame.shot { opacity: 1; scale: 1; filter: blur(0); }
+
+  /* ---------- секция веса ---------- */
+  .weight { padding: 14svh 0 20svh; }
+  .weight h2 { font-size: clamp(1.7rem, 6vw, 3.2rem); line-height: 1.05; max-width: 16ch; }
+  .weight > .wrap > p { color: var(--cream-dim); font-size: 14px; line-height: 1.65; max-width: 46ch; margin: 1.8em 0 3.4em; }
+
+  .bars { display: grid; gap: 26px; }
+  .bar__top { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 11px; }
+  .bar__top b { font-family: var(--serif); font-size: 15px; letter-spacing: .04em; text-transform: none; }
+  .bar__track { height: 3px; background: rgba(239,233,224,.1); border-radius: 2px; overflow: hidden; }
+  .bar__fill { height: 100%; width: 0; border-radius: 2px; transition: width 1.5s cubic-bezier(.2,.8,.2,1); }
+  .bar--us .bar__fill { min-width: 5px; }
+  .bar--them .bar__fill { background: linear-gradient(90deg, #6b5a3a, #a8823a); }
+  .bar--us .bar__fill { background: linear-gradient(90deg, var(--gold), #f3d98b); }
+  .bar__note { font-size: 11px; color: var(--cream-dim); margin-top: 9px; }
+
+  .foot { margin-top: 7svh; padding-top: 34px; border-top: 1px solid var(--edge); font-size: 11px; color: var(--cream-dim); line-height: 1.8; }
+  .foot b { color: var(--cream); font-weight: 500; }
+
+  /* появление секций: прячем только при живом JS, иначе всё читается сразу */
+  .rise { transition: opacity .8s, translate .9s cubic-bezier(.2,.7,.3,1); }
+  .js .rise { opacity: 0; translate: 0 26px; }
+  .js .rise.in { opacity: 1; translate: 0 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grain { animation: none }
+    .scrollcue i { animation: none }
+    .rise { opacity: 1; translate: 0 0; transition: none }
+    .book { rotate: none }
+    .cover { rotate: y -168deg }
+    .flash.fire { animation: none }
+    * { transition-duration: .01ms !important }
+  }
+</style>
+
+<script>document.documentElement.classList.add('js')</script>
+<div class="grain"></div>
+<div class="flash" id="flash"></div>
+<div class="badge">ноль библиотек · <b id="kb">—</b></div>
+
+<section class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Прототип движения · rigsalbums.ru</p>
+    <h1>Альбом<span class="thin">открывается</span></h1>
+    <p>То же ощущение, что в LOFT PARK. Без единой сторонней библиотеки и без мегабайтов, которые не доедут до телефона через мобильный интернет.</p>
+  </div>
+  <div class="scrollcue"><i></i>листай</div>
+</section>
+
+<section class="stage" id="stage">
+  <div class="stage__pin">
+    <span class="stage__label" id="stageLabel">листай — альбом раскроется</span>
+    <div class="holder" id="holder">
+    <div class="book" id="book">
+      <div class="spread">
+        <div class="spread__photo"></div>
+        <div class="spread__cap">
+          <b>ФАМИЛИЯ ИМЯ</b>
+          <span>МКОУ ЛИЦЕЙ · НАЛЬЧИК · 11 КЛАСС · 2026</span>
+        </div>
+      </div>
+      <div class="cover">
+        <div class="cover__face cover__face--front">
+          <div class="t">ВЫПУСКНОЙ<em>альбом</em></div>
+          <div class="fig"></div>
+          <div class="y">2026</div>
+          <div class="cover__shine"></div>
+        </div>
+        <div class="cover__face cover__face--back">
+          <span class="q">&ldquo;</span>
+          <p>здесь будет цитата, которую выпускник выберет сам</p>
+          <i class="sign"></i>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+</section>
+
+<section class="shoot">
+  <div class="wrap rise">
+    <p class="eyebrow">Второй приём</p>
+    <h2>Вспышка</h2>
+    <p>Переход между разделами как щелчок затвора. На сайте срабатывает при смене страницы — тут нажми сам.</p>
+    <button class="shutter" id="shutter">сфоткать</button>
+    <div class="frames" id="frames">
+      <div class="frame"></div><div class="frame"></div><div class="frame"></div>
+    </div>
+  </div>
+</section>
+
+<section class="weight">
+  <div class="wrap rise">
+    <p class="eyebrow">Почему это важно</p>
+    <h2>Вау должны увидеть все, а не только те, у кого быстрый интернет</h2>
+    <p>Школьник приходит из инсты, а значит с включённым VPN и часто с мобильного интернета. Каждый лишний мегабайт — это лишние секунды белого экрана и закрытая вкладка.</p>
+
+    <div class="bars">
+      <div class="bar bar--them">
+        <div class="bar__top"><span>LOFT PARK · трёхмерная графика</span><b>2 048 KB</b></div>
+        <div class="bar__track"><div class="bar__fill" data-w="100"></div></div>
+        <div class="bar__note">один файл с 3D весит 1.1 MB из них</div>
+      </div>
+      <div class="bar bar--us">
+        <div class="bar__top"><span>Эта страница · CSS и чистый JS</span><b id="usKb">—</b></div>
+        <div class="bar__track"><div class="bar__fill" id="usBar" data-w="1"></div></div>
+        <div class="bar__note">ноль библиотек, ноль сторонних запросов</div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <b>Что это доказывает.</b> Открытие альбома, вспышка, движение при прокрутке — всё это не требует тяжёлых библиотек.<br>
+      Трёхмерку оставляем максимум на один момент на главной и только для компьютеров — на телефоне вместо неё статичный кадр.<br>
+      Анимации уважают системную настройку «уменьшить движение».
+    </div>
+  </div>
+</section>
+
+<script>
+(function () {
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- раскрытие альбома по прокрутке ---- */
+  var stage = document.getElementById('stage');
+  var book = document.getElementById('book');
+  var holder = document.getElementById('holder');
+  var label = document.getElementById('stageLabel');
+  var ticking = false;
+
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      ticking = false;
+      var r = stage.getBoundingClientRect();
+      var travel = r.height - innerHeight;
+      if (travel <= 0) return;
+      var p = Math.min(1, Math.max(0, -r.top / travel));
+      // раскрытие происходит в середине сцены — до и после альбом «дышит» на месте
+      var open = Math.min(1, Math.max(0, (p - 0.16) / 0.55));
+      open = open < .5 ? 4 * open * open * open : 1 - Math.pow(-2 * open + 2, 3) / 2; // easeInOutCubic
+      holder.style.setProperty('--p', open.toFixed(4));
+      if (open > 0.62) book.setAttribute('data-open', ''); else book.removeAttribute('data-open');
+      label.style.opacity = open > 0.08 ? 0 : 1;
+    });
+  }
+
+  /* открытый разворот вдвое шире книги — считаем, во сколько ужать, чтобы влез */
+  function fit() {
+    var w = book.getBoundingClientRect().width / (parseFloat(getComputedStyle(holder).scale) || 1);
+    var s = Math.min(1, (innerWidth * 0.9) / (2 * w));
+    holder.style.setProperty('--s', Math.max(0.45, s).toFixed(3));
+  }
+
+  if (!reduce) {
+    addEventListener('scroll', onScroll, { passive: true });
+    addEventListener('resize', function () { fit(); onScroll(); });
+    fit(); onScroll();
+  } else {
+    fit();
+    holder.style.setProperty('--p', 1);
+    book.setAttribute('data-open', '');
+  }
+
+  /* ---- вспышка ---- */
+  var flash = document.getElementById('flash');
+  var frames = [].slice.call(document.querySelectorAll('#frames .frame'));
+  var shot = 0;
+
+  document.getElementById('shutter').addEventListener('click', function () {
+    if (!reduce) {
+      flash.classList.remove('fire');
+      void flash.offsetWidth;
+      flash.classList.add('fire');
+    }
+    var f = frames[shot % frames.length];
+    f.classList.remove('shot');
+    setTimeout(function () { f.classList.add('shot'); }, 90);
+    shot++;
+  });
+
+  /* ---- появление секций ---- */
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+      [].slice.call(e.target.querySelectorAll('.bar__fill')).forEach(function (b, i) {
+        setTimeout(function () { b.style.width = b.dataset.w + '%'; }, 220 + i * 180);
+      });
+    });
+  }, { threshold: 0.12 });
+  var rises = [].slice.call(document.querySelectorAll('.rise'));
+  rises.forEach(function (el) { io.observe(el); });
+
+  // страховка: если наблюдатель по какой-то причине не сработал — показываем всё,
+  // лучше без анимации, чем пустой экран
+  setTimeout(function () {
+    rises.forEach(function (el) {
+      if (!el.classList.contains('in') && el.getBoundingClientRect().top < innerHeight) {
+        el.classList.add('in');
+        [].slice.call(el.querySelectorAll('.bar__fill')).forEach(function (b) {
+          b.style.width = b.dataset.w + '%';
+        });
+      }
+    });
+  }, 2500);
+
+  /* ---- честный подсчёт веса страницы ---- */
+  addEventListener('load', function () {
+    setTimeout(function () {
+      var bytes = 0;
+      var nav = performance.getEntriesByType('navigation')[0];
+      // при ответе 304 transferSize — это только заголовки, поэтому берём максимум
+      if (nav) bytes += Math.max(nav.transferSize || 0, nav.encodedBodySize || 0);
+      performance.getEntriesByType('resource').forEach(function (r) {
+        bytes += Math.max(r.transferSize || 0, r.encodedBodySize || 0);
+      });
+      if (bytes < 2048) bytes = new Blob([document.documentElement.outerHTML]).size;
+      var kb = Math.max(1, Math.round(bytes / 1024));
+      document.getElementById('kb').textContent = kb + ' KB';
+      document.getElementById('usKb').textContent = kb + ' KB';
+      var bar = document.getElementById('usBar');
+      var pct = Math.max(0.4, (kb / 2048) * 100);
+      bar.dataset.w = pct.toFixed(2);
+      if (bar.style.width) bar.style.width = pct.toFixed(2) + '%';
+    }, 60);
+  });
+})();
+</script>

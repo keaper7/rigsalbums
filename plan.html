@@ -1,0 +1,838 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Концепт rigsalbums.ru</title>
+<style>
+  /* Единая тема, намеренно тёмная — под обложки альбомов Артура.
+     Ноль внешних запросов: шрифты системные, графика на CSS. */
+  :root {
+    --ink:        #08070a;
+    --ink-2:      #0e0c10;
+    --ink-3:      #141117;
+    --cream:      #efe9e0;
+    --dim:        #9d958b;
+    --dim-2:      #6b645d;
+    --gold:       #c9a227;
+    --gold-soft:  #e2c76b;
+    --paper:      #e8e1d6;
+    --bad:        #b4584c;
+    --edge:       rgba(239, 233, 224, .13);
+    --edge-2:     rgba(239, 233, 224, .07);
+
+    --serif: ui-serif, "Iowan Old Style", "New York", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    --mono:  ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--cream);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  .grain {
+    position: fixed; inset: -50%; z-index: 1;
+    pointer-events: none; opacity: .13; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .wrap { width: min(90vw, 940px); margin-inline: auto; position: relative; z-index: 2; }
+  .narrow { max-width: 62ch; }
+
+  section { padding: clamp(64px, 11vh, 120px) 0; border-top: 1px solid var(--edge-2); }
+  section:first-of-type { border-top: 0; }
+
+  h1, h2, h3 { font-family: var(--serif); font-weight: 400; margin: 0; text-wrap: balance; }
+  h2 { font-size: clamp(1.7rem, 4.6vw, 2.9rem); line-height: 1.08; letter-spacing: -.015em; }
+  h3 { font-size: clamp(1.05rem, 2.4vw, 1.3rem); line-height: 1.25; }
+  p { margin: 0 0 1.1em; }
+  p:last-child { margin-bottom: 0; }
+
+  .eyebrow {
+    font-size: 10px; letter-spacing: .3em; text-transform: uppercase;
+    color: var(--dim-2); margin: 0 0 20px; font-family: var(--sans);
+  }
+  .lede { color: var(--dim); font-size: clamp(15px, 1.9vw, 17px); margin-top: 1.5em; }
+  .note { font-size: 13px; color: var(--dim-2); line-height: 1.7; }
+  em.mark { font-style: normal; color: var(--gold-soft); }
+
+  /* ---------- обложка ---------- */
+  .cover { padding-top: clamp(70px, 14vh, 150px); padding-bottom: clamp(50px, 9vh, 90px); }
+  .cover h1 {
+    font-size: clamp(2.6rem, 9vw, 5.6rem); line-height: .95; letter-spacing: -.03em;
+  }
+  .cover h1 span { display: block; color: var(--dim-2); }
+  .cover__meta {
+    display: flex; flex-wrap: wrap; gap: 8px 28px;
+    margin-top: clamp(38px, 7vh, 64px); padding-top: 24px;
+    border-top: 1px solid var(--edge);
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim-2);
+  }
+
+  /* ---------- диагноз ---------- */
+  .chain { display: grid; gap: 10px; margin: 36px 0 0; }
+  .link {
+    display: grid; grid-template-columns: 26px 1fr; gap: 16px; align-items: start;
+    padding: 16px 18px; border: 1px solid var(--edge-2); border-radius: 3px;
+    background: var(--ink-2);
+  }
+  .link i {
+    font-style: normal; font-family: var(--mono); font-size: 11px;
+    color: var(--dim-2); padding-top: 2px;
+  }
+  .link b { display: block; font-weight: 500; font-size: 14px; }
+  .link span { display: block; font-size: 13px; color: var(--dim); margin-top: 3px; }
+  .link--fail { border-color: rgba(180, 88, 76, .38); background: rgba(180, 88, 76, .06); }
+  .link--fail i, .link--fail b { color: var(--bad); }
+
+  .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 1px; margin-top: 40px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  .fig { background: var(--ink); padding: 22px 18px; }
+  .fig b { display: block; font-family: var(--serif); font-size: clamp(1.7rem, 5vw, 2.4rem); line-height: 1; letter-spacing: -.02em; }
+  .fig span { display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim-2); margin-top: 10px; }
+  .fig--bad b { color: var(--bad); }
+
+  .proof {
+    margin-top: 34px; padding: 18px 20px; border-left: 2px solid var(--gold);
+    background: var(--ink-2); font-family: var(--mono); font-size: 12px;
+    color: var(--dim); overflow-x: auto; line-height: 1.9;
+  }
+  .proof b { color: var(--gold-soft); font-weight: 400; }
+
+  /* ---------- карта сайта ---------- */
+  .pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; margin-top: 42px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  .page { background: var(--ink); padding: 22px 20px 24px; }
+  .page b { display: block; font-family: var(--serif); font-size: 1.05rem; }
+  .page span { display: block; font-size: 12.5px; color: var(--dim); margin-top: 7px; line-height: 1.55; }
+  .page--new { background: var(--ink-3); }
+  .page--new b { color: var(--gold-soft); }
+  .page__tag { display: inline-block; font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); border: 1px solid rgba(201,162,39,.4); border-radius: 100px; padding: 3px 8px; margin-bottom: 11px; }
+
+  /* ---------- телефон с прототипом ---------- */
+  .demo { display: grid; grid-template-columns: 1fr; gap: 40px; margin-top: 46px; align-items: start; }
+  @media (min-width: 880px) { .demo { grid-template-columns: 300px 1fr; gap: 56px; } }
+
+  .phone {
+    width: min(300px, 86vw); justify-self: center;
+    border: 1px solid var(--edge); border-radius: 30px; padding: 9px;
+    background: linear-gradient(170deg, #1a171d, #0b0a0d);
+    box-shadow: 0 40px 80px -36px rgba(0,0,0,.95);
+  }
+  .phone__screen {
+    border-radius: 22px; overflow: hidden; background: var(--ink);
+    height: 560px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    position: relative;
+  }
+  .phone__screen::-webkit-scrollbar { width: 0 }
+
+  .cls { padding: 22px 18px 30px; }
+  .cls__top { font-size: 9.5px; letter-spacing: .06em; color: var(--dim-2); font-family: var(--mono); }
+  .cls h4 { font-family: var(--serif); font-weight: 400; font-size: 1.5rem; margin: 10px 0 0; line-height: 1.1; }
+  .cls__sub { font-size: 12px; color: var(--dim); margin-top: 6px; }
+
+  .tabs { display: flex; gap: 4px; margin: 22px 0 18px; border: 1px solid var(--edge-2); border-radius: 100px; padding: 3px; }
+  .tab {
+    flex: 1; appearance: none; border: 0; background: transparent; cursor: pointer;
+    font-family: var(--sans); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--dim); padding: 9px 4px; border-radius: 100px; transition: background .25s, color .25s;
+  }
+  .tab[aria-selected="true"] { background: var(--cream); color: var(--ink); }
+  .tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .vote__q { font-size: 12px; color: var(--dim); margin-bottom: 14px; }
+  .opts { display: grid; gap: 9px; }
+  .opt {
+    display: grid; grid-template-columns: 44px 1fr auto; gap: 13px; align-items: center;
+    width: 100%; text-align: left; appearance: none; cursor: pointer;
+    border: 1px solid var(--edge-2); border-radius: 3px; background: var(--ink-2);
+    padding: 11px; color: var(--cream); font-family: var(--sans);
+    transition: border-color .25s, background .25s;
+    position: relative; overflow: hidden;
+  }
+  .opt:hover:not(:disabled) { border-color: rgba(201,162,39,.45); }
+  .opt:disabled { cursor: default; }
+  .opt:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .opt__bar {
+    position: absolute; inset: 0 auto 0 0; width: 0;
+    background: rgba(201,162,39,.11); transition: width .9s cubic-bezier(.2,.8,.2,1);
+  }
+  .opt > :not(.opt__bar) { position: relative; }
+  .opt__thumb { width: 44px; aspect-ratio: 3/4; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(239,233,224,.09); }
+  .opt__thumb--a { background: linear-gradient(165deg, #6d5c49, #241d18 70%); }
+  .opt__thumb--b { background: linear-gradient(165deg, #d9d4cc, #6f6b66 60%, #17161a); filter: saturate(0); }
+  .opt__thumb--c { background: linear-gradient(165deg, #2b3340, #0d1014 65%); }
+  .opt__thumb--d { background: linear-gradient(165deg, #8a7f6d, #c9bda6 45%, #3a342c); }
+  .opt__name { font-size: 12px; line-height: 1.35; letter-spacing: .02em; }
+  .opt__pct { font-family: var(--mono); font-size: 12px; color: var(--dim-2); font-variant-numeric: tabular-nums; }
+  .opt[data-mine] .opt__name { color: var(--gold-soft); }
+  .opt[data-mine] { border-color: rgba(201,162,39,.5); }
+
+  .vote__after { margin-top: 15px; font-size: 11.5px; color: var(--dim-2); line-height: 1.6; }
+  .vote__after b { color: var(--gold-soft); font-weight: 500; }
+  .reset {
+    appearance: none; border: 0; background: none; padding: 0; margin-top: 9px;
+    font-family: var(--sans); font-size: 11px; color: var(--dim-2);
+    text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+  }
+  .reset:hover { color: var(--cream); }
+
+  .info { display: grid; gap: 1px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  .info div { background: var(--ink); padding: 12px 13px; display: grid; grid-template-columns: 82px 1fr; gap: 10px; align-items: baseline; }
+  .info dt { font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--dim-2); }
+  .info dd { margin: 0; font-size: 12.5px; }
+  .deadline { margin-top: 14px; padding: 12px 13px; border: 1px solid rgba(201,162,39,.3); border-radius: 3px; font-size: 11.5px; color: var(--gold-soft); }
+
+  .demo__side h3 { margin-bottom: 14px; }
+  .demo__side ul { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 13px; }
+  .demo__side li { display: grid; grid-template-columns: 16px 1fr; gap: 12px; font-size: 14px; color: var(--dim); line-height: 1.55; }
+  .demo__side li::before { content: ""; width: 5px; height: 5px; margin-top: .6em; border-radius: 50%; background: var(--gold); }
+  .demo__side li b { color: var(--cream); font-weight: 500; }
+
+  /* ---------- как Артур это создаёт ---------- */
+  .steps { display: grid; gap: 1px; margin-top: 42px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  @media (min-width: 760px) { .steps { grid-template-columns: repeat(4, 1fr); } }
+  .step { background: var(--ink); padding: 24px 20px 26px; }
+  .step i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--gold); letter-spacing: .1em; }
+  .step b { display: block; font-family: var(--serif); font-size: 1.05rem; margin: 12px 0 8px; }
+  .step span { font-size: 13px; color: var(--dim); line-height: 1.55; }
+
+  .form-mock { margin-top: 30px; border: 1px solid var(--edge-2); border-radius: 3px; background: var(--ink-2); padding: 20px; }
+  .form-mock__title { font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim-2); margin-bottom: 16px; }
+  .field { display: grid; gap: 6px; margin-bottom: 13px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim-2); }
+  .field div { border: 1px solid var(--edge-2); border-radius: 2px; padding: 10px 12px; font-size: 13px; color: var(--cream); background: var(--ink); }
+  .field div.ph { color: var(--dim-2); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 11px; padding: 6px 11px; border-radius: 100px; border: 1px solid var(--edge-2); color: var(--dim); }
+  .chip[data-on] { border-color: rgba(201,162,39,.5); color: var(--gold-soft); }
+
+  /* ---------- сейчас / будет ---------- */
+  .vs { display: grid; gap: 1px; margin-top: 42px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  @media (min-width: 720px) { .vs { grid-template-columns: 1fr 1fr; } }
+  .vs__col { background: var(--ink); padding: 26px 22px 28px; }
+  .vs__col h3 { margin-bottom: 4px; }
+  .vs__col > p { font-size: 12px; color: var(--dim-2); margin-bottom: 20px; }
+  .vs__list { display: grid; gap: 8px; }
+  .host { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; color: var(--dim); }
+  .host::before { content: ""; width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--bad); }
+  .vs__col--new .host::before { background: var(--gold); }
+  .vs__count { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--edge-2); font-size: 13px; }
+  .vs__count b { font-family: var(--serif); font-size: 1.5rem; }
+  .vs__col--old .vs__count b { color: var(--bad); }
+  .vs__col--new .vs__count b { color: var(--gold-soft); }
+
+  /* ---------- движение ---------- */
+  .moves { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 1px; margin-top: 42px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  .move { background: var(--ink); padding: 22px 20px 24px; }
+  .move b { display: block; font-family: var(--serif); font-size: 1.05rem; margin-bottom: 7px; }
+  .move span { font-size: 13px; color: var(--dim); line-height: 1.55; }
+
+  .cta {
+    display: inline-flex; align-items: center; gap: 12px; margin-top: 32px;
+    border: 1px solid rgba(201,162,39,.45); border-radius: 100px;
+    padding: 15px 26px; color: var(--gold-soft); text-decoration: none;
+    font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+    transition: background .3s, color .3s;
+  }
+  .cta:hover { background: rgba(201,162,39,.1); color: var(--cream); }
+  .cta:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+
+  /* ---------- мои работы ---------- */
+  .works { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1px; margin-top: 42px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  .work {
+    background: var(--ink); padding: 22px 20px 24px; text-decoration: none; color: inherit;
+    display: grid; align-content: start; gap: 7px; transition: background .3s;
+  }
+  .work:hover { background: var(--ink-3); }
+  .work:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+  .work b { font-family: var(--serif); font-size: 1.05rem; font-weight: 400; }
+  .work span { font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+  .work u {
+    font-family: var(--mono); font-size: 11px; color: var(--gold); text-decoration: none;
+    margin-top: 4px; display: block; overflow-wrap: anywhere;
+  }
+  .work--live b::after {
+    content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--gold); margin-left: 8px; vertical-align: middle;
+  }
+
+  /* ---------- идеи ---------- */
+  .ideas { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 1px; margin-top: 42px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  .idea { background: var(--ink); padding: 24px 20px 26px; }
+  .idea__tag {
+    display: inline-block; font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+    border-radius: 100px; padding: 3px 9px; margin-bottom: 12px;
+    color: var(--gold); border: 1px solid rgba(201,162,39,.35);
+  }
+  .idea__tag--heavy { color: var(--dim-2); border-color: var(--edge-2); }
+  .idea b { display: block; font-family: var(--serif); font-size: 1.1rem; font-weight: 400; margin-bottom: 8px; }
+  .idea span { font-size: 13px; color: var(--dim); line-height: 1.6; }
+
+  /* ---------- бюджет веса ---------- */
+  .bars { display: grid; gap: 24px; margin-top: 40px; }
+  .bar__top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; font-size: 12px; color: var(--dim); margin-bottom: 10px; }
+  .bar__top b { font-family: var(--mono); font-size: 13px; color: var(--cream); font-variant-numeric: tabular-nums; }
+  .bar__track { height: 3px; background: rgba(239,233,224,.08); border-radius: 2px; overflow: hidden; }
+  .bar__fill { height: 100%; width: 0; border-radius: 2px; transition: width 1.4s cubic-bezier(.2,.8,.2,1); }
+  .bar--a .bar__fill { background: linear-gradient(90deg, #5a4a30, #a8823a); }
+  .bar--b .bar__fill { background: var(--bad); }
+  .bar--c .bar__fill { background: linear-gradient(90deg, var(--gold), var(--gold-soft)); min-width: 5px; }
+  .bar__note { font-size: 11.5px; color: var(--dim-2); margin-top: 8px; }
+
+  /* ---------- этапы ---------- */
+  .stages { margin-top: 42px; display: grid; gap: 1px; background: var(--edge-2); border: 1px solid var(--edge-2); }
+  .stage { background: var(--ink); padding: 20px 22px; display: grid; grid-template-columns: 30px 1fr; gap: 18px; align-items: start; }
+  @media (min-width: 700px) { .stage { grid-template-columns: 30px 190px 1fr; align-items: baseline; } }
+  .stage i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--gold); }
+  .stage b { font-family: var(--serif); font-size: 1.05rem; font-weight: 400; }
+  .stage span { font-size: 13.5px; color: var(--dim); line-height: 1.55; }
+
+  /* ---------- нужно от тебя ---------- */
+  .need { display: grid; gap: 10px; margin-top: 38px; }
+  .need div { display: grid; grid-template-columns: 18px 1fr; gap: 14px; padding: 15px 18px; border: 1px solid var(--edge-2); border-radius: 3px; background: var(--ink-2); font-size: 14px; }
+  .need i { font-style: normal; color: var(--gold); font-family: var(--mono); font-size: 12px; }
+
+  /* ---------- границы ---------- */
+  .limits { margin-top: 38px; display: grid; gap: 14px; }
+  .limit { padding-left: 18px; border-left: 1px solid rgba(180,88,76,.35); }
+  .limit b { display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .limit span { font-size: 13px; color: var(--dim); line-height: 1.6; }
+
+  footer { padding: 60px 0 80px; border-top: 1px solid var(--edge-2); }
+  footer p { font-size: 12.5px; color: var(--dim-2); }
+
+  /* появление — только при живом JS, чтобы страница читалась и без него */
+  .rise { transition: opacity .7s ease, translate .8s cubic-bezier(.2,.7,.3,1); }
+  .js .rise { opacity: 0; translate: 0 20px; }
+  .js .rise.in { opacity: 1; translate: 0 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .js .rise { opacity: 1; translate: 0 0; }
+    * { transition-duration: .01ms !important; animation: none !important; }
+  }
+</style>
+
+<script>document.documentElement.classList.add('js')</script>
+<div class="grain"></div>
+<a href="index.html" style="position:fixed;z-index:40;top:14px;left:14px;font:500 11px/1 ui-sans-serif,system-ui;letter-spacing:.16em;text-transform:uppercase;color:#e2c76b;text-decoration:none;background:rgba(8,7,10,.78);border:1px solid rgba(239,233,224,.13);border-radius:100px;padding:9px 15px;backdrop-filter:blur(10px)">&larr; прототип сайта</a>
+
+<!-- ========== обложка ========== -->
+<section class="cover">
+  <div class="wrap">
+    <p class="eyebrow">Концепт · сентябрь 2026</p>
+    <h1>Школьные<br>альбомы<span>rigsalbums.ru</span></h1>
+    <p class="lede narrow">Как будет устроен новый сайт: страницы классов с голосованием за дизайн, админка, в которой ты создаёшь их сам, и движение, ради которого всё затевалось.</p>
+    <div class="cover__meta">
+      <span>Артур Дзахмишев</span>
+      <span>Азрет Шанибов · фронтенд</span>
+      <span>Эта страница весит <em class="mark" id="selfweight">—</em> и не грузит ничего со стороны</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== диагноз ========== -->
+<section>
+  <div class="wrap">
+    <div class="rise">
+      <p class="eyebrow">С чего начали</p>
+      <h2>Почему у ребят не открывалось</h2>
+      <p class="lede narrow">Я разобрал текущий сайт до созвона. Дело не в том, что «Тильда тормозит», там конкретный механизм, и он бьёт ровно по твоей аудитории.</p>
+
+      <div class="chain">
+        <div class="link"><i>01</i><div><b>Ребята приходят из инсты</b><span>Это твой основной канал, оттуда переходят на сайт</span></div></div>
+        <div class="link"><i>02</i><div><b>Инста заблокирована, значит VPN включён всегда</b><span>У школьников он просто не выключается</span></div></div>
+        <div class="link"><i>03</i><div><b>Перед сайтом стоит защита от ботов</b><span>DDoS-Guard смотрит на адрес и решает, пускать или проверять. Адреса VPN для неё подозрительные по умолчанию — оттуда же лезут боты</span></div></div>
+        <div class="link link--fail"><i>04</i><div><b>Страница висит, данные не доходят</b><span>Та же защита стоит на серверах, откуда Тильда подтягивает динамику. Отсюда «голоса не грузились»</span></div></div>
+      </div>
+
+      <div class="proof">
+        $ curl -sSI https://rigsalbums.ru/ | grep server<br>
+        <b>server: ddos-guard</b><br><br>
+        $ curl -sSI https://store.tildaapi.com/ | grep server<br>
+        <b>server: ddos-guard</b>
+      </div>
+
+      <p class="note" style="margin-top:26px">Самое неприятное: ломается не у случайных людей, а у всех, для кого сайт и сделан.</p>
+    </div>
+
+    <div class="rise">
+      <div class="figures">
+        <div class="fig fig--bad"><b>8.1 с</b><span>полная загрузка главной</span></div>
+        <div class="fig fig--bad"><b>53</b><span>скрипта на странице</span></div>
+        <div class="fig fig--bad"><b>11</b><span>чужих адресов</span></div>
+        <div class="fig fig--bad"><b>95</b><span>запросов</span></div>
+      </div>
+      <p class="note" style="margin-top:16px">Замеры с компьютера на быстром интернете, без VPN. У школьника на телефоне хуже. Нормой считается загрузка до 2.5 секунд.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== карта сайта ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Структура</p>
+    <h2>Не лендинг, а сайт с вкладками</h2>
+    <p class="lede narrow">Контент почти весь уже есть. Переносим с текущего сайта и раскладываем по разделам.</p>
+
+    <div class="pages">
+      <div class="page"><b>Главная</b><span>Первый экран с движением, кто ты, ключевые цифры, путь к записи</span></div>
+      <div class="page"><b>Работы</b><span>Галерея съёмок и готовых альбомов</span></div>
+      <div class="page"><b>Альбомы и цены</b><span>Album of your life, Premium, Supreme: что входит в каждый</span></div>
+      <div class="page"><b>Дизайны</b><span>Обложки, личные страницы, стили фотографий, каталог вариантов</span></div>
+      <div class="page"><b>Студия и съёмка</b><span>Как проходит день, PS5 и проектор, что входит в стоимость</span></div>
+      <div class="page"><b>Об Артуре</b><span>История про ужасный альбом и шикарные следующим поколениям</span></div>
+      <div class="page page--new">
+        <span class="page__tag">Новое</span>
+        <b>Страница класса</b><span>Своя ссылка у каждого класса: голосование за дизайн и вся информация к съёмке</span>
+      </div>
+      <div class="page page--new">
+        <span class="page__tag">Новое</span>
+        <b>Админка</b><span>Закрытый вход только для тебя: создаёшь классы, видишь голоса</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== страница класса ========== -->
+<section>
+  <div class="wrap">
+    <div class="rise">
+      <p class="eyebrow">Главное новое</p>
+      <h2>Страница класса</h2>
+      <p class="lede narrow">Вот что получит класс по своей ссылке. Потыкай, голосование настоящее.</p>
+    </div>
+
+    <div class="demo rise">
+      <div class="phone">
+        <div class="phone__screen">
+          <div class="cls">
+            <p class="cls__top">rigsalbums.ru / class / licey-2-11a</p>
+            <h4>МКОУ Лицей №2<br>11 «А»</h4>
+            <p class="cls__sub">Выпуск 2026 · 28 человек</p>
+
+            <div class="tabs" role="tablist">
+              <button class="tab" role="tab" aria-selected="true" data-panel="vote">Голосование</button>
+              <button class="tab" role="tab" aria-selected="false" data-panel="shoot">Съёмка</button>
+            </div>
+
+            <div data-view="vote">
+              <p class="vote__q">Какой стиль фотографий выбираем? Один голос на человека.</p>
+              <div class="opts" id="opts">
+                <button class="opt" data-id="a" data-votes="7">
+                  <span class="opt__bar"></span>
+                  <span class="opt__thumb opt__thumb--a"></span>
+                  <span class="opt__name">Бессмертная классика</span>
+                  <span class="opt__pct">7</span>
+                </button>
+                <button class="opt" data-id="b" data-votes="5">
+                  <span class="opt__bar"></span>
+                  <span class="opt__thumb opt__thumb--b"></span>
+                  <span class="opt__name">Только ЧБ, только дединсайд</span>
+                  <span class="opt__pct">5</span>
+                </button>
+                <button class="opt" data-id="c" data-votes="9">
+                  <span class="opt__bar"></span>
+                  <span class="opt__thumb opt__thumb--c"></span>
+                  <span class="opt__name">Ауестетик тёмный</span>
+                  <span class="opt__pct">9</span>
+                </button>
+                <button class="opt" data-id="d" data-votes="4">
+                  <span class="opt__bar"></span>
+                  <span class="opt__thumb opt__thumb--d"></span>
+                  <span class="opt__name">Школьный вайб</span>
+                  <span class="opt__pct">4</span>
+                </button>
+              </div>
+              <p class="vote__after" id="voteAfter">Проголосовало 25 из 28.</p>
+              <button class="reset" id="reset" hidden>проголосовать заново</button>
+            </div>
+
+            <div data-view="shoot" hidden>
+              <dl class="info">
+                <div><dt>Дата</dt><dd>14 октября, вторник</dd></div>
+                <div><dt>Время</dt><dd>с 11:00, примерно 6 часов</dd></div>
+                <div><dt>Где</dt><dd>Фотостудия, Нальчик, ул. Ленина 12</dd></div>
+                <div><dt>С собой</dt><dd>2–3 комплекта одежды, сменка, хорошее настроение</dd></div>
+                <div><dt>На месте</dt><dd>PS5, проектор, колонки, еда</dd></div>
+                <div><dt>Связь</dt><dd>Артур · WhatsApp</dd></div>
+              </dl>
+              <p class="deadline">Голосование открыто до 30 сентября, потом дизайн уходит в работу.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo__side">
+        <h3>Что здесь важно</h3>
+        <ul>
+          <li><b>Названия стилей твои настоящие.</b> Взял с текущего сайта, чтобы было понятно, как это ляжет на реальный каталог</li>
+          <li><b>Повторно проголосовать нельзя.</b> Нажми ещё раз и увидишь, как это работает. Та самая «базовая защита», про которую я писал</li>
+          <li><b>Считать голоса по IP-адресу мы не можем.</b> У класса на VPN легко окажется один общий адрес: первый проголосовал, остальным откажет. Поэтому на созвоне выберем способ: список класса с фамилиями или персональные коды</li>
+          <li><b>Вкладка «Съёмка»:</b> вся информация, которую ты сейчас пересылаешь руками в чат</li>
+          <li><b>Внешний вид одинаковый у всех классов</b>, меняются только данные. Это то ограничение, про которое я писал сразу</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== админка ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Твоя сторона</p>
+    <h2>Как ты создаёшь такой класс</h2>
+    <p class="lede narrow">Четыре шага, без вёрстки и без меня.</p>
+
+    <div class="steps">
+      <div class="step"><i>01</i><b>Заходишь</b><span>Свой логин, доступ только у тебя</span></div>
+      <div class="step"><i>02</i><b>Заполняешь форму</b><span>Школа, класс, даты съёмки, отмечаешь галочками варианты дизайна из библиотеки</span></div>
+      <div class="step"><i>03</i><b>Кидаешь ссылку в чат</b><span>Класс голосует со своих телефонов</span></div>
+      <div class="step"><i>04</i><b>Смотришь результат</b><span>Голоса в реальном времени, можно выгрузить и закрыть голосование</span></div>
+    </div>
+
+    <div class="form-mock">
+      <p class="form-mock__title">Админка · новый класс</p>
+      <div class="field"><label>Школа</label><div>МКОУ Лицей №2</div></div>
+      <div class="field"><label>Класс и год</label><div>11 «А» · 2026</div></div>
+      <div class="field"><label>Дата съёмки</label><div>14 октября, с 11:00</div></div>
+      <div class="field"><label>Варианты в голосование</label>
+        <div class="chips">
+          <span class="chip" data-on>Бессмертная классика</span>
+          <span class="chip" data-on>Только ЧБ</span>
+          <span class="chip" data-on>Ауестетик тёмный</span>
+          <span class="chip" data-on>Школьный вайб</span>
+          <span class="chip">Патрики</span>
+          <span class="chip">Двойная экспозиция</span>
+          <span class="chip">Урбан</span>
+          <span class="chip">Атмосферные ретро</span>
+        </div>
+      </div>
+      <div class="field"><label>Ссылка для класса</label><div class="ph">rigsalbums.ru/class/licey-2-11a</div></div>
+    </div>
+    <p class="note" style="margin-top:16px">Варианты дизайна загружаются один раз в библиотеку, дальше под каждый класс просто отмечаются галочками. Заново грузить фотографии не нужно.</p>
+  </div>
+</section>
+
+<!-- ========== как устроено ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Под капотом</p>
+    <h2>Один домен вместо одиннадцати</h2>
+    <p class="lede narrow">Лечение простое по идее: всё, что нужно сайту, лежит на твоём домене и больше нигде. Отваливаться становится нечему.</p>
+
+    <div class="vs">
+      <div class="vs__col vs__col--old">
+        <h3>Сейчас</h3>
+        <p>Одна страница тянет файлы отсюда</p>
+        <div class="vs__list">
+          <span class="host">static.tildacdn.com</span>
+          <span class="host">store.tildaapi.com</span>
+          <span class="host">stat.tildaapi.com</span>
+          <span class="host">optim.tildacdn.com</span>
+          <span class="host">fonts.googleapis.com</span>
+          <span class="host">wa.clck.bar</span>
+          <span class="host">rigsarthur.tilda.ws</span>
+          <span class="host">и ещё четыре</span>
+        </div>
+        <p class="vs__count"><b>11</b> точек, каждая может лечь отдельно</p>
+      </div>
+      <div class="vs__col vs__col--new">
+        <h3>Будет</h3>
+        <p>Всё своё, на твоём сервере</p>
+        <div class="vs__list">
+          <span class="host">rigsalbums.ru</span>
+        </div>
+        <p class="vs__count"><b>0</b> чужих адресов. Шрифты, скрипты, фотографии и голосование с твоего домена</p>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top:22px">Сервер оформляется на тебя, доступы у тебя. Сайт твой физически, не мой. Тильду не отключаем, пока новый сайт не отработает неделю без нареканий. По деньгам это не трата, а экономия: Тильда стоит 750–1250&#8202;₽ в месяц, сервер — 300–700&#8202;₽.</p>
+  </div>
+</section>
+
+<!-- ========== движение ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Ради чего всё</p>
+    <h2>Что будет двигаться</h2>
+    <p class="lede narrow">Ты называл четыре момента — беру их все. Ограничений здесь нет, вопрос только в том, где что уместно: это разложим отдельно.</p>
+
+    <div class="moves">
+      <div class="move"><b>Открытие альбома</b><span>Обложка раскрывается, показывая разворот. Уместно на первом экране главной и на странице класса</span></div>
+      <div class="move"><b>Вспышка</b><span>Щелчок затвора на переходах между разделами — сайт «фотографирует» смену страницы</span></div>
+      <div class="move"><b>Пространство студии</b><span>Прокрутка проводит по студии и показывает, как делается работа</span></div>
+      <div class="move"><b>Клики на ноутбуке</b><span>Обработка: кадр «до» превращается в кадр «после»</span></div>
+    </div>
+
+    <a class="cta" href="album/">Открыть прототип раскрытия альбома &rarr;</a>
+    <p class="note" style="margin-top:18px">Открывай с телефона — там и смысл. Прототип весит 22&#8202;КБ и не тянет ни одного файла со стороны.</p>
+  </div>
+</section>
+
+<!-- ========== скорость ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Честный разговор</p>
+    <h2>Вау должны увидеть все, а не только те, у кого быстрый интернет</h2>
+    <p class="lede narrow">LOFT PARK, который тебе понравился, весит 2 мегабайта скриптов — там трёхмерная графика. На компьютере это красиво. На телефоне школьника через мобильный интернет и VPN это секунды белого экрана.</p>
+
+    <div class="bars">
+      <div class="bar bar--a">
+        <div class="bar__top"><span>LOFT PARK — трёхмерная графика</span><b>2 048 КБ</b></div>
+        <div class="bar__track"><div class="bar__fill" data-w="100"></div></div>
+        <div class="bar__note">один файл с 3D — 1.1 МБ из них</div>
+      </div>
+      <div class="bar bar--b">
+        <div class="bar__top"><span>Твоя текущая главная</span><b>~600 КБ</b></div>
+        <div class="bar__track"><div class="bar__fill" data-w="29"></div></div>
+        <div class="bar__note">без картинок, только код страницы</div>
+      </div>
+      <div class="bar bar--c">
+        <div class="bar__top"><span>Прототип раскрытия альбома</span><b>22 КБ</b></div>
+        <div class="bar__track"><div class="bar__fill" data-w="1.1"></div></div>
+        <div class="bar__note">то же ощущение движения, ноль библиотек</div>
+      </div>
+    </div>
+
+    <p class="lede narrow" style="margin-top:34px">Поэтому открытие альбома, вспышку и клики я делаю так, что выглядит так же, а весит в десятки раз меньше. Трёхмерку оставляю максимум на один момент на главной и только для компьютеров — на телефоне вместо неё статичный кадр. Это не «сделаю попроще», это чтобы движение доехало до всех.</p>
+  </div>
+</section>
+
+<!-- ========== мои работы ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Чтобы не на словах</p>
+    <h2>Что я уже сделал</h2>
+    <p class="lede narrow">Первые три — живые сайты реальных дел, на своих доменах. Остальные — концепты, где я разгонялся по движению. Открывай любой.</p>
+
+    <div class="works">
+      <a class="work work--live" href="https://zarechye-boxing.ru" target="_blank" rel="noopener">
+        <b>Академия бокса «Заречье»</b>
+        <span>Клуб в Нальчике: тренер, расписание, запись</span>
+        <u>zarechye-boxing.ru</u>
+      </a>
+      <a class="work work--live" href="https://lianashanibova.ru" target="_blank" rel="noopener">
+        <b>Лиана Шанибова</b>
+        <span>Врач-косметолог: услуги, цены, запись</span>
+        <u>lianashanibova.ru</u>
+      </a>
+      <a class="work work--live" href="https://sevensites.ru" target="_blank" rel="noopener">
+        <b>SEVEN</b>
+        <span>Моя студия — сайты для малого бизнеса</span>
+        <u>sevensites.ru</u>
+      </a>
+      <a class="work" href="https://keaper7.github.io/loft-park/" target="_blank" rel="noopener">
+        <b>LOFT PARK</b>
+        <span>Тот самый концепт ресторана, который я тебе показывал по анимациям</span>
+        <u>keaper7.github.io/loft-park</u>
+      </a>
+      <a class="work" href="https://keaper7.github.io/kingstudio/" target="_blank" rel="noopener">
+        <b>KINGSTUDIO</b>
+        <span>Фотостудия в Нальчике — концепт, с которого начался наш разговор</span>
+        <u>keaper7.github.io/kingstudio</u>
+      </a>
+      <a class="work" href="https://keaper7.github.io/publico/" target="_blank" rel="noopener">
+        <b>PUBLICO</b>
+        <span>Кофейня в Нальчике, концепт</span>
+        <u>keaper7.github.io/publico</u>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ========== этапы ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Как работаем</p>
+    <h2>Этапы</h2>
+
+    <div class="stages">
+      <div class="stage"><i>01</i><b>Согласование</b><span>Этот созвон: отвечаешь на вопросы, фиксируем объём</span></div>
+      <div class="stage"><i>02</i><b>Дизайн</b><span>Макет главной и страницы класса. Смотришь и утверждаешь <em class="mark">до</em> того, как я напишу код — переделать макет легко, переделать свёрстанный сайт это заново</span></div>
+      <div class="stage"><i>03</i><b>Публичная часть</b><span>Все страницы, анимации, телефоны. Работает на тестовом адресе, можешь заходить в любой момент</span></div>
+      <div class="stage"><i>04</i><b>Админка и голосование</b><span>Пробуешь создать настоящий класс до того, как сайт станет публичным</span></div>
+      <div class="stage"><i>05</i><b>Запуск</b><span>Переносим на домен, проверяем с VPN и без, отдаю инструкцию</span></div>
+      <div class="stage"><i>06</i><b>Неделя под присмотром</b><span>Чиню всё, что вылезет. Только после этого отключаем Тильду</span></div>
+    </div>
+
+    <p class="note" style="margin-top:22px">Два круга правок на макете и один после сборки — входят. Оплата пополам: половина после утверждения макета, половина после запуска. Вперёд ничего не нужно.</p>
+  </div>
+</section>
+
+<!-- ========== границы ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Чтобы без сюрпризов</p>
+    <h2>Чего не будет</h2>
+    <p class="lede narrow">Я писал это до того, как мы договорились, и повторю здесь — лучше проговорить дважды, чем разойтись в ожиданиях.</p>
+
+    <div class="limits">
+      <div class="limit"><b>Свободного конструктора как в Тильде</b><span>Собирать страницу из блоков мышкой не получится. Админка — это формы: заполняешь поля, страница собирается по готовому шаблону</span></div>
+      <div class="limit"><b>Отдельного дизайна под каждый класс</b><span>Внешний вид одинаковый, отличаются данные. Придумывать новый дизайн каждый раз прямо в админке — другой уровень продукта, другие сроки и деньги</span></div>
+      <div class="limit"><b>Хранения исходников в полном качестве</b><span>На сайт идут веб-версии, оригиналы с камеры остаются у тебя, как и раньше</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== идеи ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Сверх задачи</p>
+    <h2>Что ещё напрашивается</h2>
+    <p class="lede narrow">Пока разбирался, как ты работаешь, появилось несколько идей. В обсуждённый объём они не входят — просто скажи, что из этого нужно, а что мимо.</p>
+
+    <div class="ideas">
+      <div class="idea">
+        <span class="idea__tag">почти ничего не добавляет к работе</span>
+        <b>Анкета ученика</b>
+        <span>У тебя в каждом альбоме страничка на человека, цитата и личная подпись. Сейчас ты собираешь это в чате на 28 человек. Можно на той же странице класса: каждый один раз вписывает, как писать его имя в альбоме, и свою цитату. Ты получаешь готовую таблицу, а не переписку.</span>
+      </div>
+      <div class="idea">
+        <span class="idea__tag">почти ничего не добавляет к работе</span>
+        <b>Кто ещё не заполнил</b>
+        <span>Если голосуем по списку класса, то бесплатно получаем список тех, кто ещё не проголосовал и не заполнил анкету. Отдаёшь старосте — пусть он и напоминает, а не ты.</span>
+      </div>
+      <div class="idea">
+        <span class="idea__tag">одно поле в админке</span>
+        <b>Статус заказа</b>
+        <span>Полоска на странице класса: съёмка → обработка → вёрстка → печать → готово. Ты переключаешь в админке, класс перестаёт спрашивать «когда будет».</span>
+      </div>
+      <div class="idea">
+        <span class="idea__tag idea__tag--heavy">зависит от объёма фотографий</span>
+        <b>Закрытая галерея класса</b>
+        <span>Фотографии со съёмки по той же ссылке, только для класса. Это единственная идея, которая реально влияет на стоимость сервера — поэтому сначала ответь, сколько фото планируешь хранить.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== что нужно ========== -->
+<section>
+  <div class="wrap rise">
+    <p class="eyebrow">Следующий шаг</p>
+    <h2>Что нужно от тебя</h2>
+    <p class="lede narrow">Как только это будет — сажусь за макет.</p>
+
+    <div class="need">
+      <div><i>→</i><span>К какой дате сайт должен работать и когда стартует сезон</span></div>
+      <div><i>→</i><span>Доступ к домену rigsalbums.ru — где зарегистрирован</span></div>
+      <div><i>→</i><span>Логотип, фирменные цвета и шрифт, если есть</span></div>
+      <div><i>→</i><span>Список вариантов дизайна: обложки, личные страницы, стили — и сколько их обычно</span></div>
+      <div><i>→</i><span>Сколько классов за сезон и сколько человек в классе</span></div>
+      <div><i>→</i><span>Нужно ли загружать фотографии классов на сайт после съёмки — от этого зависит тариф сервера</span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Концепт для Артура Дзахмишева · rigsalbums.ru<br>
+    Азрет Шанибов, фронтенд-разработка · сентябрь 2026</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  /* ---------- голосование: настоящее, с защитой от повторного клика ---------- */
+  var opts = [].slice.call(document.querySelectorAll('.opt'));
+  var after = document.getElementById('voteAfter');
+  var reset = document.getElementById('reset');
+  var base = opts.map(function (o) { return +o.dataset.votes; });
+  var voted = null;
+
+  function render() {
+    var total = opts.reduce(function (s, o) { return s + (+o.dataset.votes); }, 0);
+    opts.forEach(function (o) {
+      var v = +o.dataset.votes;
+      var pct = total ? Math.round(v / total * 100) : 0;
+      o.querySelector('.opt__bar').style.width = pct + '%';
+      o.querySelector('.opt__pct').textContent = voted ? pct + '%' : v;
+      o.disabled = !!voted;
+      if (voted === o.dataset.id) o.setAttribute('data-mine', ''); else o.removeAttribute('data-mine');
+    });
+    if (voted) {
+      var mine = opts.find(function (o) { return o.dataset.id === voted; });
+      after.innerHTML = 'Твой голос за <b>' + mine.querySelector('.opt__name').textContent +
+        '</b> учтён. Проголосовать ещё раз нельзя — вот так это и работает.';
+      reset.hidden = false;
+    } else {
+      after.textContent = 'Проголосовало 25 из 28.';
+      reset.hidden = true;
+    }
+  }
+
+  opts.forEach(function (o) {
+    o.addEventListener('click', function () {
+      if (voted) return;
+      voted = o.dataset.id;
+      o.dataset.votes = (+o.dataset.votes) + 1;
+      render();
+    });
+  });
+
+  reset.addEventListener('click', function () {
+    voted = null;
+    opts.forEach(function (o, i) { o.dataset.votes = base[i]; });
+    render();
+    opts[0].focus();
+  });
+
+  render();
+
+  /* ---------- вкладки внутри телефона ---------- */
+  var tabs = [].slice.call(document.querySelectorAll('.tab'));
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      tabs.forEach(function (x) { x.setAttribute('aria-selected', String(x === t)); });
+      document.querySelectorAll('[data-view]').forEach(function (v) {
+        v.hidden = v.dataset.view !== t.dataset.panel;
+      });
+    });
+  });
+
+  /* ---------- появление секций ---------- */
+  var rises = [].slice.call(document.querySelectorAll('.rise'));
+  function reveal(el) {
+    el.classList.add('in');
+    [].slice.call(el.querySelectorAll('.bar__fill')).forEach(function (b, i) {
+      setTimeout(function () { b.style.width = b.dataset.w + '%'; }, 200 + i * 160);
+    });
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      reveal(e.target);
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -8% 0px' });
+  rises.forEach(function (el) { io.observe(el); });
+
+  // страховка: ничего не должно остаться невидимым
+  setTimeout(function () {
+    rises.forEach(function (el) {
+      if (!el.classList.contains('in') && el.getBoundingClientRect().top < innerHeight * 1.2) reveal(el);
+    });
+  }, 2500);
+
+  /* ---------- честный вес страницы ---------- */
+  addEventListener('load', function () {
+    setTimeout(function () {
+      var bytes = 0;
+      var nav = performance.getEntriesByType('navigation')[0];
+      if (nav) bytes += Math.max(nav.transferSize || 0, nav.encodedBodySize || 0);
+      performance.getEntriesByType('resource').forEach(function (r) {
+        bytes += Math.max(r.transferSize || 0, r.encodedBodySize || 0);
+      });
+      if (bytes < 2048) bytes = new Blob([document.documentElement.outerHTML]).size;
+      document.getElementById('selfweight').textContent = Math.round(bytes / 1024) + ' КБ';
+    }, 80);
+  });
+})();
+</script>

@@ -267,7 +267,7 @@ section, .step { scroll-margin-top: var(--top); }
 .t--american { --bg: #DDEFF2; --ink: #12355B; --acc: #1E8FA3; padding-top: 30px; }
 .t--american:before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 12px; background: linear-gradient(180deg, #12355B 0, #12355B 33%, #fff 33%, #fff 66%, #1E8FA3 66%); }
 .t--american .theme__head:after {
-  content: attr(data-no);
+  content: '26';
   position: absolute; right: 14px; top: -10px;
   font: 400 120px/1 'Graduate', Impact, sans-serif;
   color: transparent; -webkit-text-stroke: 2px rgba(18, 53, 91, .14);

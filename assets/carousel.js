@@ -117,7 +117,7 @@
     void on.offsetWidth;
     on.classList.add('is-on');
     this.bar.classList.toggle('is-manual', !animate);
-    this.count.textContent = (this.idx < 9 ? '0' : '') + (this.idx + 1) + ' / ' + (this.items.length < 10 ? '0' : '') + this.items.length;
+    this.count.textContent = (this.idx + 1) + ' / ' + this.items.length;
     this.prev.disabled = this.idx === 0;
   };
 

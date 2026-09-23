@@ -3,90 +3,178 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Студия и съёмка — RIGSARTHUR SCHOOL ALBUMS</title>
-<meta name="description" content="Как проходит съёмка школьного выпускного альбома в студии.">
+<title>Студия и съёмка · RIGSARTHUR SCHOOL ALBUMS</title>
+<meta name="description" content="Своя фотостудия в Нальчике: PS5, проектор, колонки, циклорама. Как проходит съёмка выпускного альбома.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="assets/site.css">
+<meta name="theme-color" content="#F4EFE7">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="assets/site.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RIGSARTHUR SCHOOL ALBUMS">
+<meta property="og:title" content="Студия и съёмка · RIGSARTHUR SCHOOL ALBUMS">
+<meta property="og:description" content="Своя фотостудия в Нальчике: PS5, проектор, колонки, циклорама. Как проходит съёмка выпускного альбома.">
+<meta property="og:image" content="https://keaper7.github.io/rigsalbums/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://keaper7.github.io/rigsalbums/studio.html">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/fonts/unbounded-cyrillic-cb504d.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/manrope-cyrillic-c9a5f1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/fonts/theme-fonts.css">
+<link rel="stylesheet" href="assets/rigs.css">
+<script>document.documentElement.className += ' js';</script>
 </head>
 <body>
-<div class="grain"></div>
-<div class="flash"></div>
 
-<header class="head">
-  <div class="head__in">
+<div class="demo">
+  <span>Макет страницы «Студия». Пунктиром отмечены места под ваши фото</span>
+  <a href="#prep">Что подготовить</a>
+</div>
+
+<header class="hd">
+  <div class="hd__in">
     <a class="logo" href="index.html"><b>RIGSARTHUR</b><span>SCHOOL ALBUMS</span></a>
-    <nav class="nav" id="nav"><a href="index.html">Главная</a><a href="works.html">Работы</a><a href="albums.html">Альбомы</a><a href="designs.html">Дизайны</a><a href="studio.html" aria-current="page">Студия</a><a href="about.html">Обо мне</a><a href="contacts.html">Контакты</a></nav>
-    <button class="burger" aria-expanded="false" aria-controls="nav">Меню</button>
+    <nav class="hd__nav" aria-label="Разделы">
+      <a href="works.html">Работы</a><a href="albums.html">Альбомы</a><a href="designs.html">Дизайны</a><a href="studio.html" aria-current="page">Студия</a><a href="about.html">Обо мне</a><a href="contacts.html">Контакты</a>
+    </nav>
+    <a class="hd__cta" href="https://wa.me/79287100102">Записаться</a>
+    <button class="hd__menu" type="button" aria-expanded="false" aria-controls="menu" aria-label="Меню"><i></i></button>
   </div>
 </header>
+
+<nav class="menu" id="menu" aria-label="Меню">
+  <a class="menu__l" href="index.html"><small>01</small>Главная</a>
+  <a class="menu__l" href="works.html"><small>02</small>Работы</a>
+  <a class="menu__l" href="albums.html"><small>03</small>Альбомы и цены</a>
+  <a class="menu__l" href="designs.html"><small>04</small>Дизайны</a>
+  <a class="menu__l" href="studio.html" aria-current="page"><small>05</small>Студия</a>
+  <a class="menu__l" href="about.html"><small>06</small>Обо мне</a>
+  <a class="menu__l" href="contacts.html"><small>07</small>Контакты</a>
+  <div class="menu__foot"><a href="https://wa.me/79287100102">WhatsApp</a><a href="https://instagram.com/rigsarthur">Instagram</a></div>
+</nav>
 
 <main>
 
 <section class="ph">
+  <div class="wrap ph__grid">
+    <div class="ph__in">
+      <p class="ph__idx"><b>05</b><span>/ 07 · Студия</span></p>
+      <h1>Студия <em>и съёмка</em></h1>
+      <p class="lede">Съёмка проходит в моей фотостудии в Нальчике.</p>
+    </div>
+    <div class="bigslot rv"><div class="slot" data-prep="Фото студии общим планом|Горизонтальное, лучше с ребятами в кадре"><span class="slot__tag">Место под фото</span><b>Студия общим планом</b><small>Горизонтальное · лучше с ребятами в кадре</small></div></div>
+  </div>
+</section>
+
+<section class="sec" style="padding-top:10px">
+  <div class="wrap sec__split">
+    <div class="rv">
+      <p class="eyebrow">Внутри</p>
+      <h2 class="h2">Что есть <em>в студии</em></h2>
+      <p class="lede">Чтобы ребята могли не только сделать красивые кадры, но и отдохнуть.</p>
+    </div>
+    <div class="rv d1">
+      <ul class="kit">
+        <li><b>PS5</b><span>Игры во время съёмки</span></li>
+        <li><b>Проектор</b><span>Большой</span></li>
+        <li><b>Колонки</b><span>Хорошие</span></li>
+        <li><b>Циклорама</b><span>Для WHITE и OFFICE SIREN</span></li>
+        <li class="kit--wide"><b>Свобода</b><span>Полная свобода действий: альбом, одежду, стиль фотографий и зоны выбирают сами ребята</span></li>
+      </ul>
+      <div class="kit-photos">
+        <div><div class="slot" data-prep="Фото зоны отдыха с PS5 и проектором|Горизонтальное или квадрат"><span class="slot__tag">Место под фото</span><b>Зона с PS5 и проектором</b><small>Горизонтальное или квадрат</small></div></div>
+        <div><div class="slot" data-prep="Фото циклорамы|Горизонтальное или квадрат"><span class="slot__tag">Место под фото</span><b>Циклорама</b><small>Горизонтальное или квадрат</small></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--tint">
+  <div class="wrap sec__split">
+    <div class="rv">
+      <p class="eyebrow">По шагам</p>
+      <h2 class="h2">Как всё <em>проходит</em></h2>
+    </div>
+    <ol class="flow"><li class="rv"><h3>Записываемся</h3><p>Пишете в WhatsApp, договариваемся о дате съёмки.</p></li><li class="rv is-key"><h3>Класс голосует</h3><p>Присылаю в чат ссылку на страницу вашего класса. Там голосуете за тематику альбома, одежду и цвет.</p><span class="tag">онлайн · 30–60 минут</span></li><li class="rv"><h3>Групповая съёмка</h3><p>Локацию для групповых выбираем в чате, для каждой тематики есть рекомендация.</p><span class="tag">2–3 часа</span></li><li class="rv is-key"><h3>Авторская съёмка</h3><p>Снимаем, пока каждый не останется доволен. У кого-то это 30 минут, у кого-то 40.</p><span class="tag">6–10 часов</span></li><li class="rv"><h3>Ретушь</h3><p>Все фото ретушируются, а любые замечания учитываются и выполняются. Все фотографии отдаю в электронном виде.</p></li><li class="rv is-key"><h3>Печать и альбомы</h3><p>Печатаю в быстрых и качественных типографиях из Москвы. Альбомы готовы в срок, бывает и раньше, а вопросы брака решаю сам.</p></li></ol>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap sec__split">
+    <div class="rv">
+      <p class="eyebrow">Локации</p>
+      <h2 class="h2">Где снимаем <em>групповые</em></h2>
+      <p class="lede">Рекомендации для каждой тематики. Точное место выбираем в чате.</p>
+    </div>
+    <ul class="locs rv d1"><li><b>Студия</b><div class="chips"><span class="f-siren">OFFICE SIREN</span><span class="f-canon">CANON VIBE</span><span class="f-grey">GREY</span><span class="f-money">NEW MONEY</span><span class="f-neon">NEON</span></div></li><li><b>Циклорама в студии</b><div class="chips"><span class="f-white">WHITE</span></div></li><li><b>Улица</b><div class="chips"><span class="f-canon">CANON VIBE</span><span class="f-grey">GREY</span><span class="f-aesthetic">AESTHETIC</span></div></li><li><b>Школа</b><div class="chips"><span class="f-american">AMERICAN VIBE</span><span class="f-aesthetic">AESTHETIC</span></div></li><li><b>Спортплощадка</b><div class="chips"><span class="f-american">AMERICAN VIBE</span><span class="f-neon">NEON</span></div></li></ul>
+  </div>
+</section>
+
+<section class="end" id="end">
   <div class="wrap">
-    <p class="eyebrow">Студия и съёмка</p>
-    <h1>День, который ребята вспоминают чаще, чем альбом</h1>
-    <p class="lede narrow">Съёмка проходит в моей студии. Никакой спешки и очереди: класс приезжает и остаётся столько, сколько нужно.</p>
-  </div>
-</section>
-
-<section style="padding-top:0;border:0">
-  <div class="wrap rise">
-    <div class="cells">
-      <div class="cell"><b>PS5, проектор, колонки</b><span>Пока одни снимаются, остальные играют и отдыхают. Не приёмная у фотографа, а свой день.</span></div>
-      <div class="cell"><b>Своя одежда и свои зоны</b><span>Берите 2–3 комплекта. Зоны съёмки и стиль выбираете вы, подскажу, что лучше сядет в альбом.</span></div>
-      <div class="cell"><b>Снимаем до результата</b><span>Пока кадр не понравится самому человеку. У кого-то это тридцать минут, у кого-то сорок.</span></div>
+    <p class="eyebrow rv">Запись</p>
+    <h2 class="rv">Спросить про <em>свободные даты</em></h2>
+    <p class="lede rv d1" style="color:rgba(246,233,228,.8)">Напиши, когда планируете съёмку, и я отвечу, какие даты свободны.</p>
+    <div class="end__cta rv d2">
+      <a class="btn btn--cream" href="https://wa.me/79287100102">Написать в WhatsApp <i>&rarr;</i></a>
+      <a class="btn btn--ghost" href="albums.html">Альбомы и цены</a>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap rise">
-    <p class="eyebrow">По шагам</p>
-    <h2>Как всё проходит</h2>
-    <div class="cells" style="margin-top:40px">
-      <div class="cell"><b>1 · Договариваемся</b><span>Списываемся, выбираем дату, я завожу страницу вашего класса и кидаю ссылку в чат.</span></div>
-      <div class="cell"><b>2 · Голосуем за дизайн</b><span>Класс на своей странице выбирает обложку, личные страницы и стиль фотографий.</span></div>
-      <div class="cell"><b>3 · Снимаем</b><span>Групповая часть 2–3 часа, авторская — от 6 до 10. Всё в студии, со своим темпом.</span></div>
-      <div class="cell"><b>4 · Обработка</b><span>Ретушь всех кадров, любые замечания учитываются. Электронные версии отдаю классу.</span></div>
-      <div class="cell"><b>5 · Вёрстка и печать</b><span>Собираю альбом, печатаю в проверенной московской типографии.</span></div>
-      <div class="cell"><b>6 · Отдаю</b><span>Привожу тираж, проверяю каждый экземпляр. Брак решаю с типографией сам.</span></div>
-    </div>
-    <p style="margin-top:40px"><a class="btn btn--solid" href="https://wa.me/79287100102">Спросить про свободные даты &rarr;</a></p>
+<a class="next" href="about.html">
+  <div class="wrap">
+    <div><p class="eyebrow">Дальше</p><b>Обо мне</b></div>
+    <i>&rarr;</i>
   </div>
-</section>
+</a>
 
-<section>
-  <div class="wrap rise">
-    <p class="eyebrow">Результат</p>
-    <h2>Что получается после такого дня</h2>
-    <div class="grid" style="margin-top:40px">
-      <button class="shot" data-full="assets/img/a12-lg.webp" aria-label="Открыть: Разворот выпускного альбома"><img src="assets/img/a12-md.webp" alt="Разворот выпускного альбома" loading="lazy" decoding="async"></button><button class="shot" data-full="assets/img/a20-lg.webp" aria-label="Открыть: Разворот выпускного альбома"><img src="assets/img/a20-md.webp" alt="Разворот выпускного альбома" loading="lazy" decoding="async"></button><button class="shot" data-full="assets/img/a13-lg.webp" aria-label="Открыть: Разворот выпускного альбома"><img src="assets/img/a13-md.webp" alt="Разворот выпускного альбома" loading="lazy" decoding="async"></button>
+<section class="prep" id="prep">
+  <div class="wrap">
+    <div class="prep__box">
+      <p class="eyebrow">Только в макете</p>
+      <h2>Что подготовить для страницы «Студия»</h2>
+      <p>Список собирается сам из пунктирных мест на странице. Всё это потом меняется из админки.</p>
+      <ol class="prep__list"></ol>
     </div>
-    <p style="margin-top:34px"><a class="btn" href="works.html">Все работы &rarr;</a></p>
   </div>
 </section>
 
 </main>
 
-<div class="lb" hidden><button class="lb__close">Закрыть</button><img alt=""></div>
-
-<footer class="foot">
-  <div class="wrap foot__in">
-    <p>
-      RIGSARTHUR SCHOOL ALBUMS · Нальчик<br>
-      Артур Дзахмишев · <a href="https://wa.me/79287100102">WhatsApp</a>
-    </p>
-    <div class="foot__nav">
-      <a href="index.html">Главная</a><a href="works.html">Работы</a><a href="albums.html">Альбомы</a><a href="designs.html">Дизайны</a><a href="studio.html">Студия</a><a href="about.html">Обо мне</a><a href="contacts.html">Контакты</a>
+<footer class="ft">
+  <div class="wrap">
+    <p class="ft__mark">RIGSARTHUR<span>SCHOOL ALBUMS · НАЛЬЧИК</span></p>
+    <div class="ft__cols">
+      <div>
+        <h4>Разделы</h4>
+        <a href="works.html">Работы</a><a href="albums.html">Альбомы и цены</a><a href="designs.html">Дизайны</a><a href="studio.html">Студия</a><a href="about.html">Обо мне</a>
+      </div>
+      <div>
+        <h4>Связь</h4>
+        <a href="https://wa.me/79287100102">WhatsApp</a><a href="https://instagram.com/rigsarthur">Instagram</a><a href="contacts.html">Контакты</a>
+      </div>
     </div>
+    <p class="ft__small">Артур Дзахмишев · выпускные альбомы</p>
   </div>
 </footer>
 
-<div class="proto">
-  Черновик. <a href="structure.html">Что уже готово, что нет</a>
+<div class="dock" aria-hidden="true">
+  <p><b>Запись на съёмку</b>через WhatsApp</p>
+  <a href="https://wa.me/79287100102" tabindex="-1">Записаться</a>
 </div>
 
-<script src="assets/site.js"></script>
+<div class="lb" hidden>
+  <span class="lb__count"></span>
+  <button type="button" class="lb__close" aria-label="Закрыть">Закрыть</button>
+  <figure><img alt=""><figcaption></figcaption></figure>
+  <button type="button" class="lb__nav lb__prev" aria-label="Назад">&lsaquo;</button>
+  <button type="button" class="lb__nav lb__next" aria-label="Дальше">&rsaquo;</button>
+</div>
+
+<script src="assets/carousel.js"></script>
+<script src="assets/rigs.js"></script>
 </body>
 </html>

@@ -3,142 +3,362 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Школьные альбомы за которые не стыдно — RIGSARTHUR</title>
-<meta name="description" content="Школьные выпускные альбомы в Нальчике. Своя фотостудия, 9+ лет работы, более 5000 выпускников.">
+<title>Школьные альбомы, за которые не стыдно · RIGSARTHUR</title>
+<meta name="description" content="Выпускные альбомы в Нальчике. Своя фотостудия, 9+ лет работы, больше 5000 выпускников.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="assets/site.css">
+<meta name="theme-color" content="#F4EFE7">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="assets/site.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RIGSARTHUR SCHOOL ALBUMS">
+<meta property="og:title" content="Школьные альбомы, за которые не стыдно">
+<meta property="og:description" content="Выпускные альбомы в Нальчике. Своя фотостудия, 9+ лет работы, больше 5000 выпускников.">
+<meta property="og:image" content="https://keaper7.github.io/rigsalbums/assets/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://keaper7.github.io/rigsalbums/index.html">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/fonts/unbounded-cyrillic-cb504d.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/manrope-cyrillic-c9a5f1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/fonts/theme-fonts.css">
+<link rel="stylesheet" href="assets/rigs.css">
+<script>document.documentElement.className += ' js';</script>
 </head>
 <body>
-<div class="grain"></div>
-<div class="flash"></div>
 
-<header class="head">
-  <div class="head__in">
+<div class="demo">
+  <span>Макет главной. Пунктиром отмечены места под ваши фото и видео</span>
+  <a href="#prep">Что подготовить</a>
+</div>
+
+<header class="hd">
+  <div class="hd__in">
     <a class="logo" href="index.html"><b>RIGSARTHUR</b><span>SCHOOL ALBUMS</span></a>
-    <nav class="nav" id="nav"><a href="index.html" aria-current="page">Главная</a><a href="works.html">Работы</a><a href="albums.html">Альбомы</a><a href="designs.html">Дизайны</a><a href="studio.html">Студия</a><a href="about.html">Обо мне</a><a href="contacts.html">Контакты</a></nav>
-    <button class="burger" aria-expanded="false" aria-controls="nav">Меню</button>
+    <nav class="hd__nav" aria-label="Разделы">
+      <a href="works.html">Работы</a><a href="albums.html">Альбомы</a><a href="designs.html">Дизайны</a><a href="studio.html">Студия</a><a href="about.html">Обо мне</a><a href="contacts.html">Контакты</a>
+    </nav>
+    <a class="hd__cta" href="https://wa.me/79287100102">Записаться</a>
+    <button class="hd__menu" type="button" aria-expanded="false" aria-controls="menu" aria-label="Меню"><i></i></button>
   </div>
 </header>
+
+<nav class="menu" id="menu" aria-label="Меню">
+  <a class="menu__l" href="index.html"><small>01</small>Главная</a>
+  <a class="menu__l" href="works.html"><small>02</small>Работы</a>
+  <a class="menu__l" href="albums.html"><small>03</small>Альбомы и цены</a>
+  <a class="menu__l" href="designs.html"><small>04</small>Дизайны</a>
+  <a class="menu__l" href="studio.html"><small>05</small>Студия</a>
+  <a class="menu__l" href="about.html"><small>06</small>Обо мне</a>
+  <a class="menu__l" href="contacts.html"><small>07</small>Контакты</a>
+  <div class="menu__foot"><a href="https://wa.me/79287100102">WhatsApp</a><a href="https://instagram.com/rigsarthur">Instagram</a></div>
+</nav>
 
 <main>
 
 <section class="hero">
-  <div class="hero__stage">
-    <div class="hero__pin">
-      <div class="hero__figures">
-        <span>9+ лет работы</span><span>больше 5000 выпускников</span><span>своя фотостудия</span>
+  <div class="wrap hero__grid">
+    <div class="hero__text">
+      <p class="hero__kicker"><span>Нальчик</span><span>Выпускные альбомы</span></p>
+      <h1 class="hero__title">
+        <span class="l"><span>Школьные</span></span>
+        <span class="l"><span>альбомы,</span></span>
+        <span class="l"><span>за которые</span></span>
+        <span class="l"><span><em>не стыдно</em></span></span>
+      </h1>
+    </div>
+
+    <div class="deck-wrap">
+      <div class="deck" role="button" tabindex="0" aria-label="Листать обложки коллекции 2026">
+        <figure class="deck__card" data-name="NEW MONEY" data-f="money"><img src="assets/home/cover-money-a-sm.jpg" alt="Обложка NEW MONEY" fetchpriority="high"></figure>
+        <figure class="deck__card" data-name="WHITE" data-f="white"><img src="assets/home/cover-white-a-sm.jpg" alt="Обложка WHITE"></figure>
+        <figure class="deck__card" data-name="NEON" data-f="neon"><img src="assets/home/cover-neon-a-sm.jpg" alt="Обложка NEON"></figure>
+        <figure class="deck__card" data-name="OFFICE SIREN" data-f="siren"><img src="assets/home/cover-siren-b-sm.jpg" alt="Обложка OFFICE SIREN"></figure>
+        <figure class="deck__card" data-name="AMERICAN VIBE" data-f="american"><img src="assets/home/cover-american-b-sm.jpg" alt="Обложка AMERICAN VIBE"></figure>
+        <figure class="deck__card" data-name="CLASSIC" data-f="classic"><img src="assets/home/cover-classic-a-sm.jpg" alt="Обложка CLASSIC"></figure>
+        <figure class="deck__card" data-name="AESTHETIC" data-f="aesthetic"><img src="assets/home/cover-aesthetic-a-sm.jpg" alt="Обложка AESTHETIC"></figure>
       </div>
-      <div class="holder">
-        <div class="book">
-          <div class="book__spread">
-            <div class="book__photo"></div>
-            <div class="book__cap"><b>ФАМИЛИЯ ИМЯ</b><span>МКОУ ЛИЦЕЙ · НАЛЬЧИК · 11 КЛАСС · 2026</span></div>
-          </div>
-          <div class="book__cover">
-            <div class="book__face book__face--front">
-              <div class="t">ВЫПУСКНОЙ<em>альбом</em></div>
-              <div class="fig"></div>
-              <div class="y">2026</div>
-              <div class="book__shine"></div>
-            </div>
-            <div class="book__face book__face--back">
-              <span class="q">&ldquo;</span>
-              <p>цитата, которую выпускник выберет сам</p>
-              <i></i>
-            </div>
-          </div>
+      <p class="deck__hint" aria-hidden="true">Нажми, листай</p>
+      <p class="deck__label"><span class="deck__name f-money">NEW MONEY</span><small>коллекция 2026</small></p>
+    </div>
+
+    <div class="hero__bottom">
+      <dl class="stats">
+        <div><dt data-count="9">9+</dt><dd>лет работы</dd></div>
+        <div><dt data-count="5000">5 000+</dt><dd>выпускников</dd></div>
+        <div><dt class="word">своя</dt><dd>фотостудия</dd></div>
+      </dl>
+      <div class="hero__cta">
+        <a class="btn btn--wine" href="https://wa.me/79287100102">Записаться на съёмку <i>&rarr;</i></a>
+        <a class="btn btn--ghost" href="#live">Как это выглядит вживую</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="ticker" aria-hidden="true">
+  <div class="ticker__track">
+    <span class="f-classic">CLASSIC</span><span class="f-siren">OFFICE SIREN</span><span class="f-american">AMERICAN VIBE</span><span class="f-canon">CANON VIBE</span><span class="f-white">WHITE</span><span class="f-grey">GREY</span><span class="f-aesthetic">AESTHETIC</span><span class="f-money">NEW MONEY</span><span class="f-neon">NEON</span>
+    <span class="f-classic">CLASSIC</span><span class="f-siren">OFFICE SIREN</span><span class="f-american">AMERICAN VIBE</span><span class="f-canon">CANON VIBE</span><span class="f-white">WHITE</span><span class="f-grey">GREY</span><span class="f-aesthetic">AESTHETIC</span><span class="f-money">NEW MONEY</span><span class="f-neon">NEON</span>
+  </div>
+</div>
+
+<section class="live" id="live">
+  <div class="wrap live__head">
+    <div class="rv">
+      <p class="eyebrow">Вживую</p>
+      <h2 class="h2">И как это всё выглядит <em>вживую?</em></h2>
+    </div>
+  </div>
+  <div class="reel" data-carousel>
+    <figure class="clip rv">
+      <div class="clip__frame">
+        <img src="assets/klass/money-3-sm.jpg" alt="" loading="lazy">
+        <video muted playsinline loop preload="none" data-src=""></video>
+        <div class="slot slot--dark" data-prep="Видео, как листают альбом|Вертикальное 9:16, 20–60 секунд. Звук не обязателен, на сайте играет без звука">
+          <span class="slot__tag">Место под видео</span>
+          <span class="clip__play" aria-hidden="true"></span>
+          <b>Листаем альбом целиком</b>
+          <small>Вертикальное 9:16 · 20–60 сек</small>
         </div>
       </div>
-      <div class="hero__type">
-        <h1>Школьные альбомы<br>за которые не стыдно</h1>
-        <p>Листай, альбом раскроется</p>
+      <figcaption><b>01</b> · главное видео</figcaption>
+    </figure>
+    <figure class="clip rv d1">
+      <div class="clip__frame">
+        <img src="assets/klass/american-3-sm.jpg" alt="" loading="lazy">
+        <video muted playsinline loop preload="none" data-src=""></video>
+        <div class="slot slot--dark" data-prep="Второе видео, другой альбом|Вертикальное 9:16, 15–40 секунд">
+          <span class="slot__tag">Место под видео</span>
+          <span class="clip__play" aria-hidden="true"></span>
+          <b>Другой альбом</b>
+          <small>Вертикальное 9:16 · 15–40 сек</small>
+        </div>
+      </div>
+      <figcaption><b>02</b></figcaption>
+    </figure>
+    <figure class="clip rv d2">
+      <div class="clip__frame">
+        <img src="assets/klass/classic-3-sm.jpg" alt="" loading="lazy">
+        <video muted playsinline loop preload="none" data-src=""></video>
+        <div class="slot slot--dark" data-prep="Третье видео, по желанию|Например, крупно обложка и бумага. Вертикальное 9:16">
+          <span class="slot__tag">Место под видео</span>
+          <span class="clip__play" aria-hidden="true"></span>
+          <b>Крупно: обложка и бумага</b>
+          <small>По желанию · 9:16</small>
+        </div>
+      </div>
+      <figcaption><b>03</b></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="perks">
+  <div class="wrap perks__grid">
+    <header class="perks__head rv">
+      <p class="eyebrow">Съёмка</p>
+      <h2 class="h2">Альбом собирают <em>сами ребята</em></h2>
+      <p class="lede">Обложку, личные страницы, стиль фотографий и даже свою одежду класс выбирает сам. Я помогаю и снимаю, пока каждый не останется доволен.</p>
+    </header>
+    <div class="stack">
+      <article class="perk" style="--i:0">
+        <div class="perk__media">
+          <div class="slot" data-prep="Фото атмосферы на съёмке|Ребята в студии: PS5, проектор, колонки. Горизонтальные, 1–3 штуки">
+            <span class="slot__tag">Место под фото</span>
+            <b>Ребята на съёмке: PS5, проектор, колонки</b>
+            <small>Горизонтальное · 1–3 фото</small>
+          </div>
+        </div>
+        <div class="perk__body">
+          <span class="perk__n">01</span>
+          <h3>Атмосфера на съёмках</h3>
+          <p>Во время съёмки ребятам доступны PS5, большой проектор, хорошие колонки и полная свобода действий, чтобы не только сделать красивые кадры, но и отдохнуть.</p>
+        </div>
+      </article>
+      <article class="perk" style="--i:1">
+        <div class="perk__media"><img src="assets/klass/money-4-sm.jpg" alt="Разворот с групповыми фото" loading="lazy"></div>
+        <div class="perk__body">
+          <span class="perk__n">02</span>
+          <h3>Все кадры ваши</h3>
+          <p>Все фото со съёмки отдаются в электронном виде для вашего личного пользования.</p>
+        </div>
+      </article>
+      <article class="perk" style="--i:2">
+        <div class="perk__media"><img src="assets/klass/neon-3-sm.jpg" alt="Личные страницы в стиле NEON" loading="lazy"></div>
+        <div class="perk__body">
+          <span class="perk__n">03</span>
+          <h3>Всё для ребят</h3>
+          <p>Альбом, свою одежду, стиль фотографий, зоны: всё выбирают ребята сами. Полная свобода выбора, чтобы получился альбом их мечты.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="designs">
+  <div class="wrap">
+    <div class="rv">
+      <p class="eyebrow">Дизайн</p>
+      <h2 class="h2">Каждый год новый <em>уникальный</em> дизайн</h2>
+      <p class="lede">Я даю на выбор несколько видов обложек и личных страниц, чтобы ребята собрали свой уникальный альбом. Есть и готовые варианты сборки, но я поддерживаю любую вашу индивидуальность.</p>
+    </div>
+    <div class="designs__meta rv"><b>Коллекция 2026</b><span>9 тематик · листай</span></div>
+  </div>
+  <div class="shelf" data-carousel data-auto="2600">
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-classic-a-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-classic">CLASSIC</span><span class="book__tag">БАЗА</span></a>
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-siren-a-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-siren">OFFICE SIREN</span><span class="book__tag">NEW 2026</span></a>
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-american-a-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-american">AMERICAN VIBE</span><span class="book__tag">NEW 2026</span></a>
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-canon-a-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-canon">CANON VIBE</span><span class="book__tag">NEW 2026</span></a>
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-white-a-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-white">WHITE</span><span class="book__tag">NEW 2026</span></a>
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-grey-a-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-grey">GREY</span><span class="book__tag">NEW 2026</span></a>
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-aesthetic-b-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-aesthetic">AESTHETIC</span><span class="book__tag">NEW 2026</span></a>
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-money-a-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-money">NEW MONEY</span><span class="book__tag">NEW 2026</span></a>
+    <a class="book" href="designs.html"><span class="book__cover"><img src="assets/home/cover-neon-a-sm.jpg" alt="" loading="lazy"></span><span class="book__name f-neon">NEON</span><span class="book__tag">NEW 2026</span></a>
+    <a class="book book--more" href="designs.html"><span class="book__cover"><span>Все дизайны и стили съёмки</span><i>&rarr;</i></span></a>
+  </div>
+</section>
+
+<section class="why">
+  <div class="wrap why__grid">
+    <div class="rv">
+      <p class="eyebrow">Честно</p>
+      <h2 class="h2">Почему <em>так дорого?</em></h2>
+      <blockquote class="why__quote">Мы снимаем, пока ребёнок не&nbsp;останется доволен<small>Артур Дзахмишев</small></blockquote>
+    </div>
+    <ol class="why__list">
+      <li class="rv"><span class="why__n">I</span><div><h3>Я фотограф</h3><p>Это работы не студии, где к вам приходят незнакомые люди. Тут работаю лично я: слежу за качеством, всё с вами обсуждаю и снимаю. Моя специализация авторские фотосессии, так что за качество фотографий вы точно не будете переживать.</p></div></li>
+      <li class="rv"><span class="why__n">II</span><div><h3>Пока ребёнок не будет доволен</h3><p>Снимаем, пока не получим нужные кадры, это может занять и 30 минут, и 40. Все фото ретушируются, а любые замечания вроде «увеличить губы, поднять бровь, сделать новый зуб» учитываются и выполняются, чтобы в конце все были довольны.</p></div></li>
+      <li class="rv"><span class="why__n">III</span><div><h3>Скорость и качество альбомов</h3><p>Все альбомы будут готовы в срок, а бывает и раньше: я работаю только с быстрыми и качественными типографиями из Москвы. Печать на высоком уровне даже в классическом варианте, а любые вопросы брака я быстро решаю с типографией.</p></div></li>
+    </ol>
+  </div>
+</section>
+
+<section class="price">
+  <div class="wrap price__grid">
+    <div class="receipt rv">
+      <p class="receipt__head">RIGSARTHUR SCHOOL ALBUMS<br>НАЛЬЧИК</p>
+      <h2>В стоимость входит</h2>
+      <ul>
+        <li><span>Авторская фотосессия</span><i></i><b>6–10 ч</b></li>
+        <li><span>Групповая фотосессия</span><i></i><b>2–3 ч</b></li>
+        <li><span>Аренда фотостудии</span><i></i><b>✓</b></li>
+        <li><span>Все ваши фотографии в электронном виде</span><i></i><b>✓</b></li>
+        <li><span>Обсуждения с классом в WhatsApp и Telegram</span><i></i><b>✓</b></li>
+        <li><span>Игры и развлечения во время съёмки</span><i></i><b>✓</b></li>
+        <li class="total"><span>Ну и конечно же сам альбом</span><i></i><b>✓</b></li>
+      </ul>
+      <div class="receipt__bar" aria-hidden="true"></div>
+    </div>
+    <div class="plans rv d1">
+      <p class="eyebrow">Варианты альбома</p>
+      <h2 class="h2">Три варианта <em>альбома</em></h2>
+      <ul>
+        <li><span>ALBUM OF YOUR LIFE</span><b>5 000 ₽</b></li>
+        <li><span>PREMIUM</span><b>6 500 ₽</b></li>
+        <li><span>SUPREME</span><b>8 000 ₽</b></li>
+      </ul>
+      <a class="link" href="albums.html">Что входит в каждый вариант <i>&rarr;</i></a>
+    </div>
+  </div>
+</section>
+
+<section class="classpg">
+  <div class="wrap classpg__grid">
+    <div class="rv">
+      <p class="eyebrow">Для класса</p>
+      <h2 class="h2">Своя страница <em>у каждого класса</em></h2>
+      <p class="lede">Класс получает личную ссылку в чат. Там голосование за тематику альбома, одежду и цвет. Когда голосование закроется, на той же странице останется выбор класса и всё, что нужно знать перед съёмкой.</p>
+    </div>
+    <div class="phone rv d1" aria-hidden="true">
+      <div class="phone__screen">
+        <div class="phone__bar"><b>RIGSARTHUR</b><span>до конца 12:40</span></div>
+        <div class="phone__steps"><span class="on">1 Тематика</span><span>2 Одежда</span><span>3 Цвет</span></div>
+        <div class="mini">
+          <span class="mini__tag">NEW 2026</span>
+          <p class="mini__t f-money">NEW MONEY</p>
+          <div class="mini__row"><img src="assets/home/cover-money-a-sm.jpg" alt="" loading="lazy"><img src="assets/home/cover-money-b-sm.jpg" alt="" loading="lazy"></div>
+          <div class="mini__res"><i></i><b>31%</b></div>
+          <span class="mini__stamp">ТВОЙ ГОЛОС</span>
+        </div>
+        <div class="mini mini--neon">
+          <span class="mini__tag">NEW 2026</span>
+          <p class="mini__t f-neon">NEON</p>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap rise">
-    <div class="frame">
-      <b>Черновик</b>
-      <p>Показывает, из чего будет состоять сайт и что где стоит. </p>
-      <a class="btn" href="structure.html">Что уже готово, что нет &rarr;</a>
+<section class="gallery">
+  <div class="wrap">
+    <div class="rv">
+      <p class="eyebrow">Галерея</p>
+      <h2 class="h2">Альбомы, которые <em>уже у&nbsp;выпускников</em></h2>
+    </div>
+    <div class="mosaic rv d1">
+      <a href="works.html"><img src="assets/home/work-a13-sm.jpg" alt="Выпускной альбом, разворот" loading="lazy"></a>
+      <a href="works.html"><img src="assets/home/work-a07-sm.jpg" alt="Выпускной альбом, обложка" loading="lazy"></a>
+      <a href="works.html"><img src="assets/home/work-a19-sm.jpg" alt="Выпускной альбом, разворот" loading="lazy"></a>
+      <a href="works.html"><img src="assets/home/work-a08-sm.jpg" alt="Выпускной альбом, обложка" loading="lazy"></a>
+      <a href="works.html"><img src="assets/home/work-a03-sm.jpg" alt="Выпускной альбом, обложка" loading="lazy"></a>
+      <a href="works.html"><img src="assets/home/work-a20-sm.jpg" alt="Выпускной альбом, разворот" loading="lazy"></a>
+    </div>
+    <a class="link" href="works.html">Смотреть галерею <i>&rarr;</i></a>
+  </div>
+</section>
+
+<section class="end" id="end">
+  <div class="wrap">
+    <p class="eyebrow rv">На этом всё</p>
+    <h2 class="rv">Осталось только <em>записаться</em></h2>
+    <div class="sig rv d1">
+      <img src="assets/home/arthur.jpg" alt="Артур Дзахмишев" loading="lazy">
+      <p>Буду ждать вас у себя на съёмке<b>Артур Дзахмишев</b></p>
+    </div>
+    <div class="end__cta rv d2">
+      <a class="btn btn--cream" href="https://wa.me/79287100102">Написать в WhatsApp <i>&rarr;</i></a>
+      <a class="btn btn--ghost" href="contacts.html">Все контакты</a>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap rise">
-    <!-- <p class="eyebrow">Как это устроено</p> -->
-    <h2>Альбом собирают сами ребята</h2>
-    <p class="lede narrow">Обложку, личные страницы, стиль фотографий и даже свою одежду класс выбирает сам. Я помогаю и снимаю, пока каждый не останется доволен.</p>
-
-    <div class="trio" style="margin-top:44px">
-      <div>
-        <h3>Атмосфера на съёмках</h3>
-        <p>Во время съёмки ребятам доступны PS5, большой проектор, хорошие колонки и полная свобода действий, чтобы не только сделать красивые кадры, но и отдохнуть.</p>
-      </div>
-      <div>
-        <h3>Все кадры ваши</h3>
-        <p>Все фотографии со съёмки отдаются в электронном виде для личного пользования.</p>
-      </div>
-      <div>
-        <h3>Всё для ребят</h3>
-        <p>Альбом, одежда, стиль фотографий, зоны. Всё выбирают они сами, чтобы получился альбом их мечты.</p>
-      </div>
+<section class="prep" id="prep">
+  <div class="wrap">
+    <div class="prep__box">
+      <p class="eyebrow">Только в макете</p>
+      <h2>Что подготовить для главной</h2>
+      <p>Список собирается сам из пунктирных мест на странице. Всё это потом меняется из админки без меня.</p>
+      <ol class="prep__list"></ol>
     </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap rise">
-    <p class="eyebrow">Работы</p>
-    <h2>Каждый год новый уникальный дизайн</h2>
-    <p class="lede narrow">Несколько видов обложек и личных страниц на выбор. Есть готовые варианты сборки, но любая индивидуальность поддерживается.</p>
-    <div class="grid" style="margin-top:44px">
-      <button class="shot" data-full="assets/img/a17-lg.webp" aria-label="Открыть: Выпускной альбом — работа RIGSARTHUR"><img src="assets/img/a17-md.webp" alt="Выпускной альбом — работа RIGSARTHUR" loading="lazy" decoding="async"></button><button class="shot" data-full="assets/img/a19-lg.webp" aria-label="Открыть: Выпускной альбом — работа RIGSARTHUR"><img src="assets/img/a19-md.webp" alt="Выпускной альбом — работа RIGSARTHUR" loading="lazy" decoding="async"></button><button class="shot" data-full="assets/img/a10-lg.webp" aria-label="Открыть: Выпускной альбом — работа RIGSARTHUR"><img src="assets/img/a10-md.webp" alt="Выпускной альбом — работа RIGSARTHUR" loading="lazy" decoding="async"></button><button class="shot" data-full="assets/img/a07-lg.webp" aria-label="Открыть: Выпускной альбом — работа RIGSARTHUR"><img src="assets/img/a07-md.webp" alt="Выпускной альбом — работа RIGSARTHUR" loading="lazy" decoding="async"></button><button class="shot" data-full="assets/img/a12-lg.webp" aria-label="Открыть: Выпускной альбом — работа RIGSARTHUR"><img src="assets/img/a12-md.webp" alt="Выпускной альбом — работа RIGSARTHUR" loading="lazy" decoding="async"></button><button class="shot" data-full="assets/img/a21-lg.webp" aria-label="Открыть: Выпускной альбом — работа RIGSARTHUR"><img src="assets/img/a21-md.webp" alt="Выпускной альбом — работа RIGSARTHUR" loading="lazy" decoding="async"></button>
-    </div>
-    <p style="margin-top:36px"><a class="btn" href="works.html">Смотреть все работы &rarr;</a></p>
-  </div>
-</section>
-
-<section>
-  <div class="wrap rise">
-    <p class="eyebrow">Своя страница у каждого класса</p>
-    <h2>Голосование за дизайн онлайн</h2>
-    <p class="lede narrow">Класс получает личную ссылку в чат: там вся информация к съёмке и голосование за дизайн альбома. Не нужно собирать мнения в чате отдельно, видно сразу, кто за что и кто ещё не ответил.</p>
-  </div>
-</section>
-
-<section>
-  <div class="wrap rise">
-    <p class="eyebrow">Дальше</p>
-    <h2>Осталось только записаться</h2>
-    <p class="lede narrow">Буду ждать вас у себя на съёмке.</p>
-    <p style="margin-top:34px"><a class="btn btn--solid" href="https://wa.me/79287100102">Написать в WhatsApp &rarr;</a></p>
   </div>
 </section>
 
 </main>
 
-<div class="lb" hidden><button class="lb__close">Закрыть</button><img alt=""></div>
-
-<footer class="foot">
-  <div class="wrap foot__in">
-    <p>
-      RIGSARTHUR SCHOOL ALBUMS · Нальчик<br>
-      Артур Дзахмишев · <a href="https://wa.me/79287100102">WhatsApp</a>
-    </p>
-    <div class="foot__nav">
-      <a href="index.html">Главная</a><a href="works.html">Работы</a><a href="albums.html">Альбомы</a><a href="designs.html">Дизайны</a><a href="studio.html">Студия</a><a href="about.html">Обо мне</a><a href="contacts.html">Контакты</a>
+<footer class="ft">
+  <div class="wrap">
+    <p class="ft__mark">RIGSARTHUR<span>SCHOOL ALBUMS · НАЛЬЧИК</span></p>
+    <div class="ft__cols">
+      <div>
+        <h4>Разделы</h4>
+        <a href="works.html">Работы</a><a href="albums.html">Альбомы и цены</a><a href="designs.html">Дизайны</a><a href="studio.html">Студия</a><a href="about.html">Обо мне</a>
+      </div>
+      <div>
+        <h4>Связь</h4>
+        <a href="https://wa.me/79287100102">WhatsApp</a><a href="https://instagram.com/rigsarthur">Instagram</a><a href="contacts.html">Контакты</a>
+      </div>
     </div>
+    <p class="ft__small">Артур Дзахмишев · выпускные альбомы</p>
   </div>
 </footer>
 
-<div class="proto">
-  Черновик. <a href="structure.html">Что уже готово, что нет</a>
+<div class="dock" aria-hidden="true">
+  <p><b>Запись на съёмку</b>через WhatsApp</p>
+  <a href="https://wa.me/79287100102" tabindex="-1">Записаться</a>
 </div>
 
-<script src="assets/site.js"></script>
+<script src="assets/carousel.js"></script>
+<script src="assets/rigs.js"></script>
 </body>
 </html>

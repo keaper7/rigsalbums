@@ -3,118 +3,299 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>МКОУ Лицей №2, 11 «А» — RIGSARTHUR SCHOOL ALBUMS</title>
-<meta name="description" content="Страница класса: голосование за дизайн альбома и информация к съёмке.">
+<title>Выбор альбома · RIGSARTHUR SCHOOL ALBUMS</title>
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="assets/site.css">
+<meta name="theme-color" content="#F4EFE7">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="assets/site.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RIGSARTHUR SCHOOL ALBUMS">
+<meta property="og:title" content="Выбор альбома вашего класса">
+<meta property="og:description" content="Голосование за тематику альбома, одежду и цвет. RIGSARTHUR SCHOOL ALBUMS.">
+<meta property="og:image" content="https://keaper7.github.io/rigsalbums/assets/og-class.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://keaper7.github.io/rigsalbums/class.html">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="assets/fonts/unbounded-cyrillic-cb504d.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/manrope-cyrillic-c9a5f1.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/fonts/theme-fonts.css">
+<link rel="stylesheet" href="assets/klass/klass.css">
+<script>document.documentElement.className += ' js';</script>
 </head>
-<body>
-<div class="grain"></div>
-<div class="flash"></div>
+<body class="is-open">
 
-<header class="head">
-  <div class="head__in">
-    <a class="logo" href="index.html"><b>RIGSARTHUR</b><span>SCHOOL ALBUMS</span></a>
-    <nav class="nav" id="nav"><a href="index.html">Главная</a><a href="works.html">Работы</a><a href="albums.html">Альбомы</a><a href="designs.html">Дизайны</a><a href="studio.html">Студия</a><a href="about.html">Обо мне</a><a href="contacts.html">Контакты</a></nav>
-    <button class="burger" aria-expanded="false" aria-controls="nav">Меню</button>
+<div class="demo" role="region" aria-label="Панель показа">
+  <span>Макет. Панели не будет на сайте</span>
+  <button type="button" data-demo="open" aria-pressed="true">Голосование</button>
+  <button type="button" data-demo="closed" aria-pressed="false">Итог</button>
+  <button type="button" data-demo="reset">Сбросить мой голос</button>
+</div>
+
+<header class="top">
+  <div class="top__row">
+    <a class="logo" href="#top"><b>RIGSARTHUR</b><span>SCHOOL ALBUMS</span></a>
+    <p class="timer"><i></i><span class="timer__label">до конца</span> <b id="timer">45:00</b></p>
   </div>
+  <nav class="steps" aria-label="Этапы">
+    <a href="#s-theme" data-step="theme"><i>1</i>Тематика</a>
+    <a href="#s-wear" data-step="wear"><i>2</i>Одежда</a>
+    <a href="#s-color" data-step="color"><i>3</i>Цвет</a>
+  </nav>
 </header>
 
-<main>
+<main id="top">
 
-<section class="ph">
-  <div class="wrap">
-    <p class="eyebrow">rigsalbums.ru / class / licey-2-11a</p>
-    <h1>МКОУ Лицей №2, 11 «А»</h1>
-    <p class="lede narrow">Выпуск 2026 · 28 человек · съёмка 14 октября</p>
-  </div>
+<section class="hero">
+  <p class="hero__spine" aria-hidden="true">RIGSARTHUR · SCHOOL ALBUMS · 2026</p>
+  <p class="eyebrow">Выпускной альбом 2026</p>
+  <h1><span>Школа</span><em>11 класс</em></h1>
+  <p class="hero__demo">В настоящей ссылке здесь название вашей школы и класса</p>
+  <p class="hero__lead">Привет, ребят, это личная страничка вашего класса для альбомов. Тут вы выберете понравившийся вариант, а потом останется только ваш выбор и вся основная информация по альбому. Короче, ваша шпаргалка.</p>
+  <ol class="hero__steps">
+    <li><b>01</b><span>Тематика альбома</span><small>9 вариантов</small></li>
+    <li><b>02</b><span>Стиль одежды</span><small>4 варианта</small></li>
+    <li><b>03</b><span>Цвет одежды</span><small>4 варианта</small></li>
+  </ol>
+  <p class="hero__small">Локацию для групповых выбираем в чате. Если у тематики на выбор две обложки, вариант тоже утверждаем в чате.</p>
+  <div class="hero__meta"><span><b id="voters">22</b> уже проголосовали</span><a class="btn" href="#s-theme">Начать выбор</a></div>
 </section>
 
-<section style="padding-top:0;border:0">
-  <div class="wrap rise">
-    <div class="tabs" role="tablist" style="max-width:420px">
-      <button class="tab" role="tab" aria-selected="true" data-panel="vote">Голосование</button>
-      <button class="tab" role="tab" aria-selected="false" data-panel="shoot">Съёмка</button>
-    </div>
+<div class="voting">
 
-    <div data-view="vote">
-      <h2 style="margin-top:38px">Какой стиль выбираем?</h2>
-      <p class="lede narrow">Один голос на человека. Голосование открыто до 30 сентября, потом дизайн уходит в работу.</p>
-
-      <div class="opts" style="margin-top:36px">
-        
-        <button class="opt" data-id="a" data-votes="7">
-          <span class="opt__bar"></span>
-          <img class="opt__thumb" src="assets/img/a17-sm.webp" alt="" loading="lazy" decoding="async">
-          <span class="opt__name">Бессмертная классика</span>
-          <span class="opt__pct">7</span>
-        </button>
-        <button class="opt" data-id="b" data-votes="5">
-          <span class="opt__bar"></span>
-          <img class="opt__thumb" src="assets/img/a09-sm.webp" alt="" loading="lazy" decoding="async">
-          <span class="opt__name">Только ЧБ, только дединсайд</span>
-          <span class="opt__pct">5</span>
-        </button>
-        <button class="opt" data-id="c" data-votes="9">
-          <span class="opt__bar"></span>
-          <img class="opt__thumb" src="assets/img/a26-sm.webp" alt="" loading="lazy" decoding="async">
-          <span class="opt__name">Ауестетик тёмный</span>
-          <span class="opt__pct">9</span>
-        </button>
-        <button class="opt" data-id="d" data-votes="4">
-          <span class="opt__bar"></span>
-          <img class="opt__thumb" src="assets/img/a21-sm.webp" alt="" loading="lazy" decoding="async">
-          <span class="opt__name">Школьный вайб</span>
-          <span class="opt__pct">4</span>
-        </button>
+<section class="step" id="s-theme" data-step="theme">
+  <header class="step__head">
+    <p class="step__n">Этап 1 из 3</p>
+    <h2>Тематика альбома</h2>
+    <p>Листай развороты вбок, нажми на фото, чтобы рассмотреть. Выбери одну тематику.</p>
+  </header>
+  <nav class="jump" aria-label="Все тематики"><a href="#t-classic">CLASSIC</a><a href="#t-siren">OFFICE SIREN</a><a href="#t-american">AMERICAN VIBE</a><a href="#t-canon">CANON VIBE</a><a href="#t-white">WHITE</a><a href="#t-grey">GREY</a><a href="#t-aesthetic">AESTHETIC</a><a href="#t-money">NEW MONEY</a><a href="#t-neon">NEON</a></nav>
+  
+    <article class="opt theme t--classic" id="t-classic" data-id="classic" data-name="CLASSIC" data-loc="" data-covers="1">
+      <div class="theme__head" data-no="01">
+        <span class="theme__tag">база</span>
+        <h3 class="theme__title">CLASSIC</h3>
+        <p class="theme__lead">Классический вариант альбома</p>
       </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/classic-1-lg.jpg" style="--ar:0.7207"><img src="assets/klass/classic-1-sm.jpg" alt="Обложка" loading="lazy" decoding="async"><span>Обложка</span></a><a class="ph" href="assets/klass/classic-2-lg.jpg" style="--ar:1.4004"><img src="assets/klass/classic-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/classic-3-lg.jpg" style="--ar:1.4035"><img src="assets/klass/classic-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/classic-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/classic-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/classic-5-lg.jpg" style="--ar:1.4004"><img src="assets/klass/classic-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Минимум ограничений, просто чистая красивая картинка.</p><p>Выбор для тех, кто не хочет париться, но хочет хороший результат.</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="CLASSIC">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt theme t--siren" id="t-siren" data-id="siren" data-name="OFFICE SIREN" data-loc="студия" data-covers="2">
+      <div class="theme__head" data-no="02">
+        <span class="theme__tag">NEW 2026</span>
+        <h3 class="theme__title">OFFICE SIREN</h3>
+        <p class="theme__lead">Этот альбом про стиль, что-то новое и свежее в мире альбомов. Был вдохновлён популярным стилем фото office siren.</p>
+      </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/siren-1-lg.jpg" style="--ar:1.5202"><img src="assets/klass/siren-1-sm.jpg" alt="Обложка, два варианта" loading="lazy" decoding="async"><span>Обложка, два варианта</span></a><a class="ph" href="assets/klass/siren-2-lg.jpg" style="--ar:1.4004"><img src="assets/klass/siren-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/siren-3-lg.jpg" style="--ar:1.3974"><img src="assets/klass/siren-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/siren-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/siren-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/siren-5-lg.jpg" style="--ar:1.4004"><img src="assets/klass/siren-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Фотографируемся на циклораме, градиенты будут от тёмно-синего до светло-голубого, иногда почти белые.</p><p class="loc">Групповые: студия</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="OFFICE SIREN">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt theme t--american" id="t-american" data-id="american" data-name="AMERICAN VIBE" data-loc="спортивная площадка или школа" data-covers="2">
+      <div class="theme__head" data-no="03">
+        <span class="theme__tag">NEW 2026</span>
+        <h3 class="theme__title">AMERICAN VIBE</h3>
+        <p class="theme__lead">Да-да, это те самые вайбовые фоточки на синем, голубом или бирюзовом фоне из американских школ.</p>
+      </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/american-1-lg.jpg" style="--ar:1.5422"><img src="assets/klass/american-1-sm.jpg" alt="Обложка, два варианта" loading="lazy" decoding="async"><span>Обложка, два варианта</span></a><a class="ph" href="assets/klass/american-2-lg.jpg" style="--ar:1.4004"><img src="assets/klass/american-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/american-3-lg.jpg" style="--ar:1.4035"><img src="assets/klass/american-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/american-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/american-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/american-5-lg.jpg" style="--ar:1.4004"><img src="assets/klass/american-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Тут огромную роль играет ваша одежда. Можно смешивать классический костюм, надеть сверху хоккейный шлем, другой может быть в свитере и с битой в руках, огромная свобода действий. Просто разбудите вашу фантазию.</p><p class="loc">Групповые: спортивная площадка или школа</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="AMERICAN VIBE">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt theme t--canon" id="t-canon" data-id="canon" data-name="CANON VIBE" data-loc="студия или улица" data-covers="1">
+      <div class="theme__head" data-no="04">
+        <span class="theme__tag">NEW 2026</span>
+        <h3 class="theme__title">CANON VIBE</h3>
+        <p class="theme__lead">Альбом под стиль фоток на Canon: вспышка в лоб, мейк с бейкингом.</p>
+      </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/canon-1-lg.jpg" style="--ar:0.724"><img src="assets/klass/canon-1-sm.jpg" alt="Обложка" loading="lazy" decoding="async"><span>Обложка</span></a><a class="ph" href="assets/klass/canon-2-lg.jpg" style="--ar:1.4004"><img src="assets/klass/canon-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/canon-3-lg.jpg" style="--ar:1.4097"><img src="assets/klass/canon-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/canon-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/canon-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/canon-5-lg.jpg" style="--ar:1.4004"><img src="assets/klass/canon-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Фоточки получаются атмосферные, чаще с тёмным и тёплым фоном, но бывают и светлые кадры. Обработка под плёнку с виньеткой по краям.</p><p>В целом атмосферно, но не всем идёт вспышка в лоб и приходится ставить её сбоку, а это уже превращается в стиль AESTHETIC, который будет дальше.</p><p class="loc">Групповые: студия или улица</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="CANON VIBE">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt theme t--white" id="t-white" data-id="white" data-name="WHITE" data-loc="циклорама в студии" data-covers="2">
+      <div class="theme__head" data-no="05">
+        <span class="theme__tag">NEW 2026</span>
+        <h3 class="theme__title">WHITE</h3>
+        <p class="theme__lead">Чистый белый фон, съёмка проходит полностью на циклораме.</p>
+      </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/white-1-lg.jpg" style="--ar:1.5202"><img src="assets/klass/white-1-sm.jpg" alt="Обложка, два варианта" loading="lazy" decoding="async"><span>Обложка, два варианта</span></a><a class="ph" href="assets/klass/white-2-lg.jpg" style="--ar:1.4004"><img src="assets/klass/white-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/white-3-lg.jpg" style="--ar:1.4128"><img src="assets/klass/white-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/white-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/white-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/white-5-lg.jpg" style="--ar:1.3333"><img src="assets/klass/white-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Может быть с жидким металлом, либо просто минималистичный и лаконичный.</p><p>Максимальный стиль, никакого интерьера. Большинство школ СПб и Москвы фоткаются примерно в этом стиле, до Нальчика медленно идёт.</p><p class="loc">Групповые: циклорама в студии</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="WHITE">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt theme t--grey" id="t-grey" data-id="grey" data-name="GREY" data-loc="студия или улица" data-covers="1">
+      <div class="theme__head" data-no="06">
+        <span class="theme__tag">NEW 2026</span>
+        <h3 class="theme__title">GREY</h3>
+        <p class="theme__lead">Главная фишка стиля: чёрно-белая обложка, а внутреннее наполнение всё цветное.</p>
+      </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/grey-1-lg.jpg" style="--ar:0.724"><img src="assets/klass/grey-1-sm.jpg" alt="Обложка" loading="lazy" decoding="async"><span>Обложка</span></a><a class="ph" href="assets/klass/grey-2-lg.jpg" style="--ar:1.4004"><img src="assets/klass/grey-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/grey-3-lg.jpg" style="--ar:1.4222"><img src="assets/klass/grey-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/grey-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/grey-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/grey-5-lg.jpg" style="--ar:1.4191"><img src="assets/klass/grey-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Сама по себе чб-обложка даёт просто +1000 к необычности, альбом выглядит нестандартно.</p><p>Все фото преимущественно на тёмном фоне, светлые варианты будут, но меньше.</p><p>Стоит вашего внимания, если не хотите классику, но и не хотите сильно мудрить.</p><p class="loc">Групповые: студия или улица</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="GREY">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt theme t--aesthetic" id="t-aesthetic" data-id="aesthetic" data-name="AESTHETIC" data-loc="школа или улица" data-covers="2">
+      <div class="theme__head" data-no="07">
+        <span class="theme__tag">NEW 2026</span>
+        <h3 class="theme__title">AESTHETIC</h3>
+        <p class="theme__lead">Фоточки на альбом пойдут в обработке с текстурой бумаги-плёнки.</p>
+      </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/aesthetic-1-lg.jpg" style="--ar:1.5094"><img src="assets/klass/aesthetic-1-sm.jpg" alt="Обложка, два варианта" loading="lazy" decoding="async"><span>Обложка, два варианта</span></a><a class="ph" href="assets/klass/aesthetic-2-lg.jpg" style="--ar:1.4004"><img src="assets/klass/aesthetic-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/aesthetic-3-lg.jpg" style="--ar:1.4035"><img src="assets/klass/aesthetic-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/aesthetic-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/aesthetic-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/aesthetic-5-lg.jpg" style="--ar:1.4004"><img src="assets/klass/aesthetic-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Самый важный аспект стиля: много текста. Истории, вырезка из любимой книги, любимая цитата учителя. Чем больше текста, тем круче. Мини-эссе вам в будущее.</p><p>Это может оттолкнуть, но перечитывать, что каждый написал, в будущем будет куда интереснее, чем просто пролистать фоточки.</p><p>Очень его рекомендую, вы не пожалеете, самый ламповый и уютный стиль.</p><p class="loc">Групповые: школа или улица</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="AESTHETIC">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt theme t--money" id="t-money" data-id="money" data-name="NEW MONEY" data-loc="студия" data-covers="2">
+      <div class="theme__head" data-no="08">
+        <span class="theme__tag">NEW 2026</span>
+        <h3 class="theme__title">NEW MONEY</h3>
+        <p class="theme__lead">Этот стиль и бордовый цвет как две палочки твикс, но если что, можно и без него обойтись.</p>
+      </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/money-1-lg.jpg" style="--ar:1.5166"><img src="assets/klass/money-1-sm.jpg" alt="Обложка, два варианта" loading="lazy" decoding="async"><span>Обложка, два варианта</span></a><a class="ph" href="assets/klass/money-2-lg.jpg" style="--ar:1.4128"><img src="assets/klass/money-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/money-3-lg.jpg" style="--ar:1.4159"><img src="assets/klass/money-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/money-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/money-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/money-5-lg.jpg" style="--ar:1.3974"><img src="assets/klass/money-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Главная идея: вы богатые и успешные люди, у вас всех взяли интервью, и ваш школьный альбом это новый список Forbes.</p><p>Побольше понтов, чтобы даже патрики позавидовали.</p><p class="loc">Групповые: студия</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="NEW MONEY">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt theme t--neon" id="t-neon" data-id="neon" data-name="NEON" data-loc="спортплощадка или студия" data-covers="2">
+      <div class="theme__head" data-no="09">
+        <span class="theme__tag">NEW 2026</span>
+        <h3 class="theme__title">NEON</h3>
+        <p class="theme__lead">Для самых смелых.</p>
+      </div>
+      <div class="strip" data-carousel data-auto="3600"><a class="ph ph--cover" href="assets/klass/neon-1-lg.jpg" style="--ar:1.5202"><img src="assets/klass/neon-1-sm.jpg" alt="Обложка, два варианта" loading="lazy" decoding="async"><span>Обложка, два варианта</span></a><a class="ph" href="assets/klass/neon-2-lg.jpg" style="--ar:1.4066"><img src="assets/klass/neon-2-sm.jpg" alt="Общий список" loading="lazy" decoding="async"><span>Общий список</span></a><a class="ph" href="assets/klass/neon-3-lg.jpg" style="--ar:1.4066"><img src="assets/klass/neon-3-sm.jpg" alt="Личные страницы" loading="lazy" decoding="async"><span>Личные страницы</span></a><a class="ph" href="assets/klass/neon-4-lg.jpg" style="--ar:1.4004"><img src="assets/klass/neon-4-sm.jpg" alt="Групповые фото" loading="lazy" decoding="async"><span>Групповые фото</span></a><a class="ph" href="assets/klass/neon-5-lg.jpg" style="--ar:1.4004"><img src="assets/klass/neon-5-sm.jpg" alt="Страница для пожеланий" loading="lazy" decoding="async"><span>Страница для пожеланий</span></a></div>
+      <details class="more"><summary>Подробнее о стиле</summary><p>Кому надоели обычные красивые фоточки, кто хочет чего-то реально интересного. Тут простор для фантазии ещё больше, чем в американском стиле.</p><p>Не бойтесь, вы не будете с разноцветными лицами: цвет падающего света на лицо и на фон выбираете сами.</p><p>Фортуна любит смелых, рискуйте.</p><p class="loc">Групповые: спортплощадка или студия</p></details>
+      <div class="opt__foot"><button class="pick" type="button" data-label="NEON">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+  <p class="step__ok">Голос за тематику учтён. <a href="#s-wear">Дальше одежда</a></p>
+</section>
 
-      <p class="vote__after" id="voteAfter">Проголосовало 25 из 28.</p>
-      <button class="reset" id="voteReset" hidden>проголосовать заново</button>
-    </div>
+<section class="step" id="s-wear" data-step="wear">
+  <header class="step__head">
+    <p class="step__n">Этап 2 из 3</p>
+    <h2>Стиль одежды</h2>
+    <p>Во что одеваемся на съёмку. Примеры можно листать.</p>
+  </header>
+  
+    <article class="opt wear" id="w-oldmoney" data-id="oldmoney" data-name="Олд-мани">
+      <div class="wear__head"><h3>Олд-мани</h3><p>полуклассика</p></div>
+      <div class="strip strip--tall" data-carousel data-auto="3600"><a class="ph" href="assets/klass/oldmoney-1-lg.jpg" style="--ar:0.5762"><img src="assets/klass/oldmoney-1-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/oldmoney-2-lg.jpg" style="--ar:0.8"><img src="assets/klass/oldmoney-2-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/oldmoney-3-lg.jpg" style="--ar:0.5178"><img src="assets/klass/oldmoney-3-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/oldmoney-4-lg.jpg" style="--ar:0.8191"><img src="assets/klass/oldmoney-4-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/oldmoney-5-lg.jpg" style="--ar:0.5634"><img src="assets/klass/oldmoney-5-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/oldmoney-6-lg.jpg" style="--ar:0.5627"><img src="assets/klass/oldmoney-6-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/oldmoney-7-lg.jpg" style="--ar:0.5868"><img src="assets/klass/oldmoney-7-sm.jpg" alt="" loading="lazy" decoding="async"></a></div>
+      <a class="pin" href="https://pin.it/ydmJg6JM9" target="_blank" rel="noopener">Больше примеров в Pinterest</a>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Олд-мани">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt wear" id="w-classicwear" data-id="classicwear" data-name="Классика">
+      <div class="wear__head"><h3>Классика</h3><p>классический стиль</p></div>
+      <div class="strip strip--tall" data-carousel data-auto="3600"><a class="ph" href="assets/klass/classicwear-1-lg.jpg" style="--ar:0.6667"><img src="assets/klass/classicwear-1-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/classicwear-2-lg.jpg" style="--ar:0.75"><img src="assets/klass/classicwear-2-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/classicwear-3-lg.jpg" style="--ar:0.8"><img src="assets/klass/classicwear-3-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/classicwear-4-lg.jpg" style="--ar:0.5627"><img src="assets/klass/classicwear-4-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/classicwear-5-lg.jpg" style="--ar:0.8094"><img src="assets/klass/classicwear-5-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/classicwear-6-lg.jpg" style="--ar:0.75"><img src="assets/klass/classicwear-6-sm.jpg" alt="" loading="lazy" decoding="async"></a></div>
+      <a class="pin" href="https://pin.it/3dMXSsUs5" target="_blank" rel="noopener">Больше примеров в Pinterest</a>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Классика">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt wear" id="w-casual" data-id="casual" data-name="Повседневка">
+      <div class="wear__head"><h3>Повседневка</h3><p>то, в чём ходите каждый день</p></div>
+      <div class="strip strip--tall" data-carousel data-auto="3600"><a class="ph" href="assets/klass/casual-1-lg.jpg" style="--ar:0.5627"><img src="assets/klass/casual-1-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/casual-2-lg.jpg" style="--ar:0.75"><img src="assets/klass/casual-2-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/casual-3-lg.jpg" style="--ar:0.7805"><img src="assets/klass/casual-3-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/casual-4-lg.jpg" style="--ar:0.5627"><img src="assets/klass/casual-4-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/casual-5-lg.jpg" style="--ar:0.5627"><img src="assets/klass/casual-5-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/casual-6-lg.jpg" style="--ar:0.8"><img src="assets/klass/casual-6-sm.jpg" alt="" loading="lazy" decoding="async"></a></div>
+      <a class="pin" href="https://pin.it/77VGFOqAZ" target="_blank" rel="noopener">Больше примеров в Pinterest</a>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Повседневка">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt wear" id="w-urban" data-id="urban" data-name="Урбан-спорт">
+      <div class="wear__head"><h3>Урбан-спорт</h3><p>спортивное и уличное</p></div>
+      <div class="strip strip--tall" data-carousel data-auto="3600"><a class="ph" href="assets/klass/urban-1-lg.jpg" style="--ar:0.8"><img src="assets/klass/urban-1-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/urban-2-lg.jpg" style="--ar:0.8"><img src="assets/klass/urban-2-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/urban-3-lg.jpg" style="--ar:0.8067"><img src="assets/klass/urban-3-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/urban-4-lg.jpg" style="--ar:0.75"><img src="assets/klass/urban-4-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/urban-5-lg.jpg" style="--ar:0.5627"><img src="assets/klass/urban-5-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/urban-6-lg.jpg" style="--ar:0.5627"><img src="assets/klass/urban-6-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/klass/urban-7-lg.jpg" style="--ar:0.8"><img src="assets/klass/urban-7-sm.jpg" alt="" loading="lazy" decoding="async"></a></div>
+      <a class="pin" href="https://pin.it/47t20V8SU" target="_blank" rel="noopener">Больше примеров в Pinterest</a>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Урбан-спорт">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+  <p class="step__ok">Голос за одежду учтён. <a href="#s-color">Дальше цвет</a></p>
+</section>
 
-    <div data-view="shoot" hidden>
-      <h2 style="margin-top:38px">Всё, что нужно знать к съёмке</h2>
-      <dl class="info" style="margin-top:34px">
-        <div><dt>Дата</dt><dd>14 октября, вторник</dd></div>
-        <div><dt>Время</dt><dd>с 11:00, примерно 6 часов</dd></div>
-        <div><dt>Где</dt><dd>Фотостудия, Нальчик (точный адрес добавишь в админке)</dd></div>
-        <div><dt>С собой</dt><dd>2–3 комплекта одежды, сменная обувь</dd></div>
-        <div><dt>На месте</dt><dd>PS5, проектор, колонки, еда</dd></div>
-        <div><dt>Связь</dt><dd><a href="https://wa.me/79287100102">Артур · WhatsApp</a></dd></div>
-      </dl>
-      <p class="note" style="margin-top:26px">Опаздывать не страшно. Снимаем по свободному графику, но лучше приехать к началу, так как групповые кадры первыми.</p>
-    </div>
+<section class="step" id="s-color" data-step="color">
+  <header class="step__head">
+    <p class="step__n">Этап 3 из 3</p>
+    <h2>Цвет одежды</h2>
+    <p>Нужно, чтобы у всех была одна цветовая гамма, поэтому выбираем акцентный оттенок, который будет у всех. К любому цвету можно чёрный и белый, но оттенок, который выберет класс, должен быть обязательно.</p>
+  </header>
+  <div class="colors">
+    <article class="opt color" id="c-bw" data-id="bw" data-name="Чёрный и белый">
+      <div class="sw"><i style="background:#23201F"></i><i style="background:#FFFFFF"></i></div>
+      <h3>Чёрный и белый</h3>
+      
+      <div class="opt__foot"><button class="pick" type="button" data-label="Чёрный и белый">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt color" id="c-red" data-id="red" data-name="Тёмно-красный, бордовый, кирпичный">
+      <div class="sw"><i style="background:#7A1F2B"></i><i style="background:#5A171F"></i><i style="background:#A4452F"></i></div>
+      <h3>Тёмно-красный, бордовый, кирпичный</h3>
+      <p class="color__plus"><i></i><i></i>+ чёрный и белый</p>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Тёмно-красный, бордовый, кирпичный">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt color" id="c-blue" data-id="blue" data-name="Тёмно-синий, синий, голубой">
+      <div class="sw"><i style="background:#1B2A4E"></i><i style="background:#2F5DA8"></i><i style="background:#8FB8E0"></i></div>
+      <h3>Тёмно-синий, синий, голубой</h3>
+      <p class="color__plus"><i></i><i></i>+ чёрный и белый</p>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Тёмно-синий, синий, голубой">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt color" id="c-beige" data-id="beige" data-name="Бежевый, коричневый, кофейный, молочный">
+      <div class="sw"><i style="background:#D8C3A5"></i><i style="background:#6B4A33"></i><i style="background:#8E6B4E"></i><i style="background:#F1E8DA"></i></div>
+      <h3>Бежевый, коричневый, кофейный, молочный</h3>
+      <p class="color__plus"><i></i><i></i>+ чёрный и белый</p>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Бежевый, коричневый, кофейный, молочный">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article></div>
+  <p class="step__ok">Голос за цвет учтён.</p>
+</section>
+
+<section class="done" id="done">
+  <p class="eyebrow">Готово</p>
+  <h2>Все три голоса учтены</h2>
+  <p>Когда голосование закроется, на этой странице останется выбор класса и всё, что нужно знать перед съёмкой. Ссылка та же.</p>
+</section>
+
+</div>
+
+<section class="result" id="result">
+  <header class="result__head">
+    <p class="eyebrow">Голосование закрыто</p>
+    <h2>Выбор класса</h2>
+    <p>Проголосовали <b data-fill="total">22</b> человека. Теперь это ваша шпаргалка по альбому.</p>
+  </header>
+  <div class="result__slot" data-slot="theme"></div>
+  <div class="result__pair">
+    <div class="result__slot" data-slot="wear"></div>
+    <div class="result__slot" data-slot="color"></div>
+  </div>
+  <div class="cheat">
+    <h3>Шпаргалка к съёмке</h3>
+    <dl>
+      <div><dt>Тематика</dt><dd data-fill="theme"></dd></div>
+      <div><dt>Одежда</dt><dd data-fill="wear"></dd></div>
+      <div><dt>Групповые</dt><dd data-fill="loc"></dd></div>
+      <div class="is-admin"><dt>Дата и время съёмки</dt><dd>Артур укажет в админке</dd></div>
+      <div class="is-admin"><dt>Адрес студии</dt><dd>Артур укажет в админке</dd></div>
+      <div class="is-admin"><dt>Что взять с собой</dt><dd>Артур укажет в админке</dd></div>
+    </dl>
   </div>
 </section>
 
-<section>
-  <div class="wrap rise">
-    <h2>Эту страницу ты создаёшь сам</h2>
-    <p class="lede narrow">В админке заполняешь школу, класс, даты и отмечаешь галочками варианты дизайна из библиотеки. Ссылка готова, кидаешь её в чат класса.</p>
+<section class="react">
+  <p>Как тебе страница выбора? Я очень старался, чтобы вам было удобно</p>
+  <div class="react__row">
+    <button type="button" aria-label="Плохо">💩</button>
+    <button type="button" aria-label="Нравится">❤️</button>
+    <button type="button" aria-label="Нормально">🙂</button>
+    <button type="button" aria-label="Очень нравится">😍</button>
   </div>
 </section>
 
 </main>
 
-<div class="lb" hidden><button class="lb__close">Закрыть</button><img alt=""></div>
-
 <footer class="foot">
-  <div class="wrap foot__in">
-    <p>
-      RIGSARTHUR SCHOOL ALBUMS · Нальчик<br>
-      Артур Дзахмишев · <a href="https://wa.me/79287100102">WhatsApp</a>
-    </p>
-    <div class="foot__nav">
-      <a href="index.html">Главная</a><a href="works.html">Работы</a><a href="albums.html">Альбомы</a><a href="designs.html">Дизайны</a><a href="studio.html">Студия</a><a href="about.html">Обо мне</a><a href="contacts.html">Контакты</a>
-    </div>
-  </div>
+  <p><b>RIGSARTHUR SCHOOL ALBUMS</b> · Нальчик</p>
+  <p>Вопросы по альбому: <a href="https://wa.me/79287100102">Артур в WhatsApp</a></p>
 </footer>
 
-<div class="proto">
-  Черновик. <a href="structure.html">Что уже готово, что нет</a>
+<div class="bar" aria-live="polite">
+  <p><small>Твой выбор</small><b class="bar__name"></b></p>
+  <button type="button" class="bar__go">Голосую</button>
 </div>
 
-<script src="assets/site.js"></script>
+<div class="lb" hidden>
+  <button type="button" class="lb__close" aria-label="Закрыть">Закрыть</button>
+  <figure><img alt=""><figcaption></figcaption></figure>
+  <button type="button" class="lb__nav lb__prev" aria-label="Назад">‹</button>
+  <button type="button" class="lb__nav lb__next" aria-label="Дальше">›</button>
+</div>
+
+<script src="assets/carousel.js"></script>
+<script src="assets/klass/klass.js"></script>
 </body>
 </html>

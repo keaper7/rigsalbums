@@ -76,18 +76,6 @@ ol, ul { padding: 0; list-style: none; }
 }
 .link i { font-style: normal; }
 
-/* ---------- demo ---------- */
-.demo {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
-  padding: 8px 18px; background: var(--wine-3); color: var(--cream);
-  font-size: 12px; line-height: 1.35;
-}
-.demo span { flex: 1 1 220px; opacity: .8; }
-.demo a {
-  border: 1px solid rgba(246, 233, 228, .45); border-radius: 99px; padding: 6px 12px;
-  font-weight: 700; text-decoration: none; white-space: nowrap;
-}
-
 /* ---------- header ---------- */
 .hd {
   position: -webkit-sticky; position: sticky; top: 0; z-index: 50;
@@ -504,15 +492,19 @@ ol, ul { padding: 0; list-style: none; }
 .dock p b { display: block; font-size: 14px; }
 .dock a { flex: 0 0 auto; background: var(--wine); color: #fff; text-decoration: none; font-weight: 800; font-size: 14px; padding: 13px 18px; border-radius: 99px; }
 
-/* ---------- prep list (макет) ---------- */
-.prep { padding: 50px 0 20px; }
-.prep__box { border: 1.5px dashed rgba(140, 43, 43, .45); border-radius: 24px; padding: 22px 18px; background: var(--card); }
-.prep h2 { font: 700 22px/1.15 var(--disp); letter-spacing: -.02em; margin-top: 12px; }
+/* ---------- prep (страница «Что подготовить») ---------- */
+.prep { padding: 0 0 60px; }
+.prep__grid { display: grid; gap: 14px; }
+.prep__box { border: 1px solid var(--line); border-radius: 24px; padding: 22px 18px; background: var(--card); }
+.prep__hd { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.prep h2 { font: 700 20px/1.15 var(--disp); letter-spacing: -.02em; }
+.prep__hd .link { flex: 0 0 auto; font-size: 14px; }
 .prep p { margin-top: 8px; color: var(--ink-2); font-size: 14.5px; }
-.prep ol { margin-top: 16px; counter-reset: p; }
-.prep li { counter-increment: p; display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 14.5px; }
-.prep li:before { content: counter(p); font: 600 11px/1.9 var(--disp); color: var(--wine); }
-.prep li small { display: block; color: var(--ink-2); font-size: 12.5px; }
+.prep ol { margin-top: 14px; counter-reset: p; }
+.prep li { counter-increment: p; display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 15px; font-weight: 600; }
+.prep li:before { content: counter(p); flex: 0 0 14px; font: 600 11px/1.9 var(--disp); color: var(--wine); }
+.prep li small { display: block; margin-top: 2px; color: var(--ink-2); font-size: 13px; font-weight: 400; }
+@media (min-width: 820px) { .prep__grid { grid-template-columns: 1fr 1fr; align-items: start; } .prep__box { padding: 28px 26px; } }
 
 /* ---------- reveal ---------- */
 .js .rv { opacity: 0; -webkit-transform: translateY(26px); transform: translateY(26px); -webkit-transition: opacity .9s var(--ease), transform .9s var(--ease); transition: opacity .9s var(--ease), transform .9s var(--ease); }
@@ -853,8 +845,6 @@ ol, ul { padding: 0; list-style: none; }
 .ccard--ig i { background: var(--wine); color: #fff; }
 .note-box { margin-top: 14px; padding: 18px; border-radius: 20px; border: 1px solid var(--line); font-size: 15px; color: var(--ink-2); }
 .note-box b { color: var(--ink); }
-.mapslot { height: 240px; border-radius: 28px; margin-top: 12px; }
-.mapslot .slot { border-radius: 28px; }
 
 @media (max-width: 350px) {
   .kit, .kit-photos, .common { grid-template-columns: minmax(0, 1fr); }
@@ -900,7 +890,6 @@ ol, ul { padding: 0; list-style: none; }
   .facts { grid-template-columns: repeat(3, 1fr); }
   .facts li { flex-direction: column; min-height: 200px; justify-content: space-between; }
   .bigslot { height: 460px; }
-  .mapslot { height: 340px; }
 }
 
 

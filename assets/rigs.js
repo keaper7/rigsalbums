@@ -205,20 +205,6 @@
     } else if (v.src) v.pause();
   }, { rootMargin: '200px 0px' });
 
-  // Список «что подготовить» собирается из мест под контент
-  var list = $('.prep__list');
-  if (list) {
-    $$('[data-prep]').forEach(function (s) {
-      var parts = s.getAttribute('data-prep').split('|');
-      var li = document.createElement('li');
-      var d = document.createElement('div');
-      d.textContent = parts[0];
-      if (parts[1]) { var sm = document.createElement('small'); sm.textContent = parts[1]; d.appendChild(sm); }
-      li.appendChild(d);
-      list.appendChild(li);
-    });
-  }
-
   // Просмотр фото на весь экран
   var lb = $('.lb');
   if (lb) {

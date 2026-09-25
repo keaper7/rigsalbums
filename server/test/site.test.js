@@ -361,3 +361,32 @@ test('ненужные файлы удаляются, нужные остают�
   app.media.gc();
   assert.ok(app.store.getMedia(cat.id));
 });
+
+test('варианты: удаление из списка, выбранные классами только прячутся', async t => {
+  const { app, base, stop } = await start();
+  t.after(stop);
+  const admin = await adminLogin(base);
+  const guest = client(base);
+  const themes = () => app.store.listOptions().theme;
+  const neon = themes().find(o => o.key === 'neon');
+  const money = themes().find(o => o.key === 'money');
+
+  let r = await admin.req('GET', '/admin/catalog');
+  assert.match(r.text, new RegExp('action="/admin/o/' + neon.id + '/delete"'));
+
+  r = await admin.post('/admin/o/' + neon.id + '/delete');
+  assert.strictEqual(r.headers.get('location'), '/admin/catalog?m=optdeleted');
+  assert.ok(!themes().some(o => o.key === 'neon'));
+  r = await guest.req('GET', '/designs.html');
+  assert.doesNotMatch(r.text, /id="neon"/);
+
+  // Класс выбрал «money»: удаление прячет вариант, итог класса цел
+  const id = await createClass(admin, 'Школа 1', '11А');
+  app.store.addVote(+id, 'voter1', 'theme', 'money');
+  r = await admin.post('/admin/o/' + money.id + '/delete');
+  assert.strictEqual(r.headers.get('location'), '/admin/catalog?m=opthidden');
+  const m = themes().find(o => o.key === 'money');
+  assert.ok(m && m.hidden);
+  r = await guest.req('GET', '/designs.html');
+  assert.doesNotMatch(r.text, /id="money"/);
+});

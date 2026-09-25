@@ -250,15 +250,6 @@ ${steps.map((s, i) => html`    <li><b>${i + 1}</b><span>${STEP_TITLE[s]}</span><
   <div class="hero__meta"><span><b id="voters">${voters}</b> уже проголосовали</span><a class="btn" href="#s-${steps[0] || 'theme'}">${draft ? 'Смотреть варианты' : 'Начать выбор'}</a></div>
 </section>
 ${voting}${closed || p.demo ? resultSection(base, p) : ''}
-<section class="react">
-  <p>Как тебе страница выбора? Я очень старался, чтобы вам было удобно</p>
-  <div class="react__row">
-    <button type="button" data-v="bad" aria-label="Плохо">💩</button>
-    <button type="button" data-v="love" aria-label="Нравится">❤️</button>
-    <button type="button" data-v="ok" aria-label="Нормально">🙂</button>
-    <button type="button" data-v="wow" aria-label="Очень нравится">😍</button>
-  </div>
-</section>
 
 </main>
 

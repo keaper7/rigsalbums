@@ -403,3 +403,4 @@ a.row:active { background: var(--paper-2); }
 @media (prefers-reduced-motion: reduce) {
   * { -webkit-animation: none !important; animation: none !important; -webkit-transition: none !important; transition: none !important; }
 }
+.ic--del { color: var(--wine-2); }

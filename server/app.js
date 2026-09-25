@@ -740,6 +740,21 @@ function createApp(cfg) {
     H.json(ctx.res, 200, { ok: true, count: photos.length });
   });
 
+  // Вариант, который уже выбирали классы, не стираем, а прячем: иначе сломаются их итоги
+  r.post('/admin/o/:id/delete', ctx => {
+    const o = loadOption(ctx);
+    if (!o) return notFound(ctx);
+    if (!o.hidden && !catalog()[o.step].some(x => !x.hidden && x.id !== o.id)) return back(ctx, '/admin/catalog?e=lastopt');
+    if (store.optionUsage(o.step, o.key)) {
+      store.updateOption(o.id, o, true);
+      changed();
+      return back(ctx, '/admin/catalog', 'opthidden');
+    }
+    store.deleteOption(o.id);
+    changed();
+    back(ctx, '/admin/catalog', 'optdeleted');
+  });
+
   r.post('/admin/o/:id/move', ctx => {
     const o = loadOption(ctx);
     if (!o) return notFound(ctx);

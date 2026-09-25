@@ -28,13 +28,17 @@ const MSG = {
   video: 'Видео загружено, на сайте оно уже стоит',
   restored: 'Вернули как было',
   removed: 'Фото убрано',
+  optdeleted: 'Вариант удалён',
+  opthidden: 'Вариант убран с сайта и у новых классов. Его уже выбирали, поэтому в их итогах он сохранится',
   optcreated: 'Вариант создан и пока скрыт. Добавьте фото и тексты, потом снимите галочку «Скрыть»'
 };
 
 const ERR = {
   last: 'Последнее фото убрать нельзя. Сначала добавьте новые',
   lastphoto: 'Последнее фото убрать нельзя, пока вариант показан классам',
-  name: 'Напишите название'
+  name: 'Напишите название',
+  used: 'Этот вариант уже выбирали классы, поэтому удалить его нельзя: сломаются их итоги. Поставьте галочку «Скрыть у всех классов», и новые классы его не увидят',
+  lastopt: 'Это последний вариант этапа, его нельзя удалить'
 };
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
@@ -594,6 +598,7 @@ ${STEPS.map(step => html`<section class="group">
     <span class="row__tools">
       <form method="post" action="/admin/o/${x.id}/move">${csrf(o.sess)}<input type="hidden" name="dir" value="-1"><button class="ic" type="submit" aria-label="Выше"${i === 0 ? raw(' disabled') : ''}>↑</button></form>
       <form method="post" action="/admin/o/${x.id}/move">${csrf(o.sess)}<input type="hidden" name="dir" value="1"><button class="ic" type="submit" aria-label="Ниже"${i === arr.length - 1 ? raw(' disabled') : ''}>↓</button></form>
+      <form method="post" action="/admin/o/${x.id}/delete" data-confirm="Удалить «${x.name}»?">${csrf(o.sess)}<button class="ic ic--del" type="submit" aria-label="Удалить">✕</button></form>
     </span>
   </div>`)}</div>
   <form class="addopt" method="post" action="/admin/catalog/new">
@@ -659,7 +664,12 @@ function optionPage(o) {
   <label class="check"><input type="checkbox" name="hidden" value="1"${x.hidden ? raw(' checked') : ''}><span>Скрыть у всех классов</span></label>
   <button class="b b--main" type="submit">Сохранить</button>
 </form>
-${photoCard}`
+${photoCard}
+<form class="card" method="post" action="/admin/o/${x.id}/delete">
+  ${csrf(o.sess)}
+  <p class="muted small">Если вариант больше не нужен. Если его уже выбирал какой-то класс, он пропадёт с сайта и у новых классов, но в прошлых итогах останется.</p>
+  <button class="b b--wide b--danger" type="submit" data-confirm="Удалить «${x.name}» насовсем? Вернуть не получится">Удалить вариант</button>
+</form>`
   });
 }
 

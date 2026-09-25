@@ -383,16 +383,6 @@ section, .step { scroll-margin-top: var(--top); }
 .pending h3 { font: 600 22px/1.2 var(--disp); margin: 10px 0 8px; }
 .pending p:last-child { color: var(--ink-2); font-size: 15px; }
 
-/* react */
-.react { margin: 36px 12px 0; padding: 22px 18px; text-align: center; border-top: 1px solid var(--line); }
-.react p { font-size: 15px; color: var(--ink-2); max-width: 24em; margin: 0 auto; }
-.react__row { display: flex; justify-content: center; gap: 10px; margin-top: 14px; }
-.react button {
-  width: 54px; height: 54px; border-radius: 50%;
-  border: 1px solid var(--line); background: #fff; font-size: 24px; cursor: pointer;
-  -webkit-transition: transform .2s; transition: transform .2s;
-}
-.react button.is-on { border-color: var(--wine); box-shadow: 0 0 0 2px var(--wine); -webkit-transform: scale(1.1); transform: scale(1.1); }
 
 .foot { max-width: 720px; margin: 0 auto; padding: 24px 16px 120px; font-size: 13px; color: var(--ink-2); }
 .foot p + p { margin-top: 4px; }

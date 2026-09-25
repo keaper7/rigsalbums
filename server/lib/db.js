@@ -183,6 +183,19 @@ class Store {
     return !!this.db.prepare('SELECT id FROM options WHERE step = ? AND key = ?').get(step, key);
   }
 
+  // Сколько классов уже голосовали за вариант или получили его в итоге
+  optionUsage(step, key) {
+    const v = this.db.prepare('SELECT COUNT(DISTINCT class_id) n FROM votes WHERE step = ? AND option = ?').get(step, key).n;
+    const p = this.db.prepare('SELECT picks FROM classes').all().filter(r => {
+      try { return (JSON.parse(r.picks) || {})[step] === key; } catch (e) { return false; }
+    }).length;
+    return v + p;
+  }
+
+  deleteOption(id) {
+    this.db.prepare('DELETE FROM options WHERE id = ?').run(id);
+  }
+
   // Новый вариант встаёт в конец своего этапа
   addOption(step, key, data, hidden) {
     const clean = Object.assign({}, data);

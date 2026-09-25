@@ -390,3 +390,32 @@ test('варианты: удаление из списка, выбранные �
   r = await guest.req('GET', '/designs.html');
   assert.doesNotMatch(r.text, /id="money"/);
 });
+
+test('новый класс по образцу, сразу несколько', async t => {
+  const { app, base, stop } = await start();
+  t.after(stop);
+  const admin = await adminLogin(base);
+  const id = +(await createClass(admin, 'Лицей №2', '11А'));
+  app.store.updateClass(id, { hidden: ['neon'], address: 'Кабардинская, 1', note: 'Заметка', duration_min: 90 });
+
+  let r = await admin.req('GET', '/admin/new?from=' + id);
+  assert.match(r.text, new RegExp('<option value="' + id + '"[^>]* selected'));
+  assert.match(r.text, /value="Лицей №2"/);
+
+  r = await admin.post('/admin/new', { from: String(id), school: 'Лицей №2', title: '11Б, 11В; 11б', year: '2026', duration_min: '90' });
+  assert.strictEqual(r.headers.get('location'), '/admin?m=createdmany');
+  const made = app.store.listClasses().filter(c => c.id !== id);
+  assert.deepStrictEqual(made.map(c => c.title).sort(), ['11Б', '11В']);
+  made.forEach(c => {
+    assert.deepStrictEqual(c.hidden, ['neon']);
+    assert.strictEqual(c.address, 'Кабардинская, 1');
+    assert.strictEqual(c.note, 'Заметка');
+    assert.strictEqual(c.duration_min, 90);
+    assert.notStrictEqual(c.slug, made[0] === c ? made[1].slug : made[0].slug);
+  });
+
+  r = await admin.post('/admin/new', { school: 'Школа 5', title: '9А' });
+  assert.match(r.headers.get('location'), /^\/admin\/c\/\d+\?m=created$/);
+  r = await admin.post('/admin/new', { school: 'Школа 5', title: Array.from({ length: 11 }, (_, i) => '9' + i).join(',') });
+  assert.strictEqual(r.status, 400);
+});

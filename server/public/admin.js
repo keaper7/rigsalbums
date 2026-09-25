@@ -378,4 +378,21 @@
       state(input).fail(err.message || 'Не получилось загрузить');
     });
   });
+
+  // Новый класс: выбрали образец — подставляем его школу, год и длительность
+  document.addEventListener('change', function (e) {
+    var sel = e.target;
+    if (!sel.hasAttribute || !sel.hasAttribute('data-from')) return;
+    var opt = sel.options[sel.selectedIndex];
+    var form = sel.form;
+    if (!opt || opt.value === '0') return;
+    var school = form.elements.school;
+    if (!school.value || school.getAttribute('data-auto') === school.value) {
+      school.value = opt.getAttribute('data-school');
+      school.setAttribute('data-auto', school.value);
+    }
+    form.elements.year.value = opt.getAttribute('data-year');
+    var dur = form.elements.duration_min, v = opt.getAttribute('data-duration');
+    for (var i = 0; i < dur.options.length; i++) if (dur.options[i].value === v) dur.selectedIndex = i;
+  });
 })();

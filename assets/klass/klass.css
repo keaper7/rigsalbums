@@ -496,7 +496,7 @@ html { -webkit-tap-highlight-color: transparent; }
   .step { padding-left: 0; padding-right: 0; }
   .strip--tall { --h: 340px; }
   .colors { grid-template-columns: repeat(4, 1fr); }
-  .result__pair { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
+  .result__pair { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   .result__pair .opt { margin: 0 0 16px; }
   .lb figure { padding: 60px 80px 30px; }
   .lb__nav { top: 50%; bottom: auto; margin-top: -25px; }
@@ -507,3 +507,23 @@ html { -webkit-tap-highlight-color: transparent; }
   .rail__seg.is-on b { animation: none !important; -webkit-transform: scaleX(1); transform: scaleX(1); }
   * { -webkit-transition: none !important; transition: none !important; -webkit-animation: none !important; animation: none !important; }
 }
+
+/* Табличка итогов этапа */
+.tally { margin: 0 4px 18px; padding: 14px 16px 12px; border-radius: 18px; background: #fff; box-shadow: 0 1px 0 rgba(58, 35, 33, .06), 0 10px 30px -18px rgba(58, 35, 33, .35); }
+.tally__head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 8px; }
+.tally__head b { font: 600 13px/1.2 var(--disp); letter-spacing: .06em; text-transform: uppercase; color: var(--wine); }
+.tally__head small { font-size: 12px; color: var(--ink-2); }
+.tally ol { list-style: none; margin: 0; padding: 0; }
+.tally li { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 3em; align-items: center; gap: 10px; padding: 7px 0; font-size: 14px; border-top: 1px solid rgba(58, 35, 33, .07); }
+.tally li:first-child { border-top: 0; }
+.tally__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tally__bar { display: block; height: 8px; border-radius: 99px; background: rgba(58, 35, 33, .08); overflow: hidden; }
+.tally__bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: rgba(58, 35, 33, .28); -webkit-transition: width .9s cubic-bezier(.2, .8, .2, 1); transition: width .9s cubic-bezier(.2, .8, .2, 1); }
+.tally li b { font: 800 14px/1 var(--sans); text-align: right; font-variant-numeric: tabular-nums; }
+.tally li.is-top .tally__bar i { background: var(--wine); }
+.tally li.is-top .tally__name { font-weight: 800; }
+.tally li.is-mine .tally__name::after { content: ' · твой'; font-weight: 600; font-size: 12px; color: var(--ok); }
+.tally--all { margin: 20px 0 0; text-align: left; }
+.tally--all .tally__head { margin-top: 14px; }
+.tally--all .tally__head:first-child { margin-top: 0; }
+.result__slot { min-width: 0; }

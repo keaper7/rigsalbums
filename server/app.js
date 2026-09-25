@@ -294,8 +294,22 @@ function createApp(cfg) {
     page(ctx, 200, A.classesPage({ sess: ctx.sess, msg: ctx.q('m'), classes: withPending(store.listClasses()), base: baseUrl(ctx) }));
   });
 
+  // Классы, с которых можно взять настройки: свежие сверху, архив не нужен
+  function templates() {
+    return store.listClasses().filter(c => !c.archived);
+  }
+
+  function newView(ctx, extra) {
+    const from = parseInt(ctx.q('from') || (extra && extra.form && extra.form.from) || '', 10) || 0;
+    const src = from ? store.getClass(from) : null;
+    return A.newClassPage(Object.assign({
+      sess: ctx.sess, defaults: defaultsFor(store), classes: templates(), from: src ? src.id : 0,
+      nextTitle: src ? nextTitle(src.title) : ''
+    }, extra || {}, src && !(extra && extra.form) ? { form: { school: src.school, year: src.year, duration_min: src.duration_min } } : {}));
+  }
+
   r.get('/admin/new', ctx => {
-    page(ctx, 200, A.newClassPage({ sess: ctx.sess, defaults: defaultsFor(store) }));
+    page(ctx, 200, newView(ctx));
   });
 
   function newSlug(school, title) {
@@ -307,20 +321,40 @@ function createApp(cfg) {
     return base.slice(0, 20) + '-' + randomCode(8);
   }
 
+  // «11А, 11Б, 11В» — сразу несколько классов одной параллели
+  function splitTitles(v) {
+    const seen = {};
+    return String(v || '').split(/[,;\n]/).map(t => t.trim().slice(0, 40)).filter(t => {
+      if (!t || seen[t.toLowerCase()]) return false;
+      seen[t.toLowerCase()] = true;
+      return true;
+    });
+  }
+
+  function createFrom(src, school, title, year, duration) {
+    const d = defaultsFor(store);
+    const base = { slug: newSlug(school, title), school: school, title: title, year: year, duration_min: duration };
+    return store.createClass(Object.assign(base, src
+      ? { hidden: src.hidden, shoot: src.shoot, address: src.address, bring: src.bring, note: src.note }
+      : { address: d.address, bring: d.bring }));
+  }
+
   r.post('/admin/new', ctx => {
     const f = ctx.form;
     const d = defaultsFor(store);
     const school = str(f.school, 60);
-    const title = str(f.title, 40);
-    if (!school || !title) {
-      return page(ctx, 400, A.newClassPage({ sess: ctx.sess, defaults: d, form: f, err: 'Заполните школу и класс' }));
-    }
-    const id = store.createClass({
-      slug: newSlug(school, title), school: school, title: title,
-      year: int(f.year, 2020, 2100, d.year), duration_min: int(f.duration_min, 5, 600, d.duration_min),
-      address: d.address, bring: d.bring
-    });
-    back(ctx, '/admin/c/' + id, 'created');
+    const titles = splitTitles(f.title);
+    const from = parseInt(f.from, 10) || 0;
+    const src = from ? store.getClass(from) : null;
+    const fail = err => page(ctx, 400, newView(ctx, { form: f, err: err }));
+    if (!school || !titles.length) return fail('Заполните школу и класс');
+    if (titles.length > 10) return fail('За раз можно создать до 10 классов');
+    if (from && !src) return fail('Класс, с которого брали настройки, уже удалён. Выберите другой');
+    const year = int(f.year, 2020, 2100, src ? src.year : d.year);
+    const duration = int(f.duration_min, 5, 600, src ? src.duration_min : d.duration_min);
+    const ids = titles.map(t => createFrom(src, school, t, year, duration));
+    if (ids.length === 1) return back(ctx, '/admin/c/' + ids[0], src ? 'copied' : 'created');
+    back(ctx, '/admin', 'createdmany');
   });
 
   function loadClass(ctx) {
@@ -474,10 +508,7 @@ function createApp(cfg) {
     const school = str(ctx.form.school, 60) || cls.school;
     const title = str(ctx.form.title, 40);
     if (!title) return page(ctx, 400, classView(ctx, cls, { err: 'Напишите, для какого класса копия' }));
-    const id = store.createClass({
-      slug: newSlug(school, title), school: school, title: title, year: cls.year, duration_min: cls.duration_min,
-      hidden: cls.hidden, shoot: cls.shoot, address: cls.address, bring: cls.bring, note: cls.note
-    });
+    const id = createFrom(cls, school, title, cls.year, cls.duration_min);
     back(ctx, '/admin/c/' + id, 'copied');
   });
 

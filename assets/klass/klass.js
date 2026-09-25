@@ -94,6 +94,78 @@
       var fill = o.querySelector('.res__bar i');
       requestAnimationFrame(function () { requestAnimationFrame(function () { fill.style.width = pct + '%'; }); });
     });
+    renderTally(step);
+  }
+
+  // Табличка итогов: все варианты этапа одним взглядом, от лидера вниз
+  function tallyRows(step) {
+    var sec = section(step), c = counts(step), t = total(c), rows = [];
+    $$('.opt', sec).forEach(function (o, i) {
+      var id = o.getAttribute('data-id');
+      rows.push({ id: id, name: o.getAttribute('data-name'), n: c[id] || 0, i: i });
+    });
+    rows.sort(function (a, b) { return b.n - a.n || a.i - b.i; });
+    return rows.map(function (r) { r.pct = t ? Math.round(r.n * 100 / t) : 0; return r; });
+  }
+  function fillTally(box, step) {
+    var rows = tallyRows(step), top = rows.length ? rows[0].n : 0;
+    box.innerHTML = '';
+    rows.forEach(function (r) {
+      var li = document.createElement('li');
+      if (r.id === votes[step]) li.className = 'is-mine';
+      if (top && r.n === top) li.className += ' is-top';
+      var name = document.createElement('span');
+      name.className = 'tally__name';
+      name.textContent = r.name;
+      var bar = document.createElement('i');
+      bar.className = 'tally__bar';
+      var fill = document.createElement('i');
+      bar.appendChild(fill);
+      var pct = document.createElement('b');
+      pct.textContent = r.pct + '%';
+      li.appendChild(name); li.appendChild(bar); li.appendChild(pct);
+      box.appendChild(li);
+      requestAnimationFrame(function () { requestAnimationFrame(function () { fill.style.width = r.pct + '%'; }); });
+    });
+  }
+  function renderTally(step) {
+    var sec = section(step);
+    var box = sec.querySelector('.tally');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'tally';
+      box.innerHTML = '<p class="tally__head"><b>Сейчас в классе</b><small></small></p><ol></ol>';
+      var head = sec.querySelector('.step__head');
+      head.parentNode.insertBefore(box, head.nextSibling);
+    }
+    box.querySelector('small').textContent = 'голосов: ' + total(counts(step));
+    fillTally(box.querySelector('ol'), step);
+    renderSummary();
+  }
+  function renderSummary() {
+    var done = document.getElementById('done');
+    if (!done) return;
+    var box = done.querySelector('.tally--all');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'tally tally--all';
+      done.appendChild(box);
+    }
+    box.innerHTML = '';
+    STEPS.forEach(function (st) {
+      if (!votes[st] || !section(st)) return;
+      var h = document.createElement('p');
+      h.className = 'tally__head';
+      var b = document.createElement('b');
+      var a = document.querySelector('.steps a[data-step="' + st + '"]');
+      b.textContent = a ? a.textContent.replace(/^\d+/, '') : st;
+      var sm = document.createElement('small');
+      sm.textContent = 'голосов: ' + total(counts(st));
+      h.appendChild(b); h.appendChild(sm);
+      var ol = document.createElement('ol');
+      box.appendChild(h); box.appendChild(ol);
+      fillTally(ol, st);
+    });
   }
 
   function renderNav() {
@@ -329,6 +401,11 @@
       var d = copy.querySelector('details');
       if (d) d.setAttribute('open', '');
       $$('.rail', copy).forEach(function (r) { r.parentNode.removeChild(r); });
+      // Копия уже загруженных фото: пометка «грузится» от оригинала тут не нужна
+      $$('img.ld', copy).forEach(function (im) {
+        if (im.complete && im.naturalWidth) im.classList.remove('ld');
+        else im.addEventListener('load', function () { im.classList.remove('ld'); });
+      });
       slot.appendChild(copy);
       var st = copy.querySelector('[data-carousel]');
       if (st && window.RigsCarousel) { st.scrollLeft = 0; window.RigsCarousel(st); }

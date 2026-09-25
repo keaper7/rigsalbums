@@ -8,7 +8,8 @@ const { SLOTS, GALLERIES, TEXTS, TOGGLES, THEMES, isWide } = require('../lib/sit
 const MSG = {
   saved: 'Сохранено',
   created: 'Класс создан. Проверьте данные и отправьте ссылку классу',
-  copied: 'Копия создана. Проверьте название класса',
+  copied: 'Класс создан с теми же настройками. Можно поправить, что нужно',
+  createdmany: 'Классы созданы с одинаковыми настройками',
   opened: 'Голосование началось',
   scheduled: 'Старт запланирован. Страница откроется для голосования сама',
   unscheduled: 'Запланированный старт отменён',
@@ -205,20 +206,28 @@ function durationSelect(name, value) {
 function newClassPage(o) {
   const d = o.defaults;
   const f = o.form || {};
+  const list = o.classes || [];
+  const from = +(f.from || o.from || 0);
+  const pick = list.length ? html`
+  <label class="field"><span>Настройки взять из</span><select name="from" data-from>
+    <option value="0">Обычные настройки</option>
+    ${list.map(c => html`<option value="${c.id}" data-school="${c.school}" data-year="${c.year}" data-duration="${c.duration_min}"${c.id === from ? raw(' selected') : ''}>${c.school} · ${c.title}</option>`)}
+  </select></label>
+  <p class="muted small">Скопируются скрытые варианты, дата съёмки, адрес, что взять с собой и заметка. Голоса не копируются.</p>` : '';
   return layout({
     title: 'Новый класс', nav: 'classes', sess: o.sess, err: o.err,
     body: html`<a class="back" href="/admin">← Классы</a>
 <h1 class="h1">Новый класс</h1>
 <form class="card form" method="post" action="/admin/new">
-  ${csrf(o.sess)}
+  ${csrf(o.sess)}${pick}
   <label class="field"><span>Школа</span><input name="school" value="${f.school || ''}" placeholder="Лицей №2" required maxlength="60" autocomplete="off"></label>
-  <label class="field"><span>Класс</span><input name="title" value="${f.title || ''}" placeholder="11 «Б»" required maxlength="40" autocomplete="off"></label>
+  <label class="field"><span>Класс</span><input name="title" value="${f.title || ''}" placeholder="${o.nextTitle || '11 «Б»'}" required maxlength="400" autocomplete="off"></label>
+  <p class="muted small">Можно сразу несколько через запятую: 11А, 11Б, 11В. Каждому классу будет своя ссылка.</p>
   <div class="two">
     <label class="field"><span>Год выпуска</span><input name="year" type="number" inputmode="numeric" min="2020" max="2100" value="${f.year || d.year}" required></label>
     <label class="field"><span>Голосование длится</span>${durationSelect('duration_min', +(f.duration_min || d.duration_min))}</label>
   </div>
-  <p class="muted small">Адрес, что взять с собой и остальное для шпаргалки подставятся из настроек, их можно поменять на странице класса.</p>
-  <button class="b b--main b--wide" type="submit">Создать страницу класса</button>
+  <button class="b b--main b--wide" type="submit">Создать</button>
 </form>`
   });
 }
@@ -410,14 +419,11 @@ ${resultsBlock(o)}
   <button class="b b--main" type="submit">Сохранить</button>
 </form>
 
-<form class="card form" method="post" action="/admin/c/${c.id}/duplicate" id="duplicate">
-  ${csrf(o.sess)}
-  <div class="card__h"><h2 class="h">Дублировать</h2></div>
-  <p class="muted small">Новая страница с теми же вариантами, шпаргалкой и длительностью. Голоса не копируются.</p>
-  <label class="field"><span>Школа</span><input name="school" value="${c.school}" required maxlength="60"></label>
-  <label class="field"><span>Класс</span><input name="title" value="" placeholder="${o.nextTitle}" required maxlength="40"></label>
-  <button class="b b--main" type="submit">Создать копию</button>
-</form>
+<div class="card" id="duplicate">
+  <div class="card__h"><h2 class="h">Похожий класс</h2></div>
+  <p class="muted small">Новая страница с теми же вариантами, шпаргалкой и длительностью. Голоса не копируются. Можно сразу несколько классов параллели.</p>
+  <a class="b b--main b--wide" href="/admin/new?from=${c.id}">Создать по образцу</a>
+</div>
 
 <div class="card danger">
   <div class="card__h"><h2 class="h">Ещё</h2></div>

@@ -35,6 +35,12 @@
 
   function copy(text, btn) {
     function done() {
+      if (btn.classList.contains('row__copy')) {
+        btn.classList.add('is-done');
+        setTimeout(function () { btn.classList.remove('is-done'); }, 1600);
+        toast('Ссылка скопирована, можно вставлять в чат');
+        return;
+      }
       if (btn.classList.contains('ic')) {
         var old = btn.textContent;
         btn.textContent = '✓';
@@ -395,4 +401,41 @@
     var dur = form.elements.duration_min, v = opt.getAttribute('data-duration');
     for (var i = 0; i < dur.options.length; i++) if (dur.options[i].value === v) dur.selectedIndex = i;
   });
+
+  // Несохранённые правки: подсвечиваем кнопку и переспрашиваем перед уходом со страницы
+  var dirty = [];
+  function markDirty(e) {
+    var form = e.target.form;
+    if (!form || !form.classList.contains('form') || e.target.type === 'file' || e.target.type === 'password' || e.target.hasAttribute('data-from')) return;
+    if (form.classList.contains('is-dirty')) return;
+    form.classList.add('is-dirty');
+    dirty.push(form);
+    var btn = form.querySelector('[type=submit].b--main');
+    if (btn && !form.querySelector('.dirty-note')) {
+      var p = document.createElement('p');
+      p.className = 'dirty-note';
+      p.textContent = 'Есть несохранённые изменения';
+      btn.parentNode.insertBefore(p, btn.nextSibling);
+    }
+  }
+  document.addEventListener('input', markDirty);
+  document.addEventListener('change', markDirty);
+  document.addEventListener('submit', function (e) {
+    if (!e.defaultPrevented) dirty = dirty.filter(function (f) { return f !== e.target; });
+  });
+  window.addEventListener('beforeunload', function (e) {
+    if (!dirty.length) return;
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  });
+
+  // Ссылка с #блоком ведёт к свёрнутому блоку — раскрываем его
+  function openHash() {
+    var id = location.hash.slice(1);
+    var el = id && document.getElementById(id);
+    if (el && el.tagName === 'DETAILS') el.open = true;
+  }
+  openHash();
+  window.addEventListener('hashchange', openHash);
 })();

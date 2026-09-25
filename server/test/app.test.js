@@ -84,8 +84,6 @@ test('полный сценарий голосования', async t => {
   assert.strictEqual(r.status, 200);
   await kid2.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'wear', option: 'casual' } });
   await kid2.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'color', option: 'red' } });
-  r = await kid2.req('POST', '/k/' + cls.slug + '/react', { json: { value: 'wow' } });
-  assert.strictEqual(r.status, 200);
 
   r = await kid2.req('GET', '/k/' + cls.slug + '/state');
   assert.strictEqual(r.data.status, 'open');
@@ -131,7 +129,6 @@ test('полный сценарий голосования', async t => {
   r = await admin.req('GET', '/admin/c/' + id);
   assert.strictEqual(r.status, 200);
   assert.match(r.text, /Выбрано вручную/);
-  assert.match(r.text, /😍 1/);
 
   // Дублирование: те же настройки, без голосов, черновик
   r = await admin.post('/admin/c/' + id + '/duplicate', { school: 'Лицей №2', title: '11 «В»' });

@@ -292,26 +292,6 @@ class Store {
     this.db.prepare('DELETE FROM votes WHERE class_id = ?').run(classId);
   }
 
-  // ---------- реакции на страницу ----------
-  setReaction(classId, voter, value) {
-    this.db.prepare(`INSERT INTO reactions (class_id, voter, value, created_at) VALUES (?, ?, ?, ?)
-      ON CONFLICT(class_id, voter) DO UPDATE SET value = excluded.value, created_at = excluded.created_at`)
-      .run(classId, voter, value, Date.now());
-  }
-
-  myReaction(classId, voter) {
-    if (!voter) return null;
-    const row = this.db.prepare('SELECT value FROM reactions WHERE class_id = ? AND voter = ?').get(classId, voter);
-    return row ? row.value : null;
-  }
-
-  reactionCounts(classId) {
-    const out = {};
-    this.db.prepare('SELECT value, COUNT(*) n FROM reactions WHERE class_id = ? GROUP BY value').all(classId)
-      .forEach(r => { out[r.value] = r.n; });
-    return out;
-  }
-
   // ---------- сессии админки ----------
   createSession(id, ttl) {
     const now = Date.now();

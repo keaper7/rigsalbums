@@ -186,8 +186,7 @@ function createApp(cfg) {
       config: {
         api: '/k/' + encodeURIComponent(cls.slug),
         steps: V.activeSteps(opts),
-        state: state,
-        reaction: store.myReaction(cls.id, voter)
+        state: state
       }
     });
     H.send(ctx.res, 200, body, 'text/html; charset=utf-8', {
@@ -223,17 +222,6 @@ function createApp(cfg) {
     const state = V.publicState(store, cat, cls, voter);
     if (!ok) return H.json(ctx.res, 409, { error: 'already', state: state });
     H.json(ctx.res, 200, { ok: true, state: state });
-  });
-
-  r.post('/k/:slug/react', ctx => {
-    const cls = store.getClassBySlug(ctx.params.slug);
-    if (!cls) return H.json(ctx.res, 404, { error: 'not_found' });
-    const voter = voterOf(ctx);
-    const value = String((ctx.body || {}).value || '');
-    if (!voter || ['wow', 'love', 'ok', 'bad'].indexOf(value) === -1) return H.json(ctx.res, 400, { error: 'bad' });
-    if (!voteLimit.hit(ctx.ip)) return H.json(ctx.res, 429, { error: 'busy' });
-    store.setReaction(cls.id, voter, value);
-    H.json(ctx.res, 200, { ok: true });
   });
 
   // ---------- загруженные файлы ----------
@@ -370,7 +358,7 @@ function createApp(cfg) {
     const url = baseUrl(ctx) + '/k/' + cls.slug;
     return {
       sess: ctx.sess, cls: cls, catalog: cat, counts: counts, voters: voters,
-      reactions: store.reactionCounts(cls.id), online: online(cls.id),
+      online: online(cls.id),
       summary: V.status(cls) === 'closed' && !V.isPending(res) ? resultText(cls, res, voters, url) : ''
     };
   }

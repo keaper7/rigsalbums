@@ -223,8 +223,6 @@ a.row:active { background: var(--paper-2); }
 .bar.is-win .bar__line i { background: var(--ok); }
 .bar.is-tie .bar__line i { background: var(--warn); }
 .bar form { margin: 8px 0 2px; }
-.reacts { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 6px 14px; }
-.reacts span { font-weight: 800; color: var(--ink); }
 
 /* опасные действия */
 .danger { display: grid; gap: 8px; }
@@ -266,7 +264,12 @@ a.row:active { background: var(--paper-2); }
 .row--class { padding: 0; gap: 0; }
 .row__link { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 6px 14px 16px; text-decoration: none; }
 .row__link:active { background: var(--paper-2); }
-.ic--copy { flex: 0 0 auto; margin: 0 10px 0 4px; font-size: 17px; color: var(--ink-2); }
+.row__copy { flex: 0 0 auto; display: grid; justify-items: center; gap: 2px; width: 52px; margin-right: 6px; padding: 8px 0 6px; border: 0; border-radius: 12px; background: none; cursor: pointer; color: var(--ink-2); font-size: 10.5px; font-weight: 800; letter-spacing: .02em; }
+.row__copy svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.row__copy:active { background: var(--paper-2); }
+.row__copy.is-done { color: var(--ok); }
+.row__copy.is-done span { font-size: 0; }
+.row__copy.is-done span:after { content: 'готово'; font-size: 10.5px; }
 .ic.is-done { background: var(--ok); border-color: var(--ok); color: #fff; }
 .chip--plan { background: #E6ECF6; color: #2F4F86; }
 
@@ -371,6 +374,27 @@ a.row:active { background: var(--paper-2); }
 .addopt input:focus { border-color: var(--wine); outline: none; }
 
 /* на телефоне разделы внизу, под большим пальцем */
+/* свёрнутые блоки */
+.fold { padding: 0; }
+.fold__h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; cursor: pointer; list-style: none; border-radius: var(--r); }
+.fold__h::-webkit-details-marker { display: none; }
+.fold__h span { display: grid; gap: 3px; min-width: 0; }
+.fold__h b { font: 700 16px/1.25 var(--disp); letter-spacing: -.01em; }
+.fold__h small { font-size: 13.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fold__h:after { content: ''; flex: 0 0 auto; width: 9px; height: 9px; margin-right: 6px; border: solid var(--ink-2); border-width: 0 2px 2px 0; -webkit-transform: rotate(45deg) translateY(-3px); transform: rotate(45deg) translateY(-3px); -webkit-transition: -webkit-transform .2s; transition: transform .2s; }
+.fold[open] .fold__h:after { -webkit-transform: rotate(-135deg) translateY(-2px); transform: rotate(-135deg) translateY(-2px); }
+.fold > form, .fold > .fold__in { padding: 0 16px 18px; }
+.more--rest { margin-top: 4px; }
+.more--rest summary { font-size: 14px; }
+.more--rest summary:after { content: ' +'; }
+.more--rest[open] summary:after { content: ' −'; }
+.card .danger { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+#duplicate > .muted { margin: 8px 0 0; }
+.ah__site { margin-left: auto; font-size: 13px; font-weight: 800; color: var(--wine); text-decoration: none; white-space: nowrap; padding: 8px 4px; }
+.is-dirty [type=submit].b--main { box-shadow: 0 0 0 3px rgba(140, 43, 43, .25); }
+.dirty-note { display: none; font-size: 13.5px; font-weight: 700; color: var(--warn); margin-top: 8px; }
+.is-dirty .dirty-note { display: block; }
+
 @media (max-width: 639px) {
   .ah { background: var(--paper); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .ah__in { padding: 12px 16px; }
@@ -404,3 +428,9 @@ a.row:active { background: var(--paper-2); }
   * { -webkit-animation: none !important; animation: none !important; -webkit-transition: none !important; transition: none !important; }
 }
 .ic--del { color: var(--wine-2); }
+
+/* Список вариантов: названия целиком, кнопки компактнее */
+.row--opt .row__main b { white-space: normal; font-size: 16px; line-height: 1.2; overflow-wrap: anywhere; }
+.row--opt .row__tools { gap: 4px; }
+.row--opt .ic { width: 34px; height: 34px; font-size: 14px; }
+.row--opt .ic--del { margin-left: 4px; border-color: #E3C3BE; }

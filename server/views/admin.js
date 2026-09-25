@@ -43,7 +43,6 @@ const ERR = {
 };
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
-const REACT = { wow: '😍', love: '❤️', ok: '🙂', bad: '💩' };
 
 function votes(n) { return n + ' ' + plural(n, 'голос', 'голоса', 'голосов'); }
 function people(n) { return n + ' ' + plural(n, 'человек', 'человека', 'человек'); }
@@ -92,6 +91,7 @@ ${o.sess ? html`<meta name="csrf" content="${o.sess.csrf}">
 ${o.sess ? html`<header class="ah">
   <div class="ah__in">
     <a class="ah__logo" href="/admin"><b>RIGSARTHUR</b><span>админка</span></a>
+    <a class="ah__site" href="/" target="_blank" rel="noopener">Открыть сайт ↗</a>
     <nav class="ah__nav">${nav.map(n => html`<a href="${n[1]}"${o.nav === n[0] ? raw(' aria-current="page"') : ''}>${n[2]}</a>`)}</nav>
   </div>
 </header>
@@ -157,7 +157,7 @@ function classRow(c, now, base) {
         <span class="row__main"><b>${c.title}</b><small>${c.school}</small></span>
         <span class="row__side">${chip(c, now)}<small>${c.voters ? 'проголосовали ' + people(c.voters) : 'пока без голосов'}</small></span>
       </a>
-      <button class="ic ic--copy" type="button" data-copy="${base}/k/${c.slug}" aria-label="Скопировать ссылку на страницу класса" title="Скопировать ссылку">⧉</button>
+      <button class="row__copy" type="button" data-copy="${base}/k/${c.slug}" title="Скопировать ссылку на страницу класса"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L11.6 6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.6-1.6"/></svg><span>ссылка</span></button>
     </div>`;
 }
 
@@ -253,10 +253,7 @@ function resultsBlock(o) {
           <form method="post" action="/admin/c/${c.id}/pick">${csrf(o.sess)}<input type="hidden" name="step" value="${step}"><input type="hidden" name="option" value=""><button class="link" type="submit">Вернуть итог по голосам</button></form></div>`
         : html`<div class="note note--ok">Выбор класса: <b>${r.option.name}</b></div>`)
       : html`<div class="note note--warn">${r.tie.length > 1 ? 'Ничья. Выберите победителя, класс увидит его сразу' : 'Голосов нет. Выберите вариант сами'}</div>`;
-    return html`<div class="res">
-    <h3 class="res__h">${STEP_NAMES[step]} <small>${votes(total)}</small></h3>
-    ${note}
-    <ul class="bars">${sorted.map(x => {
+    const row = x => {
       const n = cnt[x.key] || 0;
       const pct = total ? Math.round(n * 100 / total) : 0;
       const win = r.option && r.option.key === x.key;
@@ -274,15 +271,21 @@ function resultsBlock(o) {
         <div class="bar__line"><i style="width:${pct}%"></i></div>
         ${btn ? html`<form method="post" action="/admin/c/${c.id}/pick"${ask ? raw(' data-confirm="Сделать этот вариант выбором класса, хотя по голосам он не первый?"') : ''}>${csrf(o.sess)}<input type="hidden" name="step" value="${step}"><input type="hidden" name="option" value="${x.key}">${btn}</form>` : ''}
       </li>`;
-    })}</ul>
+    };
+    // Пока голосование идёт или никто не голосовал, видны все. Иначе нули — под спойлером
+    const shown = sorted.filter(x => !closed || !total || (cnt[x.key] || 0) > 0 || (r.option && r.option.key === x.key));
+    const rest = sorted.filter(x => shown.indexOf(x) === -1);
+    return html`<div class="res">
+    <h3 class="res__h">${STEP_NAMES[step]} <small>${votes(total)}</small></h3>
+    ${note}
+    <ul class="bars">${shown.map(row)}</ul>
+    ${rest.length ? html`<details class="more more--rest"><summary>Показать ещё ${rest.length} без голосов</summary><ul class="bars">${rest.map(row)}</ul></details>` : ''}
   </div>`;
   });
-  const reacts = Object.keys(REACT).filter(k => o.reactions[k]);
   return html`<div class="card" id="results"${st === 'open' ? html` data-refresh="/admin/c/${c.id}/results"` : ''}>
   <div class="card__h"><h2 class="h">Голоса</h2><span class="muted">${people(o.voters)}</span></div>
   ${st === 'open' ? html`<p class="online"><i></i>Сейчас на странице: <b>${o.online}</b></p>` : ''}
   ${steps}
-  ${reacts.length ? html`<p class="reacts">Как им страница: ${reacts.map(k => html`<span>${REACT[k]} ${o.reactions[k]}</span>`)}</p>` : ''}
   ${o.summary ? html`<div class="sum">
     <p class="sum__h">Итог одним сообщением для чата</p>
     <pre class="sum__text">${o.summary}</pre>
@@ -361,6 +364,7 @@ function classPage(o) {
   const url = o.url;
   const share = 'Привет! Это страница вашего класса, тут выбираем альбом: ' + url;
   const all = o.catalog;
+  const hiddenCount = STEPS.reduce((n, step) => n + all[step].filter(x => !x.hidden && c.hidden.indexOf(step + ':' + x.key) !== -1).length, 0);
   return layout({
     title: c.title + ' · ' + c.school, nav: 'classes', sess: o.sess, msg: o.msg, err: o.err,
     body: html`<a class="back" href="/admin">← Классы</a>
@@ -391,9 +395,10 @@ ${resultsBlock(o)}
   <button class="b b--main" type="submit">Сохранить шпаргалку</button>
 </form>
 
-<form class="card form" method="post" action="/admin/c/${c.id}/options" id="options">
+<details class="card fold" id="options"${o.open === 'options' ? raw(' open') : ''}>
+  <summary class="fold__h"><span><b>Варианты для этого класса</b><small>${hiddenCount ? 'Скрыто для класса: ' + hiddenCount : 'Класс видит все варианты'}</small></span></summary>
+  <form class="form" method="post" action="/admin/c/${c.id}/options">
   ${csrf(o.sess)}
-  <div class="card__h"><h2 class="h">Варианты для этого класса</h2></div>
   <p class="muted small">Снимите галочку, чтобы вариант не показывался этому классу.</p>
   ${STEPS.map(step => html`<fieldset class="checks">
     <legend>${STEP_NAMES[step]}</legend>
@@ -403,11 +408,13 @@ ${resultsBlock(o)}
     })}
   </fieldset>`)}
   <button class="b b--main" type="submit">Сохранить варианты</button>
-</form>
+  </form>
+</details>
 
-<form class="card form" method="post" action="/admin/c/${c.id}/info" id="info">
+<details class="card fold" id="info"${o.open === 'info' ? raw(' open') : ''}>
+  <summary class="fold__h"><span><b>Название, год, адрес ссылки</b><small>${c.school} · ${c.title} · ${c.year}</small></span></summary>
+  <form class="form" method="post" action="/admin/c/${c.id}/info">
   ${csrf(o.sess)}
-  <div class="card__h"><h2 class="h">Данные класса</h2></div>
   <label class="field"><span>Школа</span><input name="school" value="${c.school}" required maxlength="60"></label>
   <label class="field"><span>Класс</span><input name="title" value="${c.title}" required maxlength="40"></label>
   <div class="two">
@@ -417,19 +424,18 @@ ${resultsBlock(o)}
   <label class="field"><span>Адрес страницы</span><span class="slug"><em>/k/</em><input name="slug" value="${c.slug}" required maxlength="60" pattern="[a-z0-9\\-]+" autocapitalize="off" autocorrect="off" spellcheck="false"></span></label>
   <p class="muted small">Только латиница, цифры и дефис. Если поменять адрес, старая ссылка перестанет работать.</p>
   <button class="b b--main" type="submit">Сохранить</button>
-</form>
+  </form>
+</details>
 
 <div class="card" id="duplicate">
-  <div class="card__h"><h2 class="h">Похожий класс</h2></div>
-  <p class="muted small">Новая страница с теми же вариантами, шпаргалкой и длительностью. Голоса не копируются. Можно сразу несколько классов параллели.</p>
-  <a class="b b--main b--wide" href="/admin/new?from=${c.id}">Создать по образцу</a>
-</div>
-
-<div class="card danger">
   <div class="card__h"><h2 class="h">Ещё</h2></div>
+  <a class="b b--wide" href="/admin/new?from=${c.id}">Создать похожий класс</a>
+  <p class="muted small">С теми же вариантами и шпаргалкой. Можно сразу несколько классов параллели.</p>
+  <div class="danger">
   <form method="post" action="/admin/c/${c.id}/archive">${csrf(o.sess)}<input type="hidden" name="on" value="${c.archived ? 0 : 1}"><button class="b" type="submit">${c.archived ? 'Вернуть из архива' : 'Убрать в архив'}</button></form>
   <form method="post" action="/admin/c/${c.id}/reset" data-confirm="Удалить все голоса этого класса? Это нельзя отменить.">${csrf(o.sess)}<button class="b b--danger" type="submit">Сбросить голоса</button></form>
   <form method="post" action="/admin/c/${c.id}/delete" data-confirm="Удалить страницу класса вместе с голосами? Ссылка перестанет работать. Это нельзя отменить.">${csrf(o.sess)}<button class="b b--danger" type="submit">Удалить класс</button></form>
+  </div>
 </div>`
   });
 }
@@ -492,7 +498,6 @@ function sitePage(o) {
     title: 'Сайт', nav: 'site', sess: o.sess, msg: o.msg, err: o.err,
     body: html`<div class="head">
   <h1 class="h1">Сайт</h1>
-  <a class="b b--sm" href="/" target="_blank" rel="noopener">Открыть сайт ↗</a>
 </div>
 <p class="muted intro">Здесь меняются фото, видео и цены на сайте. Всё видно на сайте сразу после сохранения. Фото с телефона сами уменьшаются перед загрузкой, ничего готовить не нужно.</p>
 <nav class="toc">
@@ -664,13 +669,14 @@ function optionPage(o) {
     body: html`<a class="back" href="/admin/catalog">← Варианты</a>
 <h1 class="h1">${x.name}</h1>
 <p class="muted">${STEP_NAMES[x.step]}${x.hidden ? ' · скрыт у всех классов' : ''}</p>
+${photoCard}
 <form class="card form" method="post" action="/admin/o/${x.id}">
   ${csrf(o.sess)}
+  <div class="card__h"><h2 class="h">Название и описание</h2></div>
   ${fields}
   <label class="check"><input type="checkbox" name="hidden" value="1"${x.hidden ? raw(' checked') : ''}><span>Скрыть у всех классов</span></label>
   <button class="b b--main" type="submit">Сохранить</button>
 </form>
-${photoCard}
 <form class="card" method="post" action="/admin/o/${x.id}/delete">
   ${csrf(o.sess)}
   <p class="muted small">Если вариант больше не нужен. Если его уже выбирал какой-то класс, он пропадёт с сайта и у новых классов, но в прошлых итогах останется.</p>

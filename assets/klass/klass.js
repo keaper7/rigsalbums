@@ -312,11 +312,6 @@
       return;
     }
 
-    var r = closest(e.target, '.react button');
-    if (r) {
-      $$('.react button').forEach(function (b) { b.classList.toggle('is-on', b === r); });
-      if (LIVE) request('POST', LIVE.api + '/react', { value: r.getAttribute('data-v') }, function () {});
-    }
   });
 
   // Пока шаг в зоне видимости, нижняя плашка показывает выбор именно этого шага
@@ -518,7 +513,6 @@
   STEPS.forEach(renderStep);
   renderNav();
   if (LIVE) {
-    if (LIVE.reaction) $$('.react button').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-v') === LIVE.reaction); });
     tick();
     schedule();
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });

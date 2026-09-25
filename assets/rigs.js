@@ -55,6 +55,8 @@
     if (open) menu.style.paddingTop = (hd.getBoundingClientRect().bottom + 20) + 'px';
     body.classList.toggle('menu-open', open);
     menuBtn.setAttribute('aria-expanded', String(open));
+    var lbl = $('span', menuBtn);
+    if (lbl) lbl.textContent = open ? 'Закрыть' : 'Меню';
     root.style.overflow = open ? 'hidden' : '';
     dockUpd();
   }
@@ -78,7 +80,7 @@
       { x: 0, y: 26, r: 2, s: .84, o: 0 }
     ];
     var order = cards.map(function (c, i) { return i; });
-    var k = 1, busy = false;
+    var k = 1, busy = false, queued = false;
     var place = function (card, p, z) {
       var st = card.style;
       st.setProperty('--x', p.x * k + 'px');
@@ -101,20 +103,23 @@
         setTimeout(function () { label.classList.remove('is-swap'); }, 30);
       }, 220);
     };
-    var next = function () {
-      if (busy) return;
+    // Нажатие во время перелёта карточки не теряется, а срабатывает сразу после него
+    var next = function (dir) {
+      if (busy) { queued = true; return; }
       busy = true;
+      var side = dir > 0 ? 1 : -1;
       var first = cards[order.shift()];
       order.push(cards.indexOf(first));
       order.forEach(function (ci, pos) { if (cards[ci] !== first) place(cards[ci], POS[Math.min(pos, POS.length - 1)], cards.length - pos); });
       first.classList.add('is-flying');
-      place(first, { x: -300, y: -30, r: -24, s: 1 }, cards.length + 1);
+      place(first, { x: 300 * side, y: -30, r: 24 * side, s: 1 }, cards.length + 1);
       setLabel();
       setTimeout(function () {
         first.classList.remove('is-flying');
         place(first, POS[POS.length - 1], 0);
         busy = false;
-      }, 480);
+        if (queued) { queued = false; next(-1); }
+      }, 420);
     };
     cards.forEach(function (c) { place(c, { x: 0, y: 40, r: 0, s: .96, o: 0 }, 1); });
     setTimeout(function () {
@@ -130,21 +135,64 @@
     var auto = function () {
       clearInterval(timer);
       if (reduce) return;
-      timer = setInterval(function () { if (deckVisible && !document.hidden) next(); }, 3200);
+      timer = setInterval(function () { if (deckVisible && !document.hidden) next(); }, 2000);
     };
-    deck.addEventListener('click', function () { next(); auto(); });
+    var swiped = 0;
+    deck.addEventListener('click', function () {
+      // Клик сразу после свайпа уже учтён
+      if (Date.now() - swiped < 500) return;
+      next(); auto();
+    });
     deck.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); auto(); }
     });
-    var dx0 = null;
-    deck.addEventListener('touchstart', function (e) { dx0 = e.touches[0].clientX; }, { passive: true });
-    deck.addEventListener('touchend', function (e) {
-      if (dx0 === null) return;
-      var dx = e.changedTouches[0].clientX - dx0; dx0 = null;
-      if (Math.abs(dx) > 40) { e.preventDefault(); next(); auto(); }
+    // Верхнюю карточку можно тянуть пальцем или мышкой: дальше порога улетает, иначе возвращается
+    var drag = null;
+    var dragStart = function (x, y) { if (!busy) drag = { x: x, y: y, dx: 0, on: false }; };
+    var dragMove = function (x, y, e) {
+      if (!drag) return;
+      var dx = x - drag.x, dy = y - drag.y;
+      if (!drag.on) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        // Вертикальный жест — это прокрутка страницы, не мешаем
+        if (Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
+        drag.on = true;
+        clearInterval(timer);
+        cards[order[0]].classList.add('is-drag');
+      }
+      drag.dx = dx;
+      var st = cards[order[0]].style;
+      st.setProperty('--x', dx + 'px');
+      st.setProperty('--y', Math.abs(dx) * -0.05 + 'px');
+      st.setProperty('--r', (-3 + dx / 16) + 'deg');
+      if (e && e.cancelable) e.preventDefault();
+    };
+    var dragEnd = function () {
+      if (!drag) return;
+      var d = drag;
+      drag = null;
+      if (!d.on) return;
+      swiped = Date.now();
+      var top = cards[order[0]];
+      top.classList.remove('is-drag');
+      if (Math.abs(d.dx) > 64) next(d.dx);
+      else place(top, POS[0], cards.length);
+      auto();
+    };
+    deck.addEventListener('touchstart', function (e) { dragStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+    deck.addEventListener('touchmove', function (e) { dragMove(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: false });
+    deck.addEventListener('touchend', dragEnd);
+    deck.addEventListener('touchcancel', dragEnd);
+    deck.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      dragStart(e.clientX, e.clientY);
     });
+    window.addEventListener('mousemove', function (e) { if (drag) dragMove(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', dragEnd);
     watch([deck], function (el, vis) { deckVisible = vis; });
-    setTimeout(auto, 1600);
+    // Первая смена почти сразу, чтобы было видно, что обложки листаются
+    setTimeout(function () { if (!reduce) next(); auto(); }, 1300);
   }
 
   // Счётчики
@@ -168,8 +216,13 @@
   // Картинки проявляются по мере загрузки
   $$('img').forEach(function (img) {
     if (img.complete && img.naturalWidth) return;
+    var box = img.parentNode;
     img.classList.add('ld');
-    var done = function () { img.classList.remove('ld'); };
+    if (box && box.classList) box.classList.add('is-ld');
+    var done = function () {
+      img.classList.remove('ld');
+      if (box && box.classList) box.classList.remove('is-ld');
+    };
     img.addEventListener('load', done);
     img.addEventListener('error', done);
   });
@@ -190,14 +243,43 @@
     }, { rootMargin: '-45% 0px -50% 0px' });
   }
 
-  // Появление блоков
+  // Появление блоков. Внутри [data-stagger] элементы выезжают по очереди
+  $$('[data-stagger]').forEach(function (box) {
+    for (var i = 0; i < box.children.length; i++) box.children[i].style.setProperty('--i', Math.min(i, 9));
+  });
   watch($$('.rv'), function (el, vis, io) {
     if (vis) { el.classList.add('in'); if (io) io.unobserve(el); }
   }, { threshold: .12, rootMargin: '0px 0px -6% 0px' });
+  // Галереи бывают выше экрана: для них хватает, чтобы показался край
+  watch($$('[data-stagger]'), function (el, vis, io) {
+    if (vis) { el.classList.add('in'); if (io) io.unobserve(el); }
+  }, { threshold: 0, rootMargin: '0px 0px -8% 0px' });
+
+  // Карточки «Альбом собирают сами ребята»: та, на которую наезжает следующая, уходит вглубь
+  var perks = $$('.perk');
+  if (perks.length > 1 && !reduce && 'CSS' in window && CSS.supports && CSS.supports('--k', '0')) {
+    var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+    var ticking = false;
+    var depth = function () {
+      ticking = false;
+      for (var i = 0; i < perks.length - 1; i++) {
+        var a = perks[i].getBoundingClientRect(), b = perks[i + 1].getBoundingClientRect();
+        var cover = Math.min(1, Math.max(0, (a.bottom - b.top) / a.height));
+        perks[i].style.setProperty('--k', cover.toFixed(3));
+      }
+    };
+    window.addEventListener('scroll', function () { if (!ticking) { ticking = true; raf(depth); } }, { passive: true });
+    depth();
+  }
 
   // Видео: подгружаются рядом с экраном и играют без звука, пока видны
   var vids = $$('.clip video').filter(function (v) { return v.getAttribute('data-src'); });
-  vids.forEach(function (v) { v.parentNode.classList.add('has-video'); });
+  vids.forEach(function (v) {
+    var frame = v.parentNode;
+    frame.classList.add('has-video');
+    // Если телефон не смог открыть видео, возвращаем заставку вместо чёрного экрана
+    v.addEventListener('error', function () { frame.classList.remove('has-video'); });
+  });
   watch(vids, function (v, vis) {
     if (vis) {
       if (!v.src) v.src = v.getAttribute('data-src');
@@ -205,31 +287,69 @@
     } else if (v.src) v.pause();
   }, { rootMargin: '200px 0px' });
 
-  // Просмотр фото на весь экран
+  // Просмотр фото на весь экран: плавно открывается, листается пальцем,
+  // закрывается жестом вниз и кнопкой «Назад» на телефоне
   var lb = $('.lb');
   if (lb) {
-    var lbImg = $('img', lb), lbCap = $('figcaption', lb), lbList = [], lbI = 0;
+    var lbImg = $('img', lb), lbCap = $('figcaption', lb), lbFig = $('figure', lb), lbList = [], lbI = 0, pushed = false;
+    var spin = document.createElement('span');
+    spin.className = 'lb__spin';
+    lb.appendChild(spin);
+    var preload = function (i) {
+      if (i < 0 || i >= lbList.length) return;
+      var im = new Image();
+      im.src = lbList[i].getAttribute('href');
+    };
     var show = function () {
       var a = lbList[lbI];
-      lbImg.src = a.getAttribute('href');
+      var href = a.getAttribute('href');
+      lb.classList.add('is-loading');
+      lbImg.onload = lbImg.onerror = function () { lb.classList.remove('is-loading'); };
+      lbImg.src = href;
+      if (lbImg.complete && lbImg.naturalWidth) lb.classList.remove('is-loading');
       lbCap.textContent = a.getAttribute('data-cap') || '';
       $('.lb__count', lb).textContent = (lbI + 1) + ' / ' + lbList.length;
       $('.lb__prev', lb).style.visibility = lbI > 0 ? '' : 'hidden';
       $('.lb__next', lb).style.visibility = lbI < lbList.length - 1 ? '' : 'hidden';
+      preload(lbI + 1);
+      preload(lbI - 1);
     };
-    var go = function (d) { var n = lbI + d; if (n >= 0 && n < lbList.length) { lbI = n; show(); } };
-    var close = function () { lb.hidden = true; lbImg.src = ''; root.style.overflow = ''; };
-    document.addEventListener('click', function (e) {
-      var a = closest(e.target, '[data-lb]');
-      if (!a) return;
-      e.preventDefault();
+    var go = function (d) {
+      var n = lbI + d;
+      if (n < 0 || n >= lbList.length) return;
+      lbI = n;
+      lbFig.classList.remove('is-next', 'is-prev');
+      void lbFig.offsetWidth;
+      lbFig.classList.add(d > 0 ? 'is-next' : 'is-prev');
+      show();
+    };
+    var open = function (a) {
       lbList = $$('[data-lb="' + a.getAttribute('data-lb') + '"]');
       lbI = lbList.indexOf(a);
       show();
       lb.hidden = false;
       root.style.overflow = 'hidden';
+      void lb.offsetWidth;
+      lb.classList.add('is-open');
+      if (window.history && history.pushState) { history.pushState({ lb: 1 }, ''); pushed = true; }
+    };
+    var close = function (fromHistory) {
+      if (lb.hidden) return;
+      lb.classList.remove('is-open');
+      root.style.overflow = '';
+      setTimeout(function () { if (!lb.classList.contains('is-open')) { lb.hidden = true; lbImg.src = ''; } }, reduce ? 0 : 260);
+      if (pushed && !fromHistory) { pushed = false; history.back(); }
+      pushed = false;
+    };
+    window.addEventListener('popstate', function () { if (!lb.hidden) close(true); });
+    document.addEventListener('click', function (e) {
+      var a = closest(e.target, '[data-lb]');
+      if (!a) return;
+      e.preventDefault();
+      open(a);
     });
     lb.addEventListener('click', function (e) {
+      if (Date.now() - lbSwiped < 400) return;
       if (closest(e.target, '.lb__prev')) return go(-1);
       if (closest(e.target, '.lb__next')) return go(1);
       if (e.target !== lbImg) close();
@@ -240,12 +360,33 @@
       if (e.key === 'ArrowRight') go(1);
       if (e.key === 'ArrowLeft') go(-1);
     });
-    var lx = null;
-    lb.addEventListener('touchstart', function (e) { lx = e.touches[0].clientX; }, { passive: true });
-    lb.addEventListener('touchend', function (e) {
-      if (lx === null) return;
-      var dx = e.changedTouches[0].clientX - lx; lx = null;
-      if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
-    });
+    // Фото едет за пальцем: вбок — листаем, вниз — закрываем
+    var t0 = null, lbSwiped = 0;
+    lb.addEventListener('touchstart', function (e) {
+      if (e.touches.length > 1) { t0 = null; return; }
+      t0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, dy: 0 };
+      lbFig.classList.add('is-drag');
+    }, { passive: true });
+    lb.addEventListener('touchmove', function (e) {
+      if (!t0 || e.touches.length > 1) return;
+      t0.dx = e.touches[0].clientX - t0.x;
+      t0.dy = e.touches[0].clientY - t0.y;
+      var down = t0.dy > 0 && Math.abs(t0.dy) > Math.abs(t0.dx);
+      lbFig.style.transform = down ? 'translateY(' + t0.dy + 'px) scale(' + Math.max(.85, 1 - t0.dy / 1200) + ')' : 'translateX(' + t0.dx + 'px)';
+      if (down) lb.style.backgroundColor = 'rgba(40, 26, 24, ' + Math.max(.4, .97 - t0.dy / 500) + ')';
+    }, { passive: true });
+    var touchEnd = function () {
+      if (!t0) return;
+      var d = t0;
+      t0 = null;
+      lbFig.classList.remove('is-drag');
+      lbFig.style.transform = '';
+      lb.style.backgroundColor = '';
+      if (Math.abs(d.dx) > 10 || Math.abs(d.dy) > 10) lbSwiped = Date.now();
+      if (d.dy > 90 && Math.abs(d.dy) > Math.abs(d.dx)) return close();
+      if (Math.abs(d.dx) > 50 && Math.abs(d.dx) > Math.abs(d.dy)) go(d.dx < 0 ? 1 : -1);
+    };
+    lb.addEventListener('touchend', touchEnd);
+    lb.addEventListener('touchcancel', touchEnd);
   }
 })();

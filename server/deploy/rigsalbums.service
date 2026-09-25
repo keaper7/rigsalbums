@@ -1,0 +1,28 @@
+[Unit]
+Description=rigsalbums.ru
+After=network.target
+
+[Service]
+Type=simple
+User=rigs
+Group=rigs
+WorkingDirectory=/srv/rigsalbums/server
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+Environment=SITE_URL=https://rigsalbums.ru
+Environment=TRUST_PROXY=1
+Environment=COOKIE_SECURE=1
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+
+# Сервис может писать только в папку с базой
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/rigsalbums/server/data
+
+[Install]
+WantedBy=multi-user.target

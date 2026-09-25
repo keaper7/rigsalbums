@@ -1,8 +1,10 @@
 (function () {
   'use strict';
 
-  var STEPS = ['theme', 'wear', 'color'];
-  // В макете: вымышленные голоса, чтобы были видны проценты. На сайте придут с сервера.
+  // На сервере страница получает window.RIGS_CLASS с настоящими голосами.
+  // Без него это демо: вымышленные голоса, чтобы были видны проценты
+  var LIVE = window.RIGS_CLASS || null;
+  var STEPS = LIVE ? LIVE.steps : ['theme', 'wear', 'color'];
   var SEED = {
     theme: { classic: 3, siren: 2, american: 4, canon: 1, white: 2, grey: 1, aesthetic: 2, money: 6, neon: 1 },
     wear: { oldmoney: 9, classicwear: 7, casual: 4, urban: 2 },
@@ -14,10 +16,15 @@
   var body = document.body;
   var bar = document.querySelector('.bar');
   var barName = bar.querySelector('.bar__name');
+  var barGo = bar.querySelector('.bar__go');
   var picks = {};
   var barStep = null;
-  var votes = readVotes();
+  var state = LIVE ? LIVE.state : null;
+  var votes = LIVE ? state.mine : readVotes();
+  var skew = LIVE ? state.now - Date.now() : 0;
   var closedByDemo = null;
+  var sending = false;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
   function closest(el, sel) {
@@ -37,23 +44,42 @@
     document.cookie = COOKIE + '=' + encodeURIComponent(JSON.stringify(votes)) + '; max-age=' + (60 * 60 * 24 * 90) + '; path=/; SameSite=Lax';
   }
 
+  // Запросы через XHR: fetch есть не на всех старых телефонах
+  function request(method, url, data, done) {
+    var x = new XMLHttpRequest();
+    x.open(method, url, true);
+    x.setRequestHeader('Accept', 'application/json');
+    if (data) x.setRequestHeader('Content-Type', 'application/json');
+    x.timeout = 15000;
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4) return;
+      var res = null;
+      try { res = JSON.parse(x.responseText); } catch (e) {}
+      done(x.status, res);
+    };
+    x.send(data ? JSON.stringify(data) : null);
+  }
+
   function counts(step) {
+    if (LIVE) return (state.counts && state.counts[step]) || {};
     var c = {}, k;
     for (k in SEED[step]) c[k] = SEED[step][k];
     if (votes[step]) c[votes[step]] = (c[votes[step]] || 0) + 1;
     return c;
   }
   function total(c) { var t = 0, k; for (k in c) t += c[k]; return t; }
+  function voters() { return LIVE ? state.voters : total(counts('theme')); }
   function winner(step) {
     var c = counts(step), best = null, k;
     for (k in c) if (best === null || c[k] > c[best]) best = k;
     return best;
   }
   function section(step) { return document.querySelector('.step[data-step="' + step + '"]'); }
-  function card(step, id) { return section(step).querySelector('.opt[data-id="' + id + '"]'); }
+  function card(step, id) { var s = section(step); return s ? s.querySelector('.opt[data-id="' + id + '"]') : null; }
 
   function renderStep(step) {
     var sec = section(step);
+    if (!sec) return;
     var mine = votes[step];
     sec.classList.toggle('is-voted', !!mine);
     $$('.opt', sec).forEach(function (o) {
@@ -61,7 +87,7 @@
       o.classList.toggle('is-mine', o.getAttribute('data-id') === mine);
     });
     if (!mine) return;
-    var c = counts(step), t = total(c);
+    var c = counts(step), t = total(c) || 1;
     $$('.opt', sec).forEach(function (o) {
       var pct = Math.round((c[o.getAttribute('data-id')] || 0) * 100 / t);
       o.querySelector('.res__pct').textContent = pct + '%';
@@ -74,22 +100,98 @@
     var all = true, now = null;
     STEPS.forEach(function (s) {
       var a = document.querySelector('.steps a[data-step="' + s + '"]');
-      a.classList.toggle('is-done', !!votes[s]);
+      if (a) a.classList.toggle('is-done', !!votes[s]);
       if (!votes[s]) { all = false; if (!now) now = s; }
     });
     $$('.steps a').forEach(function (a) { a.classList.toggle('is-now', a.getAttribute('data-step') === now); });
     body.classList.toggle('all-voted', all);
-    document.getElementById('voters').textContent = total(counts('theme'));
+    var v = document.getElementById('voters');
+    if (v) v.textContent = voters();
   }
+
+  function canVote() { return LIVE ? state.status === 'open' : !body.classList.contains('is-closed'); }
 
   function showBar(step) {
     barStep = step;
-    barName.textContent = picks[step] ? card(step, picks[step]).getAttribute('data-name') : '';
-    bar.classList.toggle('is-on', !!picks[step] && !body.classList.contains('is-closed'));
+    var c = step && picks[step] ? card(step, picks[step]) : null;
+    barName.textContent = c ? c.getAttribute('data-name') : '';
+    bar.classList.toggle('is-on', !!c && canVote());
   }
 
   function scrollToEl(el) {
+    if (!el) return;
     try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { el.scrollIntoView(true); }
+  }
+
+  function toast(text) {
+    var t = document.querySelector('.toast');
+    if (!t) {
+      t = document.createElement('p');
+      t.className = 'toast';
+      t.setAttribute('role', 'status');
+      body.appendChild(t);
+    }
+    t.textContent = text;
+    t.classList.add('is-on');
+    clearTimeout(t.tm);
+    t.tm = setTimeout(function () { t.classList.remove('is-on'); }, 4200);
+  }
+
+  // Праздник, когда все три голоса отданы
+  function confetti() {
+    if (reduce) return;
+    var colors = ['#8C2B2B', '#E8C9A8', '#B08D57', '#2F6B4F', '#D2453C', '#3A2321'];
+    var box = document.createElement('div');
+    box.className = 'confetti';
+    box.setAttribute('aria-hidden', 'true');
+    for (var i = 0; i < 42; i++) {
+      var p = document.createElement('i');
+      p.style.left = (Math.random() * 100) + '%';
+      p.style.background = colors[i % colors.length];
+      p.style.setProperty('--dx', Math.round(Math.random() * 180 - 90) + 'px');
+      p.style.setProperty('--r', Math.round(Math.random() * 900 - 450) + 'deg');
+      p.style.animationDelay = (Math.random() * 0.35).toFixed(2) + 's';
+      p.style.animationDuration = (1.7 + Math.random() * 1.2).toFixed(2) + 's';
+      if (i % 3 === 0) p.className = 'is-round';
+      box.appendChild(p);
+    }
+    body.appendChild(box);
+    setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 3600);
+  }
+
+  function afterVote(step) {
+    var next = null;
+    STEPS.forEach(function (s) { if (!next && !votes[s]) next = s; });
+    if (navigator.vibrate) { try { navigator.vibrate(next ? 18 : [20, 60, 30]); } catch (err) {} }
+    renderStep(step);
+    renderNav();
+    bar.classList.remove('is-on');
+    barStep = null;
+    setTimeout(function () {
+      scrollToEl(next ? section(next) : document.getElementById('done'));
+      if (!next) setTimeout(confetti, 350);
+    }, step === 'theme' ? 700 : 500);
+  }
+
+  function sendVote(step, option) {
+    if (sending) return;
+    sending = true;
+    barGo.disabled = true;
+    request('POST', LIVE.api + '/vote', { step: step, option: option }, function (code, res) {
+      sending = false;
+      barGo.disabled = false;
+      if (res && res.state) applyState(res.state);
+      if (code === 200 && res && res.ok) {
+        votes[step] = option;
+        afterVote(step);
+        return;
+      }
+      if (res && res.error === 'already') { renderStep(step); renderNav(); bar.classList.remove('is-on'); toast('На этом этапе твой голос уже учтён'); return; }
+      if (res && res.error === 'closed') { toast('Голосование уже закрыто'); setTimeout(function () { location.reload(); }, 1500); return; }
+      if (res && res.error === 'cookies') { toast('Браузер не сохраняет куки, поэтому голос не засчитать. Открой ссылку в обычном браузере'); return; }
+      if (res && res.error === 'busy') { toast('Слишком много голосов с этой сети, попробуй через пару минут'); return; }
+      toast('Не получилось отправить, проверь интернет и нажми ещё раз');
+    });
   }
 
   document.addEventListener('click', function (e) {
@@ -97,7 +199,7 @@
     if (pick) {
       var o = closest(pick, '.opt');
       var step = closest(o, '.step').getAttribute('data-step');
-      if (votes[step]) return;
+      if (votes[step] || !canVote()) return;
       picks[step] = o.getAttribute('data-id');
       $$('.opt', section(step)).forEach(function (x) {
         var on = x === o;
@@ -110,26 +212,17 @@
 
     if (closest(e.target, '.bar__go')) {
       if (!barStep || !picks[barStep]) return;
+      if (LIVE) { sendVote(barStep, picks[barStep]); return; }
       votes[barStep] = picks[barStep];
       saveVotes();
-      if (navigator.vibrate) { try { navigator.vibrate(18); } catch (err) {} }
-      renderStep(barStep);
-      renderNav();
-      bar.classList.remove('is-on');
-      var next = null;
-      STEPS.forEach(function (s) { if (!next && !votes[s]) next = s; });
-      var voted = barStep;
-      barStep = null;
-      setTimeout(function () {
-        scrollToEl(next ? section(next) : document.getElementById('done'));
-      }, voted === 'theme' ? 700 : 500);
+      afterVote(barStep);
       return;
     }
 
     var ph = closest(e.target, '.ph');
     if (ph) { e.preventDefault(); openLb(ph); return; }
 
-    var demo = closest(e.target, '[data-demo]');
+    var demo = !LIVE && closest(e.target, '[data-demo]');
     if (demo) {
       var mode = demo.getAttribute('data-demo');
       if (mode === 'reset') {
@@ -148,7 +241,10 @@
     }
 
     var r = closest(e.target, '.react button');
-    if (r) { $$('.react button').forEach(function (b) { b.classList.toggle('is-on', b === r); }); }
+    if (r) {
+      $$('.react button').forEach(function (b) { b.classList.toggle('is-on', b === r); });
+      if (LIVE) request('POST', LIVE.api + '/react', { value: r.getAttribute('data-v') }, function () {});
+    }
   });
 
   // Пока шаг в зоне видимости, нижняя плашка показывает выбор именно этого шага
@@ -161,32 +257,57 @@
         }
       });
     }, { rootMargin: '-45% 0px -45% 0px' });
-    STEPS.forEach(function (s) { io.observe(section(s)); });
+    STEPS.forEach(function (s) { if (section(s)) io.observe(section(s)); });
   }
 
   // Таймер
   var timerEl = document.getElementById('timer');
+  var timerLabel = document.querySelector('.timer__label');
   var end;
-  try { end = +sessionStorage.getItem('rigs_demo_end'); } catch (e) {}
-  if (!end || end < Date.now()) {
-    end = Date.now() + DURATION;
-    try { sessionStorage.setItem('rigs_demo_end', end); } catch (e) {}
+  if (LIVE) {
+    end = state.endsAt;
+  } else {
+    try { end = +sessionStorage.getItem('rigs_demo_end'); } catch (e) {}
+    if (!end || end < Date.now()) {
+      end = Date.now() + DURATION;
+      try { sessionStorage.setItem('rigs_demo_end', end); } catch (e) {}
+    }
   }
-  function isClosed() { return closedByDemo === null ? Date.now() >= end : closedByDemo; }
+  function now() { return Date.now() + skew; }
+  function isClosed() {
+    if (LIVE) return state.status === 'closed';
+    return closedByDemo === null ? Date.now() >= end : closedByDemo;
+  }
+
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function fmtLeft(ms) {
+    var s = Math.max(0, Math.floor(ms / 1000));
+    var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
+    return h ? h + ':' + two(m) + ':' + two(s % 60) : m + ':' + two(s % 60);
+  }
 
   function tick() {
+    if (LIVE && state.status === 'draft') {
+      // Старт запланирован: считаем до него, потом узнаём у сервера, открылось ли
+      if (!state.opensAt) { timerEl.textContent = 'скоро'; return; }
+      var until = Math.max(0, state.opensAt - now());
+      timerEl.textContent = fmtLeft(until);
+      if (until === 0) poll();
+      return;
+    }
     if (isClosed()) { timerEl.textContent = 'закрыто'; return; }
-    var left = Math.max(0, end - Date.now());
-    var m = Math.floor(left / 60000), s = Math.floor(left / 1000) % 60;
-    timerEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-    if (left === 0) setMode();
+    var left = Math.max(0, end - now());
+    timerEl.textContent = fmtLeft(left);
+    if (left === 0) {
+      if (LIVE) poll(); else setMode();
+    }
   }
 
   function setMode() {
     var closed = isClosed();
     body.classList.toggle('is-closed', closed);
     body.classList.toggle('is-open', !closed);
-    document.querySelector('.timer__label').style.display = closed ? 'none' : '';
+    timerLabel.style.display = closed ? 'none' : '';
     $$('.demo [data-demo="open"], .demo [data-demo="closed"]').forEach(function (b) {
       b.setAttribute('aria-pressed', String((b.getAttribute('data-demo') === 'closed') === closed));
     });
@@ -194,6 +315,8 @@
     tick();
   }
 
+  // Демо: итог собирается из карточек-победителей прямо на странице.
+  // На сервере закрытая страница приходит уже готовой
   function buildResult() {
     var res = document.getElementById('result');
     STEPS.forEach(function (s) {
@@ -218,6 +341,50 @@
     res.querySelector('[data-fill="theme"]').textContent = th.getAttribute('data-name') + (th.getAttribute('data-covers') === '2' ? '. Какую из двух обложек, утверждаем в чате' : '');
     res.querySelector('[data-fill="wear"]').textContent = wr.getAttribute('data-name') + ', в цвете: ' + cl.getAttribute('data-name').toLowerCase() + (winner('color') === 'bw' ? '' : ' + чёрный и белый');
     res.querySelector('[data-fill="loc"]').textContent = (loc ? 'Рекомендуемая локация: ' + loc + '. ' : '') + 'Место выбираем в чате';
+  }
+
+  // Сервер: следим за статусом. Открыли, закрыли или Артур выбрал победителя — перезагружаем страницу
+  var pollTimer = null, polling = false;
+  function applyState(s) {
+    var reload = s.status !== state.status || (s.status === 'closed' && s.rev !== state.rev) ||
+      (s.status === 'draft' && (s.opensAt || null) !== (state.opensAt || null));
+    skew = s.now - Date.now();
+    state.counts = s.counts;
+    state.voters = s.voters;
+    state.endsAt = s.endsAt;
+    state.rev = s.rev;
+    state.opensAt = s.opensAt || null;
+    end = s.endsAt;
+    // Голос мог уйти из другой вкладки: берём то, что знает сервер
+    if (s.mine) { for (var k in s.mine) votes[k] = s.mine[k]; }
+    if (reload) {
+      // После перезагрузки класс должен сразу увидеть итог, а не середину страницы
+      try { history.scrollRestoration = 'manual'; } catch (e) {}
+      window.scrollTo(0, 0);
+      location.reload();
+      return;
+    }
+    STEPS.forEach(function (st) { if (votes[st]) renderStep(st); });
+    renderNav();
+  }
+  function poll() {
+    clearTimeout(pollTimer);
+    if (document.hidden || polling) return;
+    polling = true;
+    request('GET', LIVE.api + '/state', null, function (code, res) {
+      polling = false;
+      if (code === 200 && res) applyState(res);
+      schedule();
+    });
+  }
+  function schedule() {
+    clearTimeout(pollTimer);
+    var st = state.status;
+    if (st === 'closed' && !state.pending) return;
+    var left = st === 'open' && end ? end - now() : Infinity;
+    var wait = st === 'open' ? (left < 20000 ? 4000 : 15000) : 20000;
+    if (st === 'draft' && state.opensAt) wait = Math.max(1000, Math.min(20000, state.opensAt - now() + 800));
+    pollTimer = setTimeout(poll, wait);
   }
 
   // Лайтбокс
@@ -273,6 +440,13 @@
 
   STEPS.forEach(renderStep);
   renderNav();
-  setMode();
+  if (LIVE) {
+    if (LIVE.reaction) $$('.react button').forEach(function (b) { b.classList.toggle('is-on', b.getAttribute('data-v') === LIVE.reaction); });
+    tick();
+    schedule();
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  } else {
+    setMode();
+  }
   setInterval(tick, 1000);
 })();

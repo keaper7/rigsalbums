@@ -15,7 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { esc, plural } = require('./util');
+const { esc, plural, fromLocalInput } = require('./util');
 
 const PAGES = ['index.html', 'works.html', 'albums.html', 'designs.html', 'studio.html', 'contacts.html'];
 
@@ -27,7 +27,7 @@ const THEMES = [
 // shape: как показать превью в админке (cover, circle, wide, square, tall)
 const SLOTS = {
   'home.video': { type: 'video', label: 'Видео «Как это выглядит вживую»', where: 'Главная, сразу после первого экрана', hint: 'Вертикальное 9:16, от 20 секунд до минуты. На сайте играет без звука.' },
-  'arthur': { type: 'image', label: 'Фото Артура', where: 'Главная (в конце) и «Контакты»', shape: 'circle', hint: 'Лицо по центру: фото обрежется в круг.' },
+  'arthur': { type: 'image', label: 'Личная', where: 'Главная (в конце) и «Контакты»', shape: 'circle', hint: 'Лицо по центру: фото обрежется в круг.' },
   'album': { type: 'image', label: 'Фото альбома', where: '«Альбомы и цены», самый верх', shape: 'wide', hint: 'Лучше на белом фоне: белый растворится в странице.' },
   'studio.main': { type: 'image', label: 'Студия общим планом', where: '«Студия», самый верх', shape: 'wide', hint: 'Горизонтальное, лучше с ребятами в кадре.' },
   'studio.rest': { type: 'image', label: 'Зона отдыха', where: '«Студия», блок «Что есть в студии»', shape: 'square' },
@@ -44,15 +44,33 @@ const GALLERIES = {
 
 const TEXTS = {
   'price.tag': { label: 'Надпись над ценой', max: 40 },
-  'price.main': { label: 'Цена, ₽', max: 12, nbsp: true },
+  'price.main': { label: 'Цена сейчас, ₽', max: 12, nbsp: true },
   'price.note': { label: 'Под ценой', max: 140 },
+  'price.later.tag': { label: 'Надпись над второй ценой', max: 40 },
+  'price.later': { label: 'Обычная цена, ₽', max: 12, nbsp: true },
+  'price.save': { label: 'Про скидку', max: 140 },
   'price.group.title': { label: 'Заголовок', max: 140 },
   'price.group.two': { label: '2 класса', max: 20 },
   'price.group.three': { label: '3 класса и больше', max: 20 }
 };
 
+// С этой даты скидка закончилась и сайт сам показывает обычную цену. Меняется в админке
+const PRICE_UNTIL = '2027-01-01';
+const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+
+// Надпись над ценой по дате: для 1 января «Скидка до Нового года», иначе «Скидка по 14 марта»
+// (последний день скидки — накануне даты окончания)
+function untilLabels(date) {
+  const m = DATE_RE.exec(date);
+  if (!m || (m[2] === '01' && m[3] === '01')) return null;
+  const last = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) - 86400000);
+  return { tag: 'Скидка по ' + last.getUTCDate() + ' ' + MONTHS[last.getUTCMonth()] };
+}
+
 const TOGGLES = {
-  'price.group': { label: 'Показывать цены для параллели' }
+  'price.group': { label: 'Показывать цены для параллели' },
+  'price.early': { label: 'Показывать скидку: обычную цену, плашку и счётчик дней' }
 };
 
 const MARK = /<!--@(media|gallery|text|count|catalog) ([a-z0-9.]+)(?: (sm|lg))?-->([\s\S]*?)<!--@end-->/g;
@@ -196,10 +214,39 @@ class Site {
 
   text(key) {
     const v = this.store.getSite(key);
-    return typeof v === 'string' ? v : (this.defaults().text[key] || '');
+    return typeof v === 'string' ? v : this.defaultText(key);
+  }
+
+  // Текст без правок: из HTML, а подписи у цены — по дате повышения
+  defaultText(key) {
+    const labels = key === 'price.tag' && untilLabels(this.priceUntil());
+    if (labels) return labels.tag;
+    return this.defaults().text[key] || '';
   }
 
   shown(key) { return this.store.getSite(key) !== false; }
+
+  priceUntil() {
+    const v = this.store.getSite('price.until');
+    return typeof v === 'string' && DATE_RE.test(v) ? v : PRICE_UNTIL;
+  }
+
+  // Наступила ли дата повышения цены (полночь по часовому поясу студии)
+  priceOver(now) {
+    return (now || Date.now()) >= fromLocalInput(this.priceUntil() + 'T00:00');
+  }
+
+  // Что сейчас видит посетитель: после даты — цена «после», без выгоды и скидки параллели
+  effective(vals, over) {
+    const v = Object.assign({}, vals);
+    if (untilLabels(this.priceUntil())) v['price.tag'] = this.text('price.tag');
+    if (over) {
+      v['price.main'] = this.text('price.later');
+      v['price.early'] = false;
+      v['price.group'] = false;
+    }
+    return v;
+  }
 
   renderMedia(key, variant, inner, v) {
     const def = SLOTS[key];
@@ -226,8 +273,9 @@ class Site {
   render(file, catalog) {
     const src = this.read(file);
     const hit = this.pages.get(file);
-    if (hit && hit.mtime === src.mtime && hit.rev === this.rev) return hit;
-    const vals = this.values();
+    const over = this.priceOver();
+    if (hit && hit.mtime === src.mtime && hit.rev === this.rev && hit.over === over) return hit;
+    const vals = this.effective(this.values(), over);
     let out = src.text.replace(MARK, (all, type, key, variant, inner) => {
       if (type === 'media') return this.renderMedia(key, variant, inner, vals[key]);
       if (type === 'gallery') {
@@ -250,10 +298,11 @@ class Site {
       return inner;
     });
     out = out.replace(SHOW, (m, tag, a, key, b) => (vals[key] === false ? '<' + tag + a + ' data-show="' + key + '"' + b + ' hidden>' : m));
-    const page = { mtime: src.mtime, rev: this.rev, text: out, etag: 'W/"p' + Math.floor(src.mtime).toString(36) + '-' + this.rev.toString(36) + '"' };
+    out = out.replace(/ data-until="[^"]*"/g, ' data-until="' + this.priceUntil() + '"');
+    const page = { mtime: src.mtime, rev: this.rev, over: over, text: out, etag: 'W/"p' + Math.floor(src.mtime).toString(36) + '-' + this.rev.toString(36) + (over ? '-z' : '') + '"' };
     this.pages.set(file, page);
     return page;
   }
 }
 
-module.exports = { Site, SLOTS, GALLERIES, TEXTS, TOGGLES, THEMES, PAGES, galleryItems, isWide };
+module.exports = { PRICE_UNTIL, DATE_RE, Site, SLOTS, GALLERIES, TEXTS, TOGGLES, THEMES, PAGES, galleryItems, isWide };

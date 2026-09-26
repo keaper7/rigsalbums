@@ -245,7 +245,7 @@ class Store {
     const r = this.db.prepare(`INSERT INTO classes
       (slug, school, title, year, duration_min, hidden, shoot, address, bring, note, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      f.slug, f.school, f.title, f.year, f.duration_min || 45, JSON.stringify(f.hidden || []),
+      f.slug, f.school, f.title, f.year, f.duration_min || 60, JSON.stringify(f.hidden || []),
       f.shoot || '', f.address || '', f.bring || '', f.note || '', now, now);
     return Number(r.lastInsertRowid);
   }

@@ -162,13 +162,16 @@ test('цены: тексты и скрытие скидки для паралл�
   for (const page of ['/', '/albums.html']) {
     r = await guest.req('GET', page);
     assert.match(r.text, /<p class="offer__price">5&nbsp;000<small>₽<\/small><\/p>/, page);
-    assert.match(r.text, /<span class="offer__tag">До Нового года<\/span>/, 'пустое поле возвращает исходный текст');
+    assert.match(r.text, /<span class="offer__tag" data-show="price\.early" hidden>Скидка до Нового года<\/span>/, 'пустое поле возвращает исходный текст');
+    assert.match(r.text, /<div class="offer__later" data-show="price\.early" hidden>/, 'сравнение с ценой после НГ выключено');
     assert.match(r.text, /с человека &lt;b&gt;всё включено&lt;\/b&gt;/, 'текст экранируется');
     assert.match(r.text, /data-show="price\.group" hidden>/, 'скидка для параллели скрыта');
   }
-  r = await admin.post('/admin/site/texts', { 'price.main': '4 500', 'price.group': '1' });
+  r = await admin.post('/admin/site/texts', { 'price.main': '4 500', 'price.group': '1', 'price.early': '1', 'price.later': '5 200' });
   r = await guest.req('GET', '/');
   assert.doesNotMatch(r.text, /data-show="price\.group" hidden/);
+  assert.doesNotMatch(r.text, /data-show="price\.early" hidden/);
+  assert.match(r.text, /<p class="offer__lp"><s>5&nbsp;200<\/s><small>₽<\/small><\/p>/);
 });
 
 test('видео на главной: MP4, HEVC и обложка', async t => {
@@ -418,4 +421,35 @@ test('новый класс по образцу, сразу несколько',
   assert.match(r.headers.get('location'), /^\/admin\/c\/\d+\?m=created$/);
   r = await admin.post('/admin/new', { school: 'Школа 5', title: Array.from({ length: 11 }, (_, i) => '9' + i).join(',') });
   assert.strictEqual(r.status, 400);
+});
+
+test('скидка сама заканчивается в свой день', async t => {
+  const { base, stop } = await start();
+  t.after(stop);
+  const admin = await adminLogin(base);
+  const guest = client(base);
+  const post = extra => admin.post('/admin/site/texts', Object.assign({
+    'price.main': '4 500', 'price.later': '5 000', 'price.early': '1', 'price.group': '1',
+    'price.tag': 'Скидка до Нового года', 'price.later.tag': 'Обычная цена'
+  }, extra));
+
+  // Дата впереди: акция, подписи по дате, счётчик получает дату
+  await post({ 'price.last': '2099-03-14' });
+  let r = await guest.req('GET', '/');
+  assert.match(r.text, /<p class="offer__price">4&nbsp;500<small>/);
+  assert.match(r.text, /<span class="offer__tag" data-show="price\.early">Скидка по 14 марта<\/span>/, 'подпись сама по дате');
+  assert.match(r.text, /<span class="offer__lt">Обычная цена<\/span>/);
+  assert.match(r.text, /data-until="2099-03-15"/);
+  assert.doesNotMatch(r.text, /data-show="price\.(early|group)" hidden/);
+  r = await admin.req('GET', '/admin/site');
+  assert.match(r.text, /После 14 марта 2099 скидка закончится сама, и на сайте будет обычная цена 5 000 ₽/);
+
+  // Дата прошла: цена после повышения, выгода и скидка параллели скрыты, хотя галочки стоят
+  await post({ 'price.last': '2019-12-31' });
+  r = await guest.req('GET', '/albums.html');
+  assert.match(r.text, /<p class="offer__price">5&nbsp;000<small>/);
+  assert.match(r.text, /data-show="price\.early" hidden/);
+  assert.match(r.text, /data-show="price\.group" hidden/);
+  r = await admin.req('GET', '/admin/site');
+  assert.match(r.text, /Скидка закончилась: на сайте обычная цена 5 000 ₽/);
 });

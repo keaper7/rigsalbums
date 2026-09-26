@@ -10,7 +10,7 @@ const H = require('./lib/http');
 const { slugify, randomCode, token, fromLocalInput, plural } = require('./lib/util');
 const V = require('./lib/voting');
 const { Media, FILE_RE, ID_RE } = require('./lib/media');
-const { Site, SLOTS, GALLERIES, TEXTS, TOGGLES, PAGES } = require('./lib/site');
+const { Site, SLOTS, GALLERIES, TEXTS, TOGGLES, PAGES, DATE_RE } = require('./lib/site');
 const klassView = require('./views/klass');
 const A = require('./views/admin');
 
@@ -28,7 +28,7 @@ function defaultsFor(store) {
   const year = now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear();
   return {
     year: d.year || year,
-    duration_min: d.duration_min || 45,
+    duration_min: [60, 120, 180].indexOf(d.duration_min) !== -1 ? d.duration_min : 60,
     address: d.address || '',
     bring: d.bring || ''
   };
@@ -543,6 +543,8 @@ function createApp(cfg) {
       galleries: Object.keys(GALLERIES).reduce((o, k) => { o[k] = site.gallery(k); return o; }, {}),
       texts: Object.keys(TEXTS).reduce((o, k) => { o[k] = site.text(k); return o; }, {}),
       toggles: Object.keys(TOGGLES).reduce((o, k) => { o[k] = site.shown(k); return o; }, {}),
+      lastDay: (m => new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]) - 86400000).toISOString().slice(0, 10))(DATE_RE.exec(site.priceUntil())),
+      priceOver: site.priceOver(), laterPrice: site.text('price.later'),
       videoNote: vals['home.video'] && vals['home.video'].media ? (store.getMedia(vals['home.video'].media) || {}).note : ''
     }, extra || {}));
   }
@@ -551,9 +553,18 @@ function createApp(cfg) {
 
   r.post('/admin/site/texts', ctx => {
     const f = ctx.form;
+    // Текст, совпадающий с исходным (до или после смены даты), не храним:
+    // тогда он сам следует за правками страницы и датой
+    const norm = t => String(t).replace(/\s+/g, ' ').trim();
+    const before = {};
+    Object.keys(TEXTS).forEach(k => { before[k] = norm(site.defaultText(k)); });
+    // В форме последний день скидки, храним следующий: с него действует обычная цена
+    const last = DATE_RE.exec(str(f['price.last'], 10));
+    if (last) store.setSite('price.until', new Date(Date.UTC(+last[1], +last[2] - 1, +last[3]) + 86400000).toISOString().slice(0, 10));
+    else if (!f['price.last']) store.deleteSite('price.until');
     Object.keys(TEXTS).forEach(k => {
-      const v = str(f[k], TEXTS[k].max).replace(/\s+/g, ' ');
-      if (v) store.setSite(k, v);
+      const v = norm(str(f[k], TEXTS[k].max));
+      if (v && v !== before[k] && v !== norm(site.defaultText(k))) store.setSite(k, v);
       else store.deleteSite(k);
     });
     Object.keys(TOGGLES).forEach(k => {

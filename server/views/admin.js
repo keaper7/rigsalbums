@@ -42,7 +42,23 @@ const ERR = {
   lastopt: 'Это последний вариант этапа, его нельзя удалить'
 };
 
-const DURATIONS = [15, 30, 45, 60, 90, 120];
+const DURATIONS = [60, 120, 180];
+const REOPEN = [15, 30, 60];
+
+// '2027-01-01' → «1 января 2027»
+const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+function dateText(d) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || '');
+  return m ? +m[3] + ' ' + MONTHS_GEN[+m[2] - 1] + ' ' + m[1] : d;
+}
+
+// 60 → «1 час», 90 → «1 ч 30 мин», 30 → «30 мин»
+function minutes(m) {
+  const h = Math.floor(m / 60), r = m % 60;
+  if (!h) return r + ' мин';
+  if (!r) return h + ' ' + plural(h, 'час', 'часа', 'часов');
+  return h + ' ч ' + r + ' мин';
+}
 
 function votes(n) { return n + ' ' + plural(n, 'голос', 'голоса', 'голосов'); }
 function people(n) { return n + ' ' + plural(n, 'человек', 'человека', 'человек'); }
@@ -198,9 +214,10 @@ ${o.classes.length > 5 ? html`<label class="search"><span class="sr">Поиск<
 
 // ---------- новый класс ----------
 
-function durationSelect(name, value) {
-  const list = DURATIONS.indexOf(value) === -1 ? DURATIONS.concat(value).sort((a, b) => a - b) : DURATIONS;
-  return html`<select name="${name}">${list.map(d => html`<option value="${d}"${d === value ? raw(' selected') : ''}>${d} мин</option>`)}</select>`;
+function durationSelect(name, value, base) {
+  base = base || DURATIONS;
+  const list = base.indexOf(value) === -1 ? base.concat(value).sort((a, b) => a - b) : base;
+  return html`<select name="${name}">${list.map(d => html`<option value="${d}"${d === value ? raw(' selected') : ''}>${minutes(d)}</option>`)}</select>`;
 }
 
 function newClassPage(o) {
@@ -306,7 +323,7 @@ function controlBlock(o) {
     if (at) {
       return html`<div class="card ctl ctl--plan">
   <div class="card__h"><h2 class="h">Старт запланирован</h2><span class="chip chip--plan">${fmtWhen(at, now)}</span></div>
-  <p class="muted">Голосование начнётся ${fmtWhen(at, now)} и продлится ${c.duration_min} мин. До этого ребята видят варианты, но голосовать не могут. Страница откроется у всех сама.</p>
+  <p class="muted">Голосование начнётся ${fmtWhen(at, now)} и продлится ${minutes(c.duration_min)}. До этого ребята видят варианты, но голосовать не могут. Страница откроется у всех сама.</p>
   <p class="count count--sm" data-ends="${at}" data-now="${now}">${left(at - now)}</p>
   <div class="ctl__btns ctl__btns--two">
     <form method="post" action="/admin/c/${c.id}/open">${csrf(o.sess)}<input type="hidden" name="duration_min" value="${c.duration_min}"><button class="b b--main" type="submit">Начать сейчас</button></form>
@@ -339,8 +356,8 @@ function controlBlock(o) {
   <div class="card__h"><h2 class="h">Идёт голосование</h2><span class="chip chip--live">до ${fmtTime(c.ends_at)}</span></div>
   <p class="count" data-ends="${c.ends_at}" data-now="${now}">${left(c.ends_at - now)}</p>
   <div class="ctl__btns">
-    <form method="post" action="/admin/c/${c.id}/extend">${csrf(o.sess)}<input type="hidden" name="min" value="10"><button class="b" type="submit">+10 мин</button></form>
-    <form method="post" action="/admin/c/${c.id}/extend">${csrf(o.sess)}<input type="hidden" name="min" value="30"><button class="b" type="submit">+30 мин</button></form>
+    <form method="post" action="/admin/c/${c.id}/extend">${csrf(o.sess)}<input type="hidden" name="min" value="15"><button class="b" type="submit">+15 мин</button></form>
+    <form method="post" action="/admin/c/${c.id}/extend">${csrf(o.sess)}<input type="hidden" name="min" value="60"><button class="b" type="submit">+1 час</button></form>
     <form method="post" action="/admin/c/${c.id}/close" data-confirm="Закрыть голосование сейчас? Класс сразу увидит итог.">${csrf(o.sess)}<button class="b b--danger" type="submit">Закрыть сейчас</button></form>
   </div>
 </div>`;
@@ -352,7 +369,7 @@ function controlBlock(o) {
     <p class="muted small">Голоса сохранятся, ручной выбор победителя сбросится.</p>
     <form method="post" action="/admin/c/${c.id}/open" class="ctl__row" data-confirm="Открыть голосование заново?">
       ${csrf(o.sess)}
-      <label class="field field--inline"><span>Ещё</span>${durationSelect('duration_min', 15)}</label>
+      <label class="field field--inline"><span>Ещё</span>${durationSelect('duration_min', 30, REOPEN)}</label>
       <button class="b" type="submit">Открыть</button>
     </form>
   </details>
@@ -509,9 +526,25 @@ function sitePage(o) {
   <div class="card__h"><h2 class="h">Цены</h2><span class="muted small">Главная и «Альбомы и цены»</span></div>
   <div class="two">
     <label class="field"><span>${TEXTS['price.main'].label}</span><input name="price.main" value="${t['price.main']}" maxlength="${TEXTS['price.main'].max}" inputmode="numeric" required></label>
-    <label class="field"><span>${TEXTS['price.tag'].label}</span><input name="price.tag" value="${t['price.tag']}" maxlength="${TEXTS['price.tag'].max}"></label>
+    <label class="field"><span>${TEXTS['price.note'].label}</span><input name="price.note" value="${t['price.note']}" maxlength="${TEXTS['price.note'].max}"></label>
   </div>
-  <label class="field"><span>${TEXTS['price.note'].label}</span><input name="price.note" value="${t['price.note']}" maxlength="${TEXTS['price.note'].max}"></label>
+  <fieldset class="checks group-price">
+    <legend>Скидка</legend>
+    ${o.priceOver
+      ? html`<p class="note note--warn">Скидка закончилась: на сайте обычная цена ${o.laterPrice} ₽, скидка для параллели тоже скрыта. Чтобы запустить новую скидку, поставьте новый последний день и цены.</p>`
+      : html`<p class="note note--ok">Сейчас на сайте цена со скидкой ${t['price.main']} ₽. После ${dateText(o.lastDay)} скидка закончится сама, и на сайте будет обычная цена ${o.laterPrice} ₽.</p>`}
+    <div class="two">
+      <label class="field"><span>Последний день скидки</span><input type="date" name="price.last" value="${o.lastDay}" required></label>
+      <label class="field"><span>${TEXTS['price.later'].label}</span><input name="price.later" value="${t['price.later']}" maxlength="${TEXTS['price.later'].max}" inputmode="numeric" required></label>
+    </div>
+    <label class="check"><input type="checkbox" name="price.early" value="1"${o.toggles['price.early'] ? raw(' checked') : ''}><span>${TOGGLES['price.early'].label}</span></label>
+    <div class="two">
+      <label class="field"><span>${TEXTS['price.tag'].label}</span><input name="price.tag" value="${t['price.tag']}" maxlength="${TEXTS['price.tag'].max}"></label>
+      <label class="field"><span>${TEXTS['price.later.tag'].label}</span><input name="price.later.tag" value="${t['price.later.tag']}" maxlength="${TEXTS['price.later.tag'].max}"></label>
+    </div>
+    <label class="field"><span>${TEXTS['price.save'].label}</span><input name="price.save" value="${t['price.save']}" maxlength="${TEXTS['price.save'].max}"></label>
+    <p class="muted small">Надпись над ценой подстраивается под дату сама. Рядом со скидкой сайт пишет, сколько дней она ещё действует.</p>
+  </fieldset>
   <fieldset class="checks group-price">
     <legend>Скидка для параллели</legend>
     <label class="check"><input type="checkbox" name="price.group" value="1"${o.toggles['price.group'] ? raw(' checked') : ''}><span>${TOGGLES['price.group'].label}</span></label>
@@ -521,7 +554,7 @@ function sitePage(o) {
       <label class="field"><span>${TEXTS['price.group.three'].label}</span><input name="price.group.three" value="${t['price.group.three']}" maxlength="${TEXTS['price.group.three'].max}"></label>
     </div>
   </fieldset>
-  <p class="muted small">Если поле очистить, вернётся исходный текст. Например, после Нового года поставьте цену 5 000, надпись над ценой можно убрать, а скидку для параллели выключить.</p>
+  <p class="muted small">Если поле очистить, вернётся исходный текст.</p>
   <button class="b b--main" type="submit">Сохранить цены</button>
 </form>
 

@@ -255,7 +255,7 @@ ${voting}${closed || p.demo ? resultSection(base, p) : ''}
 
 <footer class="foot">
   <p><b>RIGSARTHUR SCHOOL ALBUMS</b> · Нальчик</p>
-  <p>Вопросы по альбому: <a href="https://wa.me/79287100102">Артур в WhatsApp</a></p>
+  <p>Вопросы по альбому: <a href="https://wa.me/79287100102">WhatsApp</a></p>
 </footer>
 
 <div class="bar" aria-live="polite">

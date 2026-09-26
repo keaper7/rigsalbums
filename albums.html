@@ -81,12 +81,22 @@
       </div>
       <div class="offer__row">
         <div class="offer__card rv">
-          <span class="offer__tag"><!--@text price.tag-->До Нового года<!--@end--></span>
-          <p class="offer__price"><!--@text price.main-->4&nbsp;500<!--@end--><small>₽</small></p>
-          <p class="offer__note"><!--@text price.note-->с человека. После Нового года 5 000 ₽<!--@end--></p>
+          <div class="offer__cols">
+            <div class="offer__now">
+              <span class="offer__tag" data-show="price.early"><!--@text price.tag-->Скидка до Нового года<!--@end--></span>
+              <p class="offer__price"><!--@text price.main-->4&nbsp;500<!--@end--><small>₽</small></p>
+              <p class="offer__note"><!--@text price.note-->с человека<!--@end--></p>
+            </div>
+            <div class="offer__later" data-show="price.early">
+              <span class="offer__lt"><!--@text price.later.tag-->Обычная цена<!--@end--></span>
+              <p class="offer__lp"><s><!--@text price.later-->5&nbsp;000<!--@end--></s><small>₽</small></p>
+              <p class="offer__ln">с человека</p>
+            </div>
+          </div>
+          <p class="offer__save" data-show="price.early"><b><!--@text price.save-->Экономия 500 ₽ с каждого, а на класс из 25 человек — 12 500 ₽<!--@end--></b><span data-until="2027-01-01" hidden></span></p>
         </div>
         <div class="offer__group rv d1" data-show="price.group">
-          <p class="offer__gt"><!--@text price.group.title-->Снимаетесь вместе с параллелью? Цена до Нового года:<!--@end--></p>
+          <p class="offer__gt"><!--@text price.group.title-->Снимаетесь вместе с параллелью? Ещё выгоднее:<!--@end--></p>
           <ul>
             <li><span>2 класса</span><i></i><b><!--@text price.group.two-->4 300 ₽<!--@end--></b></li>
             <li><span>3 класса и больше</span><i></i><b><!--@text price.group.three-->4 000 ₽<!--@end--></b></li>

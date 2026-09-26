@@ -389,4 +389,18 @@
     lb.addEventListener('touchend', touchEnd);
     lb.addEventListener('touchcancel', touchEnd);
   }
+
+  // Сколько дней ещё действует скидка. Дату подставляет сервер из админки
+  (function () {
+    var els = $$('[data-until]');
+    if (!els.length) return;
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(els[0].getAttribute('data-until'));
+    if (!m) return;
+    var days = Math.ceil((new Date(+m[1], +m[2] - 1, +m[3]) - new Date()) / 86400000);
+    if (days < 1 || days > 200) return;
+    var n = days % 10, nn = days % 100;
+    var word = n === 1 && nn !== 11 ? 'день' : n >= 2 && n <= 4 && (nn < 10 || nn >= 20) ? 'дня' : 'дней';
+    var text = days === 1 ? 'Сегодня последний день' : 'Осталось ' + days + ' ' + word;
+    els.forEach(function (el) { el.textContent = text; el.hidden = false; });
+  })();
 })();

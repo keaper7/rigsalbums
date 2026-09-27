@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /admin
+Disallow: /k/
+Disallow: /class.html
+Disallow: /prep.html
+
+Sitemap: https://rigsarthur.ru/sitemap.xml

@@ -1,4 +1,4 @@
-# Сервер rigsalbums.ru
+# Сервер rigsarthur.ru
 
 Отдаёт сайт, страницы классов с голосованием и админку для Артура.
 Сторонних пакетов нет: только Node.js и встроенный в него SQLite.
@@ -89,7 +89,7 @@ server/
 |---|---|---|
 | `PORT` | `3000` | порт |
 | `HOST` | `127.0.0.1` | адрес; на VPS оставить так, наружу смотрит nginx |
-| `SITE_URL` | берётся из запроса | `https://rigsalbums.ru`, для ссылок и превью в мессенджерах |
+| `SITE_URL` | берётся из запроса | `https://rigsarthur.ru`, для ссылок и превью в мессенджерах |
 | `TRUST_PROXY` | выключено | `1` за nginx, чтобы видеть настоящий IP и https |
 | `COOKIE_SECURE` | выключено | `1` на боевом сервере с https |
 | `DATA_DIR` | `server/data` | где лежит база |
@@ -125,7 +125,7 @@ server/
 5. HTTPS, после того как домен смотрит на сервер:
    ```bash
    sudo apt install -y certbot python3-certbot-nginx
-   sudo certbot --nginx -d rigsalbums.ru -d www.rigsalbums.ru
+   sudo certbot --nginx -d rigsarthur.ru -d www.rigsarthur.ru
    ```
 6. Бэкап каждую ночь (`sudo crontab -u rigs -e`):
    ```

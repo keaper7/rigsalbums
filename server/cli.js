@@ -73,8 +73,8 @@ function demo() {
     meta: {
       title: 'Выбор альбома · RIGSARTHUR SCHOOL ALBUMS',
       ogTitle: 'Выбор альбома вашего класса',
-      image: 'https://keaper7.github.io/rigsalbums/assets/og-class.jpg',
-      url: 'https://keaper7.github.io/rigsalbums/class.html'
+      image: 'https://rigsarthur.ru/assets/og-class.jpg',
+      url: 'https://rigsarthur.ru/class.html'
     }
   });
   const file = path.join(__dirname, '..', 'class.html');

@@ -1,5 +1,5 @@
 [Unit]
-Description=rigsalbums.ru
+Description=rigsarthur.ru
 After=network.target
 
 [Service]
@@ -10,7 +10,7 @@ WorkingDirectory=/srv/rigsalbums/server
 Environment=NODE_ENV=production
 Environment=PORT=3000
 Environment=HOST=127.0.0.1
-Environment=SITE_URL=https://rigsalbums.ru
+Environment=SITE_URL=https://rigsarthur.ru
 Environment=TRUST_PROXY=1
 Environment=COOKIE_SECURE=1
 ExecStart=/usr/bin/node server.js

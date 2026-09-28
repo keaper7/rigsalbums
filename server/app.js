@@ -125,8 +125,20 @@ function createApp(cfg) {
     H.redirect(ctx.res, base + (msg ? (base.indexOf('?') === -1 ? '?' : '&') + 'm=' + msg : '') + tail);
   }
 
+  // Раньше на домене было портфолио на wfolio (облако с фото клиентов). Незнакомые адреса
+  // отправляем туда, где оно живёт теперь, чтобы старые ссылки клиентов не ломались
+  const OWN = /^\/(admin|k|media|assets)(\/|$)|\.(html|css|js|png|jpg|ico|txt|xml|webmanifest|woff2)$/;
+  function legacy(ctx) {
+    const base = String(cfg.legacyUrl || '').replace(/\/+$/, '');
+    const p = ctx.url.pathname;
+    if (!base || (ctx.req.method !== 'GET' && ctx.req.method !== 'HEAD') || p === '/' || OWN.test(p)) return false;
+    H.redirect(ctx.res, base + p + ctx.url.search, 302);
+    return true;
+  }
+
   function notFound(ctx) {
     if (ctx.url.pathname.indexOf('/admin') === 0 && ctx.sess) return page(ctx, 404, A.notFoundPage(ctx));
+    if (legacy(ctx)) return;
     let body = 'Страница не найдена';
     try {
       body = fs.readFileSync(path.join(siteRoot, '404.html'), 'utf8').replace('<head>', '<head>\n<base href="/">');

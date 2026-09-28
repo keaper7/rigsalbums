@@ -453,3 +453,24 @@ test('скидка сама заканчивается в свой день', as
   r = await admin.req('GET', '/admin/site');
   assert.match(r.text, /Скидка закончилась: на сайте обычная цена 5 000 ₽/);
 });
+
+test('старые ссылки портфолио уходят на его новый адрес', async t => {
+  const { base, stop } = await start({ legacyUrl: 'https://foto.example.ru/' });
+  t.after(stop);
+  const guest = client(base);
+  let r = await guest.req('GET', '/disk/vypusk-2025?pass=1');
+  assert.strictEqual(r.status, 302);
+  assert.strictEqual(r.headers.get('location'), 'https://foto.example.ru/disk/vypusk-2025?pass=1');
+  // Свои адреса не трогаем
+  for (const p of ['/', '/albums.html', '/k/net-takogo', '/assets/net.jpg', '/media/net.jpg', '/admin/login', '/net.html']) {
+    r = await guest.req('GET', p);
+    assert.notStrictEqual(r.status, 302, p);
+  }
+});
+
+test('без адреса портфолио незнакомые страницы — обычная 404', async t => {
+  const { base, stop } = await start();
+  t.after(stop);
+  const r = await client(base).req('GET', '/disk/vypusk-2025');
+  assert.strictEqual(r.status, 404);
+});

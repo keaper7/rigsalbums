@@ -95,6 +95,7 @@ server/
 | `DATA_DIR` | `server/data` | где лежит база |
 | `TIMEZONE` | `Europe/Moscow` | в каком поясе админка показывает время |
 | `ADMIN_PASSWORD` | нет | пароль при самом первом запуске, если не хочется вызывать `npm run password` |
+| `LEGACY_URL` | нет | куда перекидывать незнакомые адреса (старые ссылки портфолио wfolio), сейчас `https://rigsarthur.su` |
 
 ## Выкладка на VPS (Ubuntu 24.04)
 

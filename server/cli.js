@@ -60,7 +60,25 @@ function backup() {
       copied++;
     });
   }
-  console.log('Бэкап: ' + file + (copied ? ', новых файлов: ' + copied : ''));
+  // Файл убрали с сайта: храним его копию ещё 30 дней (столько живут копии базы), потом удаляем,
+  // иначе заменённые видео и фото копились бы на диске вечно
+  let dropped = 0;
+  if (fs.existsSync(dst)) {
+    const goneFile = path.join(dir, 'gone.json');
+    let gone = {};
+    try { gone = JSON.parse(fs.readFileSync(goneFile, 'utf8')) || {}; } catch (e) {}
+    const now = Date.now();
+    const keep = 30 * 24 * 60 * 60 * 1000;
+    const next = {};
+    fs.readdirSync(dst).forEach(f => {
+      if (fs.existsSync(path.join(src, f))) return;
+      const since = gone[f] || now;
+      if (now - since > keep) { fs.unlinkSync(path.join(dst, f)); dropped++; }
+      else next[f] = since;
+    });
+    fs.writeFileSync(goneFile, JSON.stringify(next));
+  }
+  console.log('Бэкап: ' + file + (copied ? ', новых файлов: ' + copied : '') + (dropped ? ', удалено старых: ' + dropped : ''));
 }
 
 function demo() {

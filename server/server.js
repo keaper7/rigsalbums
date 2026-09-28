@@ -11,7 +11,8 @@ const app = createApp({
   siteUrl: env.SITE_URL || '',
   trustProxy: env.TRUST_PROXY === '1',
   cookieSecure: env.COOKIE_SECURE === '1',
-  adminPassword: env.ADMIN_PASSWORD || ''
+  adminPassword: env.ADMIN_PASSWORD || '',
+  legacyUrl: env.LEGACY_URL || ''
 });
 
 const port = parseInt(env.PORT || '3000', 10);

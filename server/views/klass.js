@@ -198,8 +198,8 @@ ${steps.map((s, i) => stepSection(base, s, i + 1, steps.length, opts[s], Object.
 <title>${p.meta.title}</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#F4EFE7">
-<link rel="icon" href="${base}assets/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="${base}assets/apple-touch-icon.png">
+<link rel="icon" href="${base}assets/favicon-32.png?v=2" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="${base}assets/apple-touch-icon.png?v=2">
 <link rel="manifest" href="${base}assets/site.webmanifest">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RIGSARTHUR SCHOOL ALBUMS">

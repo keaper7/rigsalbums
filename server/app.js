@@ -10,7 +10,7 @@ const H = require('./lib/http');
 const { slugify, randomCode, token, fromLocalInput, plural } = require('./lib/util');
 const V = require('./lib/voting');
 const { Media, FILE_RE, ID_RE } = require('./lib/media');
-const { Site, SLOTS, GALLERIES, TEXTS, TOGGLES, PAGES, DATE_RE } = require('./lib/site');
+const { Site, SLOTS, COVER, coverKey, coverSrc, GALLERIES, TEXTS, TOGGLES, PAGES, DATE_RE } = require('./lib/site');
 const klassView = require('./views/klass');
 const A = require('./views/admin');
 
@@ -29,9 +29,19 @@ function defaultsFor(store) {
   return {
     year: d.year || year,
     duration_min: [60, 120, 180].indexOf(d.duration_min) !== -1 ? d.duration_min : 60,
+    shoot: d.shoot || '',
     address: d.address || '',
-    bring: d.bring || ''
+    bring: d.bring || '',
+    note: d.note || ''
   };
+}
+
+// Шпаргалка общая для всех классов. Своё значение у класса важнее общего
+const CHEAT = ['shoot', 'address', 'bring', 'note'];
+function withCommon(cls, d) {
+  const out = Object.assign({}, cls);
+  CHEAT.forEach(k => { out[k] = cls[k] || d[k] || ''; });
+  return out;
 }
 
 function str(v, max) {
@@ -59,6 +69,7 @@ function nextTitle(t) {
 function resultText(cls, res, voters, url) {
   const lines = ['Итоги голосования · ' + cls.title + ', ' + cls.school];
   if (res.theme && res.theme.option) lines.push('Тематика: ' + res.theme.option.name);
+  if (res.place && res.place.option) lines.push('Групповые: ' + res.place.option.name);
   if (res.wear && res.wear.option) lines.push('Стиль одежды: ' + res.wear.option.name);
   if (res.color && res.color.option) {
     lines.push('Цвет одежды: ' + res.color.option.name.toLowerCase() + (res.color.option.plus ? ' + чёрный и белый' : ''));
@@ -86,6 +97,26 @@ function createApp(cfg) {
   const siteRoot = path.resolve(cfg.siteRoot);
   const media = new Media(store, cfg.mediaDir || path.join(cfg.dataDir, 'media'));
   const site = new Site(siteRoot, store);
+
+  // «Работы» разделились на пять разделов. Если галерею уже меняли в админке,
+  // групповые фото из неё переезжают в свои разделы, в «Индивидуальной» остаются остальные
+  // Два отдельных фото студии стали одной галереей «Зоны студии»
+  if (store.getSite('studio.zones') === null || store.getSite('studio.zones') === undefined) {
+    const old = ['studio.rest', 'studio.extra'].map(k => store.getSite(k)).filter(v => v && v.sm && v.lg);
+    // к фото студии, которые лежат в самом сайте, добавляем загруженные раньше
+    if (old.length) store.setSite('studio.zones', old.concat(site.defaults().gallery['studio.zones'] || []));
+  }
+
+  if (!store.getSetting('works.split')) {
+    const v = store.getSite('works');
+    if (Array.isArray(v)) {
+      const d = site.defaults().gallery;
+      const moved = new Set();
+      ['works.spring', 'works.autumn', 'works.school', 'works.studio'].forEach(k => (d[k] || []).forEach(it => moved.add(it.sm)));
+      store.setSite('works', v.filter(it => !moved.has(it.sm)));
+    }
+    store.setSetting('works.split', true);
+  }
   const presence = new Map();
   const r = new H.Router();
 
@@ -188,7 +219,7 @@ function createApp(cfg) {
     const nonce = crypto.randomBytes(12).toString('base64');
     const url = baseUrl(ctx) + '/k/' + cls.slug;
     const body = klassView.classPage({
-      cls: cls, opts: opts, status: st, state: state, result: result, base: '/', demo: false, nonce: nonce,
+      cls: withCommon(cls, defaultsFor(store)), opts: opts, status: st, state: state, result: result, base: '/', demo: false, nonce: nonce,
       meta: {
         title: cls.title + ' · Выбор альбома · RIGSARTHUR',
         ogTitle: 'Выбор альбома · ' + cls.title + ', ' + cls.school,
@@ -234,6 +265,21 @@ function createApp(cfg) {
     const state = V.publicState(store, cat, cls, voter);
     if (!ok) return H.json(ctx.res, 409, { error: 'already', state: state });
     H.json(ctx.res, 200, { ok: true, state: state });
+  });
+
+  // Пока голосование идёт, свой голос можно отменить и выбрать заново
+  r.post('/k/:slug/unvote', ctx => {
+    const cls = store.getClassBySlug(ctx.params.slug);
+    if (!cls) return H.json(ctx.res, 404, { error: 'not_found' });
+    const voter = voterOf(ctx);
+    if (!voter) return H.json(ctx.res, 400, { error: 'cookies' });
+    if (!voteLimit.hit(ctx.ip)) return H.json(ctx.res, 429, { error: 'busy' });
+    const cat = catalog();
+    const step = String((ctx.body || {}).step || '');
+    if (V.activeSteps(V.visibleOptions(cat, cls)).indexOf(step) === -1) return H.json(ctx.res, 400, { error: 'bad_step' });
+    if (V.status(cls) !== 'open') return H.json(ctx.res, 409, { error: 'closed', state: V.publicState(store, cat, cls, voter) });
+    store.removeVote(cls.id, voter, step);
+    H.json(ctx.res, 200, { ok: true, state: V.publicState(store, cat, cls, voter) });
   });
 
   // ---------- загруженные файлы ----------
@@ -332,11 +378,10 @@ function createApp(cfg) {
   }
 
   function createFrom(src, school, title, year, duration) {
-    const d = defaultsFor(store);
     const base = { slug: newSlug(school, title), school: school, title: title, year: year, duration_min: duration };
     return store.createClass(Object.assign(base, src
       ? { hidden: src.hidden, shoot: src.shoot, address: src.address, bring: src.bring, note: src.note }
-      : { address: d.address, bring: d.bring }));
+      : {}));
   }
 
   r.post('/admin/new', ctx => {
@@ -379,7 +424,8 @@ function createApp(cfg) {
     return A.classPage(Object.assign(resultsData(ctx, cls), {
       msg: ctx.q('m'),
       url: baseUrl(ctx) + '/k/' + cls.slug,
-      nextTitle: nextTitle(cls.title)
+      nextTitle: nextTitle(cls.title),
+      defaults: defaultsFor(store)
     }, extra || {}));
   }
 
@@ -561,6 +607,12 @@ function createApp(cfg) {
     }, extra || {}));
   }
 
+  // Место на сайте: обычное или обложка существующей тематики
+  function slotDef(key) {
+    if (SLOTS[key]) return SLOTS[key];
+    return coverKey(key) && store.optionKeyTaken('theme', key.slice(6)) ? COVER : null;
+  }
+
   r.get('/admin/site', ctx => page(ctx, 200, siteView(ctx)));
 
   r.post('/admin/site/texts', ctx => {
@@ -590,7 +642,7 @@ function createApp(cfg) {
   // Поставить загруженное фото или видео на место
   r.post('/admin/api/site/:key', ctx => {
     const key = ctx.params.key;
-    const def = SLOTS[key];
+    const def = slotDef(key);
     const b = ctx.body || {};
     if (!def) return H.json(ctx.res, 404, { error: 'Нет такого места на сайте' });
     let value;
@@ -610,16 +662,19 @@ function createApp(cfg) {
 
   r.post('/admin/site/reset/:key', ctx => {
     const key = ctx.params.key;
-    if (!SLOTS[key] && !GALLERIES[key]) return notFound(ctx);
+    if (!slotDef(key) && !GALLERIES[key]) return notFound(ctx);
     store.deleteSite(key);
     changed();
-    back(ctx, GALLERIES[key] ? '/admin/site/g/' + key : '/admin/site#' + key, 'restored');
+    const from = parseInt(ctx.form.from, 10);
+    back(ctx, from ? '/admin/o/' + from + '#cover' : GALLERIES[key] ? '/admin/site/g/' + key : '/admin/site#' + key, 'restored');
   });
 
   r.get('/admin/site/g/:key', ctx => {
     const key = ctx.params.key;
     if (!GALLERIES[key]) return notFound(ctx);
-    page(ctx, 200, A.galleryPage({ sess: ctx.sess, msg: ctx.q('m'), errCode: ctx.q('e'), key: key, def: GALLERIES[key], gallery: site.gallery(key) }));
+    const sections = Object.keys(GALLERIES).filter(k => GALLERIES[k].section && k !== key).map(k => ({ key: k, label: GALLERIES[k].label }));
+    page(ctx, 200, A.galleryPage({ sess: ctx.sess, msg: ctx.q('m'), errCode: ctx.q('e'), key: key, def: GALLERIES[key], gallery: site.gallery(key),
+      link: GALLERIES[key].section ? baseUrl(ctx) + '/works.html#' + GALLERIES[key].section : '', sections: GALLERIES[key].section ? sections : [] }));
   });
 
   // Новые фото в галерею: в начало списка
@@ -641,12 +696,25 @@ function createApp(cfg) {
     const key = ctx.params.key;
     if (!GALLERIES[key]) return notFound(ctx);
     const items = site.gallery(key).items;
-    const op = /^(up|down|first|del):(\d+)$/.exec(str(ctx.form.op, 20));
+    const op = /^(up|down|first|del|to):(\d+)(?::([a-z0-9.]+))?$/.exec(str(ctx.form.op, 40));
     if (op) {
       const i = +op[2];
       if (i >= 0 && i < items.length) {
+        if (op[1] === 'to') {
+          // Перенести фото в другой раздел «Работ»: встаёт там первым
+          const to = op[3];
+          const def = GALLERIES[to];
+          if (!def || to === key || !def.section || !GALLERIES[key].section) return back(ctx, '/admin/site/g/' + key);
+          const dest = site.gallery(to).items;
+          if (dest.length >= def.max) return back(ctx, '/admin/site/g/' + key + '?e=full');
+          dest.unshift(items.splice(i, 1)[0]);
+          store.setSite(to, dest);
+          store.setSite(key, items);
+          changed();
+          return back(ctx, '/admin/site/g/' + key + '#g' + Math.max(0, i - 1), 'moved');
+        }
         if (op[1] === 'del') {
-          if (items.length <= 1) return back(ctx, '/admin/site/g/' + key + '?e=last');
+          if (items.length <= 1 && !GALLERIES[key].empty) return back(ctx, '/admin/site/g/' + key + '?e=last');
           items.splice(i, 1);
         } else {
           const j = op[1] === 'up' ? i - 1 : op[1] === 'down' ? i + 1 : 0;
@@ -679,6 +747,7 @@ function createApp(cfg) {
     while (store.optionKeyTaken(step, k)) k = key + n++;
     const data = step === 'theme' ? { name: name, tag: 'NEW', lead: '', about: [], loc: '', covers: 1, photos: [] }
       : step === 'wear' ? { name: name, sub: '', pin: '', photos: [] }
+        : step === 'place' ? { name: name, sub: '', link: '', photos: [] }
         : { name: name, colors: ['#D8C3A5'], plus: true };
     const id = store.addOption(step, k, data, true);
     changed();
@@ -693,7 +762,8 @@ function createApp(cfg) {
   r.get('/admin/o/:id', ctx => {
     const o = loadOption(ctx);
     if (!o) return notFound(ctx);
-    page(ctx, 200, A.optionPage({ sess: ctx.sess, msg: ctx.q('m'), errCode: ctx.q('e'), option: o }));
+    const cover = o.step === 'theme' ? { own: store.getSite('cover.' + o.key) || null, src: coverSrc(o, {}) } : null;
+    page(ctx, 200, A.optionPage({ sess: ctx.sess, msg: ctx.q('m'), errCode: ctx.q('e'), option: o, cover: cover }));
   });
 
   r.post('/admin/o/:id', ctx => {
@@ -710,6 +780,12 @@ function createApp(cfg) {
       data.about = str(f.about, 2000).split(/\n\s*\n/).map(s => s.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
       data.loc = str(f.loc, 80);
       data.covers = f.covers === '2' ? 2 : 1;
+    } else if (o.step === 'place') {
+      data.sub = str(f.sub, 120);
+      // Ссылка на раздел «Работ» (works.html#school) или любая https-ссылка
+      const link = str(f.link, 300);
+      if (link && !/^(https?:\/\/\S+|[a-z0-9-]+\.html(#[a-z0-9-]+)?)$/.test(link)) return fail('Ссылка должна быть вида works.html#school или начинаться с https://');
+      data.link = link;
     } else if (o.step === 'wear') {
       data.sub = str(f.sub, 80);
       const pin = str(f.pin, 300);
@@ -814,11 +890,21 @@ function createApp(cfg) {
   r.post('/admin/settings', ctx => {
     const f = ctx.form;
     const d = defaultsFor(store);
-    store.setSetting('defaults', {
+    const next = {
       year: int(f.year, 2020, 2100, d.year),
       duration_min: int(f.duration_min, 1, 600, d.duration_min),
+      shoot: str(f.shoot, 120),
       address: str(f.address, 160),
-      bring: str(f.bring, 600)
+      bring: str(f.bring, 600),
+      note: str(f.note, 600)
+    };
+    store.setSetting('defaults', next);
+    // Раньше общий текст копировался в каждый класс. Такие копии убираем,
+    // чтобы эти классы тоже показывали новый общий текст
+    store.listClasses().forEach(c => {
+      const ch = {};
+      CHEAT.forEach(k => { if (c[k] && (c[k] === d[k] || c[k] === next[k])) ch[k] = ''; });
+      if (Object.keys(ch).length) store.updateClass(c.id, ch);
     });
     back(ctx, '/admin/settings', 'saved');
   });

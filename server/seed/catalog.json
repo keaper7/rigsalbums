@@ -353,6 +353,104 @@
       ]
     }
   ],
+  "place": [
+    {
+      "key": "nature",
+      "name": "Природа",
+      "sub": "Парк, лес, зелень. Весной и осенью",
+      "link": "works.html#nature",
+      "photos": [
+        {
+          "src": "assets/gallery/p34",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p46",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p55",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p64",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p15",
+          "ar": 0.6667
+        },
+        {
+          "src": "assets/gallery/p18",
+          "ar": 1.5
+        }
+      ]
+    },
+    {
+      "key": "school",
+      "name": "Школа",
+      "sub": "Двор, стадион, спортплощадка, ваши любимые места",
+      "link": "works.html#school",
+      "photos": [
+        {
+          "src": "assets/gallery/p04",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p06",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p26",
+          "ar": 1.7763
+        },
+        {
+          "src": "assets/gallery/p61",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p23",
+          "ar": 0.6673
+        },
+        {
+          "src": "assets/gallery/p58",
+          "ar": 1.7763
+        }
+      ]
+    },
+    {
+      "key": "studio",
+      "name": "Студия",
+      "sub": "Моя фотостудия в Нальчике, не зависит от погоды",
+      "link": "works.html#studio",
+      "photos": [
+        {
+          "src": "assets/gallery/p49",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p53",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p62",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p38",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p51",
+          "ar": 1.5
+        },
+        {
+          "src": "assets/gallery/p59",
+          "ar": 1.5
+        }
+      ]
+    }
+  ],
   "wear": [
     {
       "key": "oldmoney",

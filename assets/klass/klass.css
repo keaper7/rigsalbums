@@ -94,6 +94,12 @@ section, .step { scroll-margin-top: var(--top); }
   border: 1.5px solid currentColor;
 }
 .steps a.is-now { color: var(--ink); border-bottom-color: var(--wine); }
+/* четыре этапа помещаются и на узком телефоне */
+@media (max-width: 400px) {
+  .steps { padding: 0 4px; }
+  .steps a { flex: 1 1 auto; min-width: 0; gap: 4px; padding-left: 2px; padding-right: 2px; font-size: 12px; }
+  .steps i { width: 18px; height: 18px; flex: 0 0 18px; font-size: 10px; }
+}
 .steps a.is-done { color: var(--ok); }
 .steps a.is-done i { background: var(--ok); border-color: var(--ok); color: #fff; font-size: 0; }
 .steps a.is-done i:after { content: '✓'; font-size: 11px; }
@@ -161,6 +167,10 @@ section, .step { scroll-margin-top: var(--top); }
 .step__head p { color: var(--ink-2); font-size: 15px; max-width: 34em; }
 .step__ok { display: none; margin: 4px 4px 0; padding: 14px 16px; border-radius: 14px; background: #E3EEE6; color: var(--ok); font-weight: 700; font-size: 14px; }
 .step.is-voted .step__ok { display: block; }
+/* ошибся или класс передумал: голос можно снять и выбрать заново, пока идёт голосование */
+.undo { display: block; margin-top: 10px; padding: 9px 14px; border: 1.5px solid currentColor; border-radius: 99px; background: none; color: inherit; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+.undo:disabled { opacity: .5; }
+.is-closed .undo { display: none; }
 
 .jump {
   display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -365,12 +375,16 @@ section, .step { scroll-margin-top: var(--top); }
 .result__head { padding: 0 4px 18px; }
 .result__head h2 { font: 800 40px/1 var(--disp); font-size: clamp(34px, 10vw, 52px); color: var(--wine); margin: 10px 0 10px; letter-spacing: -.02em; }
 .result__head p { color: var(--ink-2); }
+/* заголовок шпаргалки в одну строку даже на узком телефоне */
+.result__head--cheat h2 { white-space: nowrap; font-size: clamp(20px, 6.4vw, 46px); }
+.result__head--pick { padding-top: 22px; }
+.result__head--pick h2 { margin-top: 0; }
 .result .opt__foot, .result .jump { display: none; }
 .result .opt:after { content: 'ВЫБОР КЛАССА'; }
 .result .opt { box-shadow: 0 1px 2px rgba(58, 35, 33, .06), 0 16px 34px -24px rgba(58, 35, 33, .5); }
 .result__pair .opt.color { padding-bottom: 18px; }
 .result__pair .sw { height: 120px; }
-.cheat { margin-top: 8px; padding: 22px 18px; border-radius: 22px; background: #fff; }
+.cheat { margin: 0 0 14px; padding: 22px 18px; border-radius: 22px; background: #fff; }
 .cheat h3 { font: 600 20px/1.2 var(--disp); margin-bottom: 8px; }
 .cheat dl { margin: 0; }
 .cheat dl div { padding: 12px 0; border-bottom: 1px solid var(--line); }

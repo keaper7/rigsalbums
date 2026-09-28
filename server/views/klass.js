@@ -5,9 +5,10 @@
 const { html, raw, plural, fmtWhen } = require('../lib/util');
 const { activeSteps, cheat } = require('../lib/voting');
 
-const STEP_TITLE = { theme: 'Тематика альбома', wear: 'Стиль одежды', color: 'Цвет одежды' };
-const STEP_SHORT = { theme: 'Тематика', wear: 'Одежда', color: 'Цвет' };
-const STEP_OK = { theme: 'Голос за тематику учтён.', wear: 'Голос за одежду учтён.', color: 'Голос за цвет учтён.' };
+const STEP_TITLE = { theme: 'Тематика альбома', place: 'Место для групповых', wear: 'Стиль одежды', color: 'Цвет одежды' };
+const STEP_SHORT = { theme: 'Тематика', place: 'Место', wear: 'Одежда', color: 'Цвет' };
+const STEP_OK = { theme: 'Голос за тематику учтён.', place: 'Голос за место учтён.', wear: 'Голос за одежду учтён.', color: 'Голос за цвет учтён.' };
+const COUNT_WORD = ['', 'Голос учтён', 'Оба голоса учтены', 'Все три голоса учтены', 'Все четыре голоса учтены'];
 
 // JSON внутри <script>: без </script> и переводов строк, которые ломают JS
 function safeJson(o) {
@@ -63,6 +64,18 @@ function wearCard(base, o, v) {
     </article>`;
 }
 
+// Место для групповых: фото листаются, ссылка ведёт в нужный раздел «Работ»
+function placeCard(base, o, v) {
+  const link = o.link ? (/^https?:/.test(o.link) ? o.link : base + o.link) : '';
+  return html`
+    <article class="opt wear place"${v.ids ? html` id="p-${o.key}"` : ''} data-id="${o.key}" data-name="${o.name}">
+      <div class="wear__head"><h3>${o.name}</h3>${o.sub ? html`<p>${o.sub}</p>` : ''}</div>
+      ${(o.photos || []).length ? strip(base, o.photos, true) : ''}
+      ${link ? html`<a class="pin" href="${link}" target="_blank" rel="noopener">Больше фото в галерее</a>` : ''}
+      ${foot(o, v.pick, v.disabled)}
+    </article>`;
+}
+
 function colorCard(base, o, v) {
   const sw = (o.colors || []).map(c => html`<i style="background:${c}"></i>`);
   return html`
@@ -74,12 +87,13 @@ function colorCard(base, o, v) {
     </article>`;
 }
 
-const CARD = { theme: themeCard, wear: wearCard, color: colorCard };
+const CARD = { theme: themeCard, place: placeCard, wear: wearCard, color: colorCard };
 
 function stepSection(base, step, n, total, list, v) {
   const next = v.next;
   const head = {
     theme: 'Листай развороты вбок, нажми на фото, чтобы рассмотреть. Выбери одну тематику.',
+    place: 'Где снимаем групповые фото всем классом. Листай примеры, больше фото в галерее по ссылке.',
     wear: 'Во что одеваемся на съёмку. Примеры можно листать.',
     color: 'Нужно, чтобы у всех была одна цветовая гамма, поэтому выбираем акцентный оттенок, который будет у всех. К любому цвету можно чёрный и белый, но оттенок, который выберет класс, должен быть обязательно.'
   }[step];
@@ -90,9 +104,10 @@ function stepSection(base, step, n, total, list, v) {
   const cards = list.map(o => CARD[step](base, o, v));
   const body = step === 'color' ? html`
   <div class="colors">${cards}</div>` : cards;
+  const undo = html`<button class="undo" type="button">Переголосовать</button>`;
   const ok = next
-    ? html`<p class="step__ok">${STEP_OK[step]} <a href="#s-${next}">Дальше ${STEP_SHORT[next].toLowerCase()}</a></p>`
-    : html`<p class="step__ok">${STEP_OK[step]}</p>`;
+    ? html`<p class="step__ok">${STEP_OK[step]} <a href="#s-${next}">Дальше ${STEP_SHORT[next].toLowerCase()}</a>${undo}</p>`
+    : html`<p class="step__ok">${STEP_OK[step]}${undo}</p>`;
   return html`
 <section class="step" id="s-${step}" data-step="${step}">
   <header class="step__head">
@@ -131,21 +146,25 @@ function resultSection(base, p) {
   const total = r ? p.state.voters : null;
   return html`
 <section class="result" id="result">
-  <header class="result__head">
+  <header class="result__head result__head--cheat">
     <p class="eyebrow">Голосование закрыто</p>
-    <h2>Выбор класса</h2>
-    <p>${r ? (total ? html`Проголосовали <b>${people(total)}</b>. ` : '') : html`Проголосовали <b data-fill="total">22</b> человека. `}Теперь это ваша шпаргалка по альбому.</p>
+    <h2>Шпаргалка к съёмке</h2>
+    <p>Всё, что нужно знать перед съёмкой. Ссылка та же, заглядывайте сюда.</p>
   </header>
-  <div class="result__slot" data-slot="theme">${slot('theme')}</div>
-  <div class="result__pair">
-    <div class="result__slot" data-slot="wear">${slot('wear')}</div>
-    <div class="result__slot" data-slot="color">${slot('color')}</div>
-  </div>
   <div class="cheat">
-    <h3>Шпаргалка к съёмке</h3>
     <dl>
 ${rows.map(x => html`      <div${x.muted ? raw(' class="is-admin"') : ''}><dt>${x.label}</dt><dd${x.fill ? html` data-fill="${x.fill}"` : ''}>${x.value || ''}</dd></div>
 `)}    </dl>
+  </div>
+  <header class="result__head result__head--pick">
+    <h2>Выбор класса</h2>
+    <p>${r ? (total ? html`Проголосовали <b>${people(total)}</b>.` : '') : html`Проголосовали <b data-fill="total">22</b> человека.`}</p>
+  </header>
+  <div class="result__slot" data-slot="theme">${slot('theme')}</div>
+  <div class="result__slot" data-slot="place">${slot('place')}</div>
+  <div class="result__pair">
+    <div class="result__slot" data-slot="wear">${slot('wear')}</div>
+    <div class="result__slot" data-slot="color">${slot('color')}</div>
   </div>
 </section>
 `;
@@ -184,7 +203,7 @@ function classPage(p) {
 ${steps.map((s, i) => stepSection(base, s, i + 1, steps.length, opts[s], Object.assign({ next: steps[i + 1] }, v)))}
 <section class="done" id="done">
   <p class="eyebrow">Готово</p>
-  <h2>${steps.length === 3 ? 'Все три голоса учтены' : 'Все голоса учтены'}</h2>
+  <h2>${COUNT_WORD[steps.length] || 'Все голоса учтены'}</h2>
   <p>Когда голосование закроется, на этой странице останется выбор класса и всё, что нужно знать перед съёмкой. Ссылка та же.</p>
 </section>
 
@@ -246,7 +265,7 @@ ${draft ? html`  <p class="draft">${planned ? 'Голосование начнё
 ` : ''}  <ol class="hero__steps">
 ${steps.map((s, i) => html`    <li><b>${i + 1}</b><span>${STEP_TITLE[s]}</span><small>${variants(opts[s].length)}</small></li>
 `)}  </ol>
-  <p class="hero__small">Локацию для групповых выбираем в чате. Если у тематики на выбор две обложки, вариант тоже утверждаем в чате.</p>
+  <p class="hero__small">${steps.indexOf('place') === -1 ? 'Локацию для групповых выбираем в чате. Если у тематики на выбор две обложки, вариант тоже утверждаем в чате.' : 'Если у тематики на выбор две обложки, вариант утверждаем в чате.'}</p>
   <div class="hero__meta"><span><b id="voters">${voters}</b> уже проголосовали</span><a class="btn" href="#s-${steps[0] || 'theme'}">${draft ? 'Смотреть варианты' : 'Начать выбор'}</a></div>
 </section>
 ${voting}${closed || p.demo ? resultSection(base, p) : ''}

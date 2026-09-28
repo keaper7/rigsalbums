@@ -67,6 +67,21 @@ test('полный сценарий голосования', async t => {
   assert.strictEqual(r.data.state.counts.theme.money, 1);
   assert.strictEqual(r.data.state.counts.theme.neon, 0);
 
+  // Передумал: снимает голос и голосует заново
+  r = await kid1.req('POST', '/k/' + cls.slug + '/unvote', { json: { step: 'theme' } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.state.counts.theme.money, 0);
+  assert.strictEqual(r.data.state.mine.theme, undefined);
+  r = await kid1.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'theme', option: 'neon' } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.state.counts.theme.neon, 1);
+  r = await kid1.req('POST', '/k/' + cls.slug + '/unvote', { json: { step: 'theme' } });
+  r = await kid1.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'theme', option: 'money' } });
+  assert.strictEqual(r.data.state.counts.theme.money, 1);
+  assert.strictEqual(r.data.state.counts.theme.neon, 0);
+  r = await kid1.req('POST', '/k/' + cls.slug + '/unvote', { json: { step: 'nope' } });
+  assert.strictEqual(r.status, 400);
+
   // Несуществующий вариант, голос формой, голос без cookie
   r = await kid1.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'theme', option: 'nope' } });
   assert.strictEqual(r.status, 400);
@@ -84,6 +99,7 @@ test('полный сценарий голосования', async t => {
   assert.strictEqual(r.status, 200);
   await kid2.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'wear', option: 'casual' } });
   await kid2.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'color', option: 'red' } });
+  await kid2.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'place', option: 'studio' } });
 
   r = await kid2.req('GET', '/k/' + cls.slug + '/state');
   assert.strictEqual(r.data.status, 'open');
@@ -104,6 +120,10 @@ test('полный сценарий голосования', async t => {
   assert.doesNotMatch(r.text, /class="voting"/);
   r = await kid2.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'theme', option: 'money' } });
   assert.strictEqual(r.status, 409);
+  // После закрытия голос уже не снять
+  r = await kid2.req('POST', '/k/' + cls.slug + '/unvote', { json: { step: 'theme' } });
+  assert.strictEqual(r.status, 409);
+  assert.strictEqual(r.data.state.counts.theme.neon, 1);
 
   r = await admin.req('GET', '/admin');
   assert.match(r.text, /Нужно выбрать победителя/);
@@ -144,7 +164,7 @@ test('полный сценарий голосования', async t => {
   // Скрытые для класса варианты не видны и за них нельзя голосовать
   const on = [];
   const cat = app.store.listOptions();
-  ['theme', 'wear', 'color'].forEach(s => cat[s].forEach(o => { if (!(s === 'theme' && o.key === 'neon')) on.push(s + ':' + o.key); }));
+  ['theme', 'place', 'wear', 'color'].forEach(s => cat[s].forEach(o => { if (!(s === 'theme' && o.key === 'neon')) on.push(s + ':' + o.key); }));
   const form = new URLSearchParams({ _csrf: admin.csrf });
   on.forEach(v => form.append('on', v));
   r = await admin.req('POST', '/admin/c/' + copyId + '/options', { form: form });
@@ -245,12 +265,34 @@ test('настройки и пароль', async t => {
   const { app, server, base } = await start();
   t.after(() => server.close());
   const admin = await adminLogin(base);
-  await admin.post('/admin/settings', { year: '2027', duration_min: '60', address: 'Студия, Нальчик', bring: 'Хорошее настроение' });
+  await admin.post('/admin/settings', { year: '2027', duration_min: '60', shoot: 'Суббота, 11:00', address: 'Студия, Нальчик', bring: 'Хорошее настроение', note: 'Не опаздываем' });
   const id = await createClass(admin, 'Гимназия 1', '11 «А»');
-  // Форма создания присылает свой год и длительность, адрес берётся из настроек
-  assert.strictEqual(app.store.getClass(+id).address, 'Студия, Нальчик');
+  // Адрес и «что взять» общие: у класса пусто, а на его странице общий текст
+  const c = app.store.getClass(+id);
+  assert.strictEqual(c.address, '');
+  await admin.post('/admin/c/' + id + '/open', { duration_min: '30' });
+  await admin.post('/admin/c/' + id + '/close');
+  const kid = client(base);
+  let r = await kid.req('GET', '/k/' + c.slug);
+  assert.match(r.text, /Студия, Нальчик/);
+  assert.match(r.text, /Хорошее настроение/);
+  assert.match(r.text, /Суббота, 11:00/);
+  assert.match(r.text, /Не опаздываем/);
+  assert.ok(r.text.indexOf('class="cheat"') < r.text.indexOf('data-slot="theme"'), 'шпаргалка выше выбора класса');
+  // Поменяли общий текст: меняется у всех классов, свой текст у класса важнее
+  await admin.post('/admin/settings', { year: '2027', duration_min: '60', address: 'Новый адрес', bring: 'Хорошее настроение' });
+  r = await kid.req('GET', '/k/' + c.slug);
+  assert.match(r.text, /Новый адрес/);
+  await admin.post('/admin/c/' + id + '/cheat', { shoot: '', address: 'Школьный двор', bring: '', note: '' });
+  r = await kid.req('GET', '/k/' + c.slug);
+  assert.match(r.text, /Школьный двор/);
+  assert.doesNotMatch(r.text, /Новый адрес/);
+  // Старый класс, куда общий текст был скопирован раньше, начинает следовать общему
+  app.store.updateClass(+id, { address: 'Новый адрес' });
+  await admin.post('/admin/settings', { year: '2027', duration_min: '60', address: 'Третий адрес', bring: 'Хорошее настроение' });
+  assert.strictEqual(app.store.getClass(+id).address, '');
 
-  let r = await admin.post('/admin/password', { current: 'bad', next: 'new-password-2', repeat: 'new-password-2' });
+  r = await admin.post('/admin/password', { current: 'bad', next: 'new-password-2', repeat: 'new-password-2' });
   assert.strictEqual(r.status, 400);
   r = await admin.post('/admin/password', { current: PASS, next: 'new-password-2', repeat: 'new-password-2' });
   assert.strictEqual(r.status, 303);
@@ -293,4 +335,45 @@ test('перебор пароля ограничен', async t => {
   assert.strictEqual(last.status, 429);
   last = await c.req('POST', '/admin/login', { form: { password: PASS } });
   assert.strictEqual(last.status, 429);
+});
+
+test('место для групповых: голосование, ссылка на галерею, старые классы без нового этапа', async t => {
+  const { app, server, base } = await start();
+  t.after(() => server.close());
+  const admin = await adminLogin(base);
+  const id = await createClass(admin, 'Школа 5', '11 «Г»');
+  const cls = app.store.getClass(+id);
+  await admin.post('/admin/c/' + id + '/open', { duration_min: '30' });
+  const kid = client(base);
+  let r = await kid.req('GET', '/k/' + cls.slug);
+  assert.match(r.text, /Место для групповых/);
+  assert.match(r.text, /id="p-nature"/);
+  assert.match(r.text, /href="\/works\.html#school"/);
+  assert.match(r.text, /Этап 2 из 4/);
+  r = await kid.req('POST', '/k/' + cls.slug + '/vote', { json: { step: 'place', option: 'school' } });
+  assert.strictEqual(r.status, 200);
+  await admin.post('/admin/c/' + id + '/close');
+  r = await kid.req('GET', '/k/' + cls.slug);
+  assert.match(r.text, /Школа\. Точное место обсудим в чате/);
+
+  // Миграция: у базы без этапа place классы, уже начавшие голосовать, его не получают
+  const os = require('os');
+  const path = require('path');
+  const { Store } = require('../lib/db');
+  const file = path.join(os.tmpdir(), 'rigs-mig-' + Date.now() + '.db');
+  let s = new Store(file);
+  s.db.exec("DELETE FROM options WHERE step = 'place'");
+  s.setSetting('steps', ['theme', 'wear', 'color']);
+  const started = s.createClass({ slug: 'a', school: 'Ш', title: '11 А', year: 2027, duration_min: 60 });
+  const draft = s.createClass({ slug: 'b', school: 'Ш', title: '11 Б', year: 2027, duration_min: 60 });
+  s.updateClass(started, { opened_at: Date.now() - 1000 });
+  s.close();
+  s = new Store(file);
+  assert.strictEqual(s.listOptions().place.length, 3);
+  assert.deepStrictEqual(s.getClass(started).hidden, ['place:nature', 'place:school', 'place:studio']);
+  assert.deepStrictEqual(s.getClass(draft).hidden, []);
+  s.close();
+  s = new Store(file);
+  assert.strictEqual(s.listOptions().place.length, 3, 'второй раз не добавляется');
+  s.close();
 });

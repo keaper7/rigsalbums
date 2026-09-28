@@ -4,9 +4,10 @@
   // На сервере страница получает window.RIGS_CLASS с настоящими голосами.
   // Без него это демо: вымышленные голоса, чтобы были видны проценты
   var LIVE = window.RIGS_CLASS || null;
-  var STEPS = LIVE ? LIVE.steps : ['theme', 'wear', 'color'];
+  var STEPS = LIVE ? LIVE.steps : ['theme', 'place', 'wear', 'color'];
   var SEED = {
     theme: { classic: 3, siren: 2, american: 4, canon: 1, white: 2, grey: 1, aesthetic: 2, money: 6, neon: 1 },
+    place: { nature: 11, school: 6, studio: 5 },
     wear: { oldmoney: 9, classicwear: 7, casual: 4, urban: 2 },
     color: { bw: 5, red: 10, blue: 4, beige: 3 }
   };
@@ -86,7 +87,13 @@
       o.classList.remove('is-picked');
       o.classList.toggle('is-mine', o.getAttribute('data-id') === mine);
     });
-    if (!mine) return;
+    if (!mine) {
+      // Голос сняли: результаты снова скрыты, пока не проголосует заново
+      var tally = sec.querySelector('.tally');
+      if (tally) tally.parentNode.removeChild(tally);
+      renderSummary();
+      return;
+    }
     var c = counts(step), t = total(c) || 1;
     $$('.opt', sec).forEach(function (o) {
       var pct = Math.round((c[o.getAttribute('data-id')] || 0) * 100 / t);
@@ -266,7 +273,40 @@
     });
   }
 
+  // Снять свой голос на этапе и выбрать заново
+  function unvote(step, btn) {
+    var done = function () {
+      delete votes[step];
+      delete picks[step];
+      $$('.opt', section(step)).forEach(function (x) { x.querySelector('.pick').textContent = 'Выбрать'; });
+      renderStep(step);
+      renderNav();
+      scrollToEl(section(step));
+      toast('Голос снят, выбери заново');
+    };
+    if (!LIVE) { done(); saveVotes(); return; }
+    if (sending) return;
+    sending = true;
+    btn.disabled = true;
+    request('POST', LIVE.api + '/unvote', { step: step }, function (code, res) {
+      sending = false;
+      btn.disabled = false;
+      if (code === 200 && res && res.ok) { done(); if (res.state) applyState(res.state); return; }
+      if (res && res.state) applyState(res.state);
+      if (res && res.error === 'closed') { toast('Голосование уже закрыто'); setTimeout(function () { location.reload(); }, 1500); return; }
+      if (res && res.error === 'busy') { toast('Слишком много запросов с этой сети, попробуй через пару минут'); return; }
+      toast('Не получилось, проверь интернет и нажми ещё раз');
+    });
+  }
+
   document.addEventListener('click', function (e) {
+    var undo = closest(e.target, '.undo');
+    if (undo) {
+      var us = closest(undo, '.step');
+      if (us && canVote()) unvote(us.getAttribute('data-step'), undo);
+      return;
+    }
+
     var pick = closest(e.target, '.pick');
     if (pick) {
       var o = closest(pick, '.opt');
@@ -409,10 +449,11 @@
     var wr = card('wear', winner('wear'));
     var cl = card('color', winner('color'));
     var loc = th.getAttribute('data-loc');
+    var pl = card('place', winner('place'));
     res.querySelector('[data-fill="total"]').textContent = total(counts('theme'));
     res.querySelector('[data-fill="theme"]').textContent = th.getAttribute('data-name') + (th.getAttribute('data-covers') === '2' ? '. Какую из двух обложек, утверждаем в чате' : '');
     res.querySelector('[data-fill="wear"]').textContent = wr.getAttribute('data-name') + ', в цвете: ' + cl.getAttribute('data-name').toLowerCase() + (winner('color') === 'bw' ? '' : ' + чёрный и белый');
-    res.querySelector('[data-fill="loc"]').textContent = (loc ? 'Рекомендуемая локация: ' + loc + '. ' : '') + 'Место выбираем в чате';
+    res.querySelector('[data-fill="loc"]').textContent = pl ? pl.getAttribute('data-name') + '. Точное место обсудим в чате' : (loc ? 'Рекомендуемая локация: ' + loc + '. ' : '') + 'Место выбираем в чате';
   }
 
   // Сервер: следим за статусом. Открыли, закрыли или Артур выбрал победителя — перезагружаем страницу
@@ -427,8 +468,13 @@
     state.rev = s.rev;
     state.opensAt = s.opensAt || null;
     end = s.endsAt;
-    // Голос мог уйти из другой вкладки: берём то, что знает сервер
-    if (s.mine) { for (var k in s.mine) votes[k] = s.mine[k]; }
+    // Голос мог уйти или отмениться в другой вкладке: берём то, что знает сервер
+    if (s.mine) {
+      STEPS.forEach(function (k) {
+        if (votes[k] && !s.mine[k]) { delete votes[k]; renderStep(k); }
+        else if (s.mine[k]) votes[k] = s.mine[k];
+      });
+    }
     if (reload) {
       // После перезагрузки класс должен сразу увидеть итог, а не середину страницы
       try { history.scrollRestoration = 'manual'; } catch (e) {}

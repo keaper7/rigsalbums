@@ -356,6 +356,13 @@ a.row:active { background: var(--paper-2); }
 .gi__b { width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .94); font-size: 15px; font-weight: 800; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
 .gi__b:disabled { opacity: .35; cursor: default; }
 .gi__b--del { background: var(--wine); color: #fff; }
+/* перенос фото в другой раздел «Работ»: кнопка сверху, по нажатию список разделов поверх фото */
+.gi__move { position: absolute; top: 6px; right: 6px; left: 34px; text-align: right; }
+.gi__move summary { display: inline-block; list-style: none; padding: 4px 9px; border-radius: 99px; background: rgba(255, 255, 255, .94); font: 800 11px/1.3 var(--sans); cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+.gi__move summary::-webkit-details-marker { display: none; }
+.gi__move[open] { z-index: 2; }
+.gi__move[open] summary { background: var(--wine); color: #fff; }
+.gi__move button { display: block; width: 100%; margin-top: 4px; padding: 7px 8px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, .96); font: 700 11.5px/1.2 var(--sans); text-align: left; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
 
 /* фото варианта */
 .photos-card { display: flex; flex-direction: column; }

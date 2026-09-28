@@ -102,7 +102,46 @@ test('фото на сайте: замена, варианты размеров,
 
   r = await admin.req('GET', '/admin/site');
   assert.strictEqual(r.status, 200);
-  assert.match(r.text, /Обложки тематик/);
+  assert.doesNotMatch(r.text, /Обложки тематик/, 'обложки теперь в разделе «Варианты»');
+});
+
+test('тематики на главной: колода, полка и строка из раздела «Варианты»', async t => {
+  const { app, base, stop } = await start();
+  t.after(stop);
+  const admin = await adminLogin(base);
+  const guest = client(base);
+  const themes = app.store.listOptions().theme;
+  let r = await guest.req('GET', '/');
+  assert.strictEqual((r.text.match(/class="deck__card"/g) || []).length, themes.filter(o => !o.hidden).length);
+  assert.strictEqual((r.text.match(/<a class="book" /g) || []).length, themes.filter(o => !o.hidden).length);
+
+  // Новая тематика: пока скрыта, на главной её нет; показали — появилась с обложкой
+  r = await admin.post('/admin/catalog/new', { step: 'theme', name: 'Y2K' });
+  const id = +/\/admin\/o\/(\d+)/.exec(r.headers.get("location"))[1];
+  const o = app.store.getOption(id);
+  r = await guest.req('GET', '/');
+  assert.doesNotMatch(r.text, /data-name="Y2K"/);
+  r = await admin.req('GET', '/admin/o/' + id);
+  assert.match(r.text, /Загрузить обложку/);
+  const m = await admin.photo(JPEG_TALL);
+  r = await admin.api('/admin/api/site/cover.' + o.key, { media: m.id });
+  assert.strictEqual(r.status, 200);
+  const sp = await admin.photo(JPEG_WIDE);
+  await admin.api('/admin/api/o/' + id + '/photos', { media: [sp.id] });
+  await admin.post('/admin/o/' + id, { name: 'Y2K', tag: 'NEW 2027', lead: '', about: '', loc: '' });
+  r = await guest.req('GET', '/');
+  assert.match(r.text, new RegExp('data-name="Y2K" data-f="' + o.key + '"><img src="media/' + m.id + '-sm\\.jpg"'));
+  assert.match(r.text, /<span class="book__tag">NEW 2027<\/span>/);
+  assert.match(r.text, /<span class="f-[a-z0-9]+">Y2K<\/span>/);
+
+  // Обложка несуществующей тематики не принимается
+  r = await admin.api('/admin/api/site/cover.nope', { media: m.id });
+  assert.strictEqual(r.status, 404);
+
+  // Переименовали — новое имя везде
+  await admin.post('/admin/o/' + id, { name: 'Y2K VIBE', tag: 'NEW 2027', lead: '', about: '', loc: '' });
+  r = await guest.req('GET', '/');
+  assert.match(r.text, /data-name="Y2K VIBE"/);
 });
 
 test('галерея: добавить, переставить, убрать, вернуть', async t => {
@@ -113,18 +152,18 @@ test('галерея: добавить, переставить, убрать, в
 
   let r = await admin.req('GET', '/admin/site/g/works');
   assert.strictEqual(r.status, 200);
-  assert.strictEqual((r.text.match(/class="gi[ "]/g) || []).length, 65);
+  assert.strictEqual((r.text.match(/class="gi[ "]/g) || []).length, 31, 'в «Индивидуальной» 31 фото, групповые в своих разделах');
 
   const a = await admin.photo(JPEG_WIDE);
   const b = await admin.photo(JPEG_TALL);
   r = await admin.api('/admin/api/site/g/works', { media: [a.id, b.id] });
   assert.strictEqual(r.status, 200);
-  assert.strictEqual(r.data.count, 67);
+  assert.strictEqual(r.data.count, 33);
   r = await guest.req('GET', '/works.html');
   const first = /<a class="pic( pic--wide)?" href="([^"]+)"/.exec(r.text);
   assert.strictEqual(first[2], 'media/' + a.id + '-lg.jpg', 'новые фото в начале');
   assert.strictEqual(first[1], ' pic--wide', 'горизонтальное фото на всю ширину');
-  assert.match(r.text, /<span>67 фото<\/span>/);
+  assert.match(r.text, /<span>33 фото<\/span>/);
 
   r = await admin.post('/admin/site/g/works', { op: 'down:0' });
   assert.strictEqual(r.status, 303);
@@ -134,7 +173,7 @@ test('галерея: добавить, переставить, убрать, в
   r = await admin.post('/admin/site/g/works', { op: 'del:0' });
   r = await guest.req('GET', '/works.html');
   assert.doesNotMatch(r.text, new RegExp(b.id));
-  assert.match(r.text, /<span>66 фото<\/span>/);
+  assert.match(r.text, /<span>32 фото<\/span>/);
 
   // На главной не больше 16 фото
   const many = [];
@@ -144,8 +183,47 @@ test('галерея: добавить, переставить, убрать, в
 
   r = await admin.post('/admin/site/reset/works');
   r = await guest.req('GET', '/works.html');
-  assert.match(r.text, /<span>65 фото<\/span>/);
+  assert.match(r.text, /<span>31 фото<\/span>/);
   assert.doesNotMatch(r.text, /media\//);
+});
+
+test('«Работы»: разделы со ссылками, пустой скрыт, перенос фото', async t => {
+  const { base, stop } = await start();
+  t.after(stop);
+  const admin = await adminLogin(base);
+  const guest = client(base);
+  let r = await guest.req('GET', '/works.html');
+  ['individual', 'spring', 'autumn', 'school', 'studio'].forEach(id => assert.match(r.text, new RegExp('<section class="wsec" id="' + id + '"')));
+  assert.match(r.text, /<div id="nature">/);
+  // Осень пока пустая: раздел и его кнопка скрыты
+  assert.match(r.text, /id="autumn" data-need="works.autumn" hidden>/);
+  assert.match(r.text, /<a href="#autumn" data-need="works.autumn" hidden>/);
+  assert.match(r.text, /id="school" data-need="works.school">/);
+
+  // В админке у раздела есть ссылка, которую можно отправить родителям
+  r = await admin.req('GET', '/admin/site/g/works.school');
+  assert.match(r.text, /\/works\.html#school/);
+  assert.match(r.text, /Скопировать ссылку/);
+  const n = (r.text.match(/class="gi[ "]/g) || []).length;
+  assert.strictEqual(n, 12);
+
+  // Переносим фото из школы в осень: осень появляется на сайте
+  r = await admin.post('/admin/site/g/works.school', { op: 'to:0:works.autumn' });
+  assert.strictEqual(r.status, 303);
+  r = await admin.req('GET', '/admin/site/g/works.school');
+  assert.strictEqual((r.text.match(/class="gi[ "]/g) || []).length, 11);
+  r = await guest.req('GET', '/works.html');
+  assert.match(r.text, /id="autumn" data-need="works.autumn">/);
+  assert.match(r.text, /<a href="#autumn" data-need="works.autumn">/);
+  assert.match(r.text, /data-lb="autumn"/);
+
+  // Раздел можно опустошить целиком — он просто пропадает с сайта
+  r = await admin.post('/admin/site/g/works.autumn', { op: 'del:0' });
+  r = await guest.req('GET', '/works.html');
+  assert.match(r.text, /id="autumn" data-need="works.autumn" hidden>/);
+  // Главная галерея пустой быть не может
+  r = await admin.req('GET', '/admin/site/g/home.works');
+  assert.doesNotMatch(r.text, /Перенести/);
 });
 
 test('цены: тексты и скрытие скидки для параллели', async t => {
@@ -326,6 +404,7 @@ test('кто на странице и итог для чата', async t => {
   await a.req('POST', '/k/' + slug + '/vote', { json: { step: 'theme', option: 'money' } });
   await a.req('POST', '/k/' + slug + '/vote', { json: { step: 'wear', option: 'casual' } });
   await a.req('POST', '/k/' + slug + '/vote', { json: { step: 'color', option: 'red' } });
+  await a.req('POST', '/k/' + slug + '/vote', { json: { step: 'place', option: 'nature' } });
   await admin.post('/admin/c/' + id + '/close');
   r = await admin.req('GET', '/admin/c/' + id);
   assert.match(r.text, /Итоги голосования · 11 «А», Гимназия 4/);
@@ -473,4 +552,32 @@ test('без адреса портфолио незнакомые страниц
   t.after(stop);
   const r = await client(base).req('GET', '/disk/vypusk-2025');
   assert.strictEqual(r.status, 404);
+});
+
+test('«Студия»: несколько фото зон, блок как на главной, без «Где снимаем групповые»', async t => {
+  const { app, base, stop } = await start();
+  t.after(stop);
+  const admin = await adminLogin(base);
+  const guest = client(base);
+  let r = await guest.req('GET', '/studio.html');
+  assert.match(r.text, /id="zones" data-need="studio.zones" style="padding-top:0">/);
+  assert.strictEqual((r.text.match(/data-lb="zones"/g) || []).length, 8, 'фото студии от Артура');
+  assert.match(r.text, /class="marq rv" data-marquee/, 'лента');
+  assert.match(r.text, /src="assets\/studio\/z01-lg\.jpg"/, 'общий план наверху');
+  assert.doesNotMatch(r.text, /Где снимаем групповые/);
+  assert.match(r.text, /Съёмка проходит в моей фотостудии в Нальчике/);
+  const home = await guest.req('GET', '/');
+  const kit = s => /<ul class="kit[^"]*"[^>]*>([\s\S]*?)<\/ul>/.exec(s)[1];
+  assert.strictEqual(kit(r.text), kit(home.text), 'список «Что есть в студии» как на главной');
+
+  r = await admin.req('GET', '/admin/site');
+  assert.match(r.text, /Зоны студии/);
+  assert.doesNotMatch(r.text, /Зона отдыха/);
+  const a = await admin.photo(JPEG_WIDE), b = await admin.photo(JPEG_TALL);
+  r = await admin.api('/admin/api/site/g/studio.zones', { media: [a.id, b.id] });
+  assert.strictEqual(r.status, 200);
+  r = await guest.req('GET', '/studio.html');
+  assert.match(r.text, /id="zones" data-need="studio.zones" style="padding-top:0">/);
+  assert.match(r.text, new RegExp('media/' + a.id + '-lg\\.jpg" data-lb="zones"'));
+  assert.strictEqual((r.text.match(/data-lb="zones"/g) || []).length, 10);
 });

@@ -654,6 +654,15 @@ ol, ul { padding: 0; list-style: none; }
 .works a:hover img { -webkit-transform: scale(1.04); transform: scale(1.04); }
 .works-meta { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--ink-2); }
 .works-meta b { font: 700 13px/1 var(--disp); color: var(--ink); }
+/* разделы «Работ»: у каждого своя ссылка works.html#school и т.п. */
+.wsec { padding: 34px 0 10px; scroll-margin-top: calc(var(--hd) + 56px); }
+.wsec:first-child { padding-top: 22px; }
+.wsec__h { font: 700 20px/1.1 var(--disp); font-size: clamp(19px, 5.4vw, 30px); letter-spacing: -.03em; color: var(--ink); }
+.wsec .works-meta { align-items: flex-end; gap: 12px; }
+.wsec .works-meta span { flex: 0 0 auto; }
+/* пустой раздел не показываем (и на сервере, и на GitHub Pages) */
+.wsec:has(.pics:empty) { display: none; }
+.works-all { padding-bottom: 50px; }
 
 .darkband { padding: 60px 0 56px; background: var(--wine-3); color: var(--cream); }
 .darkband .eyebrow, .darkband .h2 em { color: var(--champ); }
@@ -673,6 +682,11 @@ ol, ul { padding: 0; list-style: none; }
 /* ---------- альбомы ---------- */
 .ph__photo { margin: 26px -8px 0; }
 .ph__photo img { width: 100%; height: auto; mix-blend-mode: multiply; }
+/* Пока блок с фото плавно появляется, браузер не смешивает его с фоном, и видно белую подложку.
+   Поэтому сам блок не двигаем, а плавно проявляем только картинку */
+.js .ph__photo.rv { opacity: 1; -webkit-transform: none; transform: none; -webkit-transition: none; transition: none; }
+.js .ph__photo.rv img { opacity: 0; -webkit-transition: opacity .9s var(--ease) .1s; transition: opacity .9s var(--ease) .1s; }
+.js .ph__photo.rv.in img { opacity: 1; }
 
 .common { display: -ms-grid; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .common li { padding: 16px 14px; border-radius: 18px; background: var(--card); font-weight: 700; font-size: 14.5px; line-height: 1.3; box-shadow: 0 1px 2px rgba(58, 35, 33, .05); }
@@ -783,6 +797,9 @@ ol, ul { padding: 0; list-style: none; }
 .kit li span { font-weight: 700; font-size: 15px; line-height: 1.25; }
 .kit li.kit--wide { grid-column: span 2; background: var(--wine); color: var(--cream); min-height: 0; }
 .kit li.kit--wide b { color: var(--champ); }
+/* выделенная карточка без растягивания на всю ширину: четыре карточки встают ровно 2×2 */
+.kit li.kit--hl { background: var(--wine); color: var(--cream); }
+.kit li.kit--hl b { color: var(--champ); }
 .kit-photos { display: -ms-grid; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .kit-photos > div { height: 190px; border-radius: 20px; }
 .kit-photos .slot { border-radius: 20px; padding: 12px; }
@@ -1191,18 +1208,22 @@ p, li { text-wrap: pretty; }
 @-webkit-keyframes stagger-in { from { opacity: 0; -webkit-transform: translateY(18px); transform: translateY(18px); } to { opacity: 1; -webkit-transform: none; transform: none; } }
 @keyframes stagger-in { from { opacity: 0; -webkit-transform: translateY(18px); transform: translateY(18px); } to { opacity: 1; -webkit-transform: none; transform: none; } }
 
-/* карточки-слои: нижняя уходит вглубь, когда на неё наезжает следующая */
-.perk { -webkit-transform-origin: 50% 0; transform-origin: 50% 0; -webkit-transform: scale(calc(1 - var(--k, 0) * .05)); transform: scale(calc(1 - var(--k, 0) * .05)); }
-.perk:after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; background: #1E0F0E; opacity: calc(var(--k, 0) * .16); pointer-events: none; }
+/* карточки-слои: нижняя уходит вглубь, когда на неё наезжает следующая (только полный набор эффектов) */
+.perk { -webkit-transform-origin: 50% 0; transform-origin: 50% 0; }
+.fx .perk { will-change: transform; -webkit-transform: scale(calc(1 - var(--k, 0) * .05)); transform: scale(calc(1 - var(--k, 0) * .05)); }
+.fx .perk:after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; background: #1E0F0E; opacity: calc(var(--k, 0) * .18); pointer-events: none; will-change: opacity; }
 
-/* пока фото грузится, по плитке пробегает блик */
-.pic.is-ld, .book__cover.is-ld, .ph-i.is-ld, .deck__card.is-ld, .clip__frame.is-ld {
-  background-image: linear-gradient(100deg, rgba(255, 255, 255, 0) 35%, rgba(255, 255, 255, .5) 50%, rgba(255, 255, 255, 0) 65%);
-  background-size: 220% 100%; background-repeat: no-repeat;
-  -webkit-animation: shimmer 1.3s linear infinite; animation: shimmer 1.3s linear infinite;
+/* пока фото грузится, по плитке пробегает блик. Едет полоска света (transform),
+   а не фон: так плитка не перерисовывается каждый кадр. Скрипт включает блик
+   только у плиток на экране */
+.is-ld:before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 100%; pointer-events: none;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .45) 50%, rgba(255, 255, 255, 0) 70%);
+  -webkit-transform: translate3d(-100%, 0, 0); transform: translate3d(-100%, 0, 0);
+  -webkit-animation: shimmer 1.4s linear infinite; animation: shimmer 1.4s linear infinite;
 }
-@-webkit-keyframes shimmer { from { background-position: 140% 0; } to { background-position: -40% 0; } }
-@keyframes shimmer { from { background-position: 140% 0; } to { background-position: -40% 0; } }
+@-webkit-keyframes shimmer { to { -webkit-transform: translate3d(100%, 0, 0); transform: translate3d(100%, 0, 0); } }
+@keyframes shimmer { to { -webkit-transform: translate3d(100%, 0, 0); transform: translate3d(100%, 0, 0); } }
 
 /* цена: живая точка у надписи */
 .offer__tag:before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: currentColor; vertical-align: 1px; -webkit-animation: dot 1.8s ease-in-out infinite; animation: dot 1.8s ease-in-out infinite; }
@@ -1250,7 +1271,7 @@ p, li { text-wrap: pretty; }
   .js [data-stagger].in > * { -webkit-animation: none; animation: none; }
   .perk { -webkit-transform: none; transform: none; }
   .perk:after { display: none; }
-  .pic.is-ld, .book__cover.is-ld, .ph-i.is-ld, .deck__card.is-ld, .clip__frame.is-ld, .offer__tag:before, .lb__spin { -webkit-animation: none; animation: none; }
+  .is-ld:before, .offer__tag:before, .lb__spin { -webkit-animation: none; animation: none; }
   .lb, .lb figure { -webkit-transition: none; transition: none; }
 }
 
@@ -1295,3 +1316,206 @@ p, li { text-wrap: pretty; }
   .receipt { font-size: 17.5px; padding: 38px 32px 32px; }
   .receipt h2 { font-size: 30px; }
 }
+
+/* =========================================================
+   Анимации
+   .js  — базовые, для всех устройств
+   .fx  — полный набор, скрипт включает на быстрых устройствах
+   .lite — облегчённый набор для старых телефонов
+   Двигаем только transform и opacity: их считает видеочип,
+   страница при этом не перерисовывается. Эффекты от прокрутки
+   делает сам браузер (scroll-driven animations), без скриптов
+   ========================================================= */
+
+/* --- Полоска прочитанного: толще и с переходом цвета. Где браузер умеет,
+   её двигает сама прокрутка, без скрипта --- */
+.hd:after { height: 3px; bottom: -2px; background: linear-gradient(90deg, var(--wine), var(--gold)); will-change: transform; }
+@-webkit-keyframes hd-progress { from { -webkit-transform: scaleX(0); transform: scaleX(0); } to { -webkit-transform: scaleX(1); transform: scaleX(1); } }
+@keyframes hd-progress { from { -webkit-transform: scaleX(0); transform: scaleX(0); } to { -webkit-transform: scaleX(1); transform: scaleX(1); } }
+@supports (animation-timeline: scroll()) {
+  .hd:after { animation: hd-progress linear both; animation-timeline: scroll(root block); }
+}
+
+/* --- Заголовки выезжают по словам --- */
+.split .w { display: inline-block; vertical-align: top; overflow: hidden; padding: .14em .07em .12em; margin: -.14em -.07em -.12em; }
+.fx .split .w > span {
+  display: inline-block;
+  -webkit-transform: translate3d(0, 110%, 0) rotate(4deg); transform: translate3d(0, 110%, 0) rotate(4deg);
+  -webkit-transform-origin: 0 100%; transform-origin: 0 100%;
+  -webkit-transition: -webkit-transform 1s cubic-bezier(.16, 1, .3, 1); transition: transform 1s cubic-bezier(.16, 1, .3, 1);
+  -webkit-transition-delay: calc(var(--wi, 0) * 55ms + .05s); transition-delay: calc(var(--wi, 0) * 55ms + .05s);
+}
+.fx .split.in .w > span { -webkit-transform: none; transform: none; }
+.fx .ph__in > h1.split { opacity: 1; -webkit-transform: none; transform: none; -webkit-animation: none; animation: none; }
+.fx .ph h1.split .w > span { -webkit-transition-delay: calc(var(--wi, 0) * 70ms + .12s); transition-delay: calc(var(--wi, 0) * 70ms + .12s); }
+.fx .why__quote.split .w > span { -webkit-transition-duration: 1.2s; transition-duration: 1.2s; -webkit-transition-delay: calc(var(--wi, 0) * 35ms + .1s); transition-delay: calc(var(--wi, 0) * 35ms + .1s); }
+
+/* --- Чек «печатается»: строки появляются по одной, галочки прыгают --- */
+.js .receipt.rv .receipt__head, .js .receipt.rv h2, .js .receipt.rv li, .js .receipt.rv .receipt__bar {
+  opacity: 0; -webkit-transform: translate3d(0, 10px, 0); transform: translate3d(0, 10px, 0);
+  -webkit-transition: opacity .5s var(--ease), -webkit-transform .5s var(--ease); transition: opacity .5s var(--ease), transform .5s var(--ease);
+}
+.js .receipt.rv h2 { -webkit-transition-delay: .15s; transition-delay: .15s; }
+.js .receipt.rv li { -webkit-transition-delay: calc(.3s + var(--ri, 0) * 110ms); transition-delay: calc(.3s + var(--ri, 0) * 110ms); }
+.js .receipt.rv .receipt__bar {
+  -webkit-transform: scaleX(0); transform: scaleX(0); -webkit-transform-origin: 0 50%; transform-origin: 0 50%;
+  -webkit-transition-duration: .9s; transition-duration: .9s; -webkit-transition-delay: 1.2s; transition-delay: 1.2s;
+}
+.js .receipt.rv.in .receipt__head, .js .receipt.rv.in h2, .js .receipt.rv.in li { opacity: 1; -webkit-transform: none; transform: none; }
+.js .receipt.rv.in .receipt__bar { opacity: .8; -webkit-transform: none; transform: none; }
+.js .receipt.rv li b {
+  display: inline-block; -webkit-transform: scale(0) rotate(-40deg); transform: scale(0) rotate(-40deg);
+  -webkit-transition: -webkit-transform .55s cubic-bezier(.34, 1.56, .64, 1); transition: transform .55s cubic-bezier(.34, 1.56, .64, 1);
+  -webkit-transition-delay: calc(.5s + var(--ri, 0) * 110ms); transition-delay: calc(.5s + var(--ri, 0) * 110ms);
+}
+.js .receipt.rv.in li b { -webkit-transform: none; transform: none; }
+/* чек «выезжает» сверху и ложится с наклоном */
+.fx .receipt.rv { -webkit-transform: translate3d(0, -34px, 0) rotate(-3.5deg) scale(.92); transform: translate3d(0, -34px, 0) rotate(-3.5deg) scale(.92); -webkit-transition-duration: 1.1s; transition-duration: 1.1s; }
+.fx .receipt.rv.in { -webkit-transform: rotate(-1.2deg); transform: rotate(-1.2deg); }
+
+.offer__card:not(.is-live) .offer__tag:before { -webkit-animation-play-state: paused; animation-play-state: paused; }
+
+/* --- Карточки «Альбом собирают сами ребята»: крупное слово въезжает сбоку --- */
+.fx .perk .perk__big {
+  opacity: 0; -webkit-transform: translate3d(16%, 0, 0); transform: translate3d(16%, 0, 0);
+  -webkit-transition: -webkit-transform 1s cubic-bezier(.16, 1, .3, 1) .1s, opacity .6s ease .1s; transition: transform 1s cubic-bezier(.16, 1, .3, 1) .1s, opacity .6s ease .1s;
+}
+.fx .perk .perk__body {
+  opacity: 0; -webkit-transform: translate3d(0, 18px, 0); transform: translate3d(0, 18px, 0);
+  -webkit-transition: -webkit-transform .8s var(--ease) .3s, opacity .6s ease .3s; transition: transform .8s var(--ease) .3s, opacity .6s ease .3s;
+}
+.fx .perk.in .perk__big, .fx .perk.in .perk__body { opacity: 1; -webkit-transform: none; transform: none; }
+
+/* --- «Как всё проходит»: номера шагов «впрыгивают» --- */
+.js .flow li.rv:before {
+  opacity: 0; -webkit-transform: scale(.3); transform: scale(.3);
+  -webkit-transition: -webkit-transform .6s cubic-bezier(.34, 1.56, .64, 1) .15s, opacity .3s ease .15s; transition: transform .6s cubic-bezier(.34, 1.56, .64, 1) .15s, opacity .3s ease .15s;
+}
+.js .flow li.rv.in:before { opacity: 1; -webkit-transform: none; transform: none; }
+
+/* --- «Почему так дорого»: римские цифры поворачиваются на место --- */
+.js .why__list li.rv .why__n {
+  opacity: 0; -webkit-transform: translate3d(0, 30%, 0) rotate(-14deg); transform: translate3d(0, 30%, 0) rotate(-14deg);
+  -webkit-transition: -webkit-transform .8s cubic-bezier(.34, 1.4, .64, 1) .2s, opacity .4s ease .2s; transition: transform .8s cubic-bezier(.34, 1.4, .64, 1) .2s, opacity .4s ease .2s;
+}
+.js .why__list li.rv.in .why__n { opacity: 1; -webkit-transform: none; transform: none; }
+
+/* --- Экран голосования в телефоне: штамп «ТВОЙ ГОЛОС» и неоновая вывеска --- */
+.fx .phone .mini__stamp {
+  opacity: 0; -webkit-transform: rotate(8deg) scale(2.4); transform: rotate(8deg) scale(2.4);
+  -webkit-transition: -webkit-transform .5s cubic-bezier(.34, 1.56, .64, 1) 1.9s, opacity .2s ease 1.9s; transition: transform .5s cubic-bezier(.34, 1.56, .64, 1) 1.9s, opacity .2s ease 1.9s;
+}
+.fx .phone.in .mini__stamp { opacity: 1; -webkit-transform: rotate(8deg); transform: rotate(8deg); }
+@-webkit-keyframes neon-on { 0%, 18%, 22%, 38%, 44% { opacity: .15; } 20%, 40%, 100% { opacity: 1; } }
+@keyframes neon-on { 0%, 18%, 22%, 38%, 44% { opacity: .15; } 20%, 40%, 100% { opacity: 1; } }
+.fx .phone.in .mini--neon .mini__t { -webkit-animation: neon-on 1.6s linear 2.3s both; animation: neon-on 1.6s linear 2.3s both; }
+
+/* --- Тематики на странице «Дизайны»: карточка поднимается, название выезжает --- */
+.fx .tcard.rv { -webkit-transform: translate3d(0, 50px, 0) scale(.96); transform: translate3d(0, 50px, 0) scale(.96); -webkit-transition-duration: 1s; transition-duration: 1s; }
+.fx .tcard.rv.in { -webkit-transform: none; transform: none; }
+.fx .tcard.rv .tcard__title {
+  opacity: 0; -webkit-transform: translate3d(0, 40%, 0); transform: translate3d(0, 40%, 0);
+  -webkit-transition: -webkit-transform 1s cubic-bezier(.16, 1, .3, 1) .2s, opacity .6s ease .2s; transition: transform 1s cubic-bezier(.16, 1, .3, 1) .2s, opacity .6s ease .2s;
+}
+.fx .tcard.rv.in .tcard__title { opacity: 1; -webkit-transform: none; transform: none; }
+
+/* --- «Дальше»: стрелка зовёт на следующую страницу --- */
+@-webkit-keyframes nudge { 0%, 60%, 100% { -webkit-transform: none; transform: none; } 30% { -webkit-transform: translate3d(8px, 0, 0); transform: translate3d(8px, 0, 0); } }
+@keyframes nudge { 0%, 60%, 100% { -webkit-transform: none; transform: none; } 30% { -webkit-transform: translate3d(8px, 0, 0); transform: translate3d(8px, 0, 0); } }
+.fx .next.is-live i { -webkit-animation: nudge 2.6s ease-in-out 1s infinite; animation: nudge 2.6s ease-in-out 1s infinite; }
+.fx .next.is-live:hover i { -webkit-animation: none; animation: none; }
+
+/* --- Бесконечное крутится, только пока его видно --- */
+.ticker:not(.is-live) .ticker__track, .me:not(.is-live) svg { -webkit-animation-play-state: paused; animation-play-state: paused; }
+
+/* --- Финал страницы: искры у кнопки записи --- */
+.end__cta { position: relative; }
+.sparks { position: absolute; width: 0; height: 0; z-index: 2; pointer-events: none; }
+.sparks i {
+  position: absolute; left: -7px; top: -9px; opacity: 0;
+  font: 400 16px/1 var(--sans); font-style: normal; color: var(--champ);
+  -webkit-animation: spark 1.3s cubic-bezier(.16, 1, .3, 1) var(--sd, 0ms) forwards; animation: spark 1.3s cubic-bezier(.16, 1, .3, 1) var(--sd, 0ms) forwards;
+}
+@-webkit-keyframes spark { 0% { opacity: 0; -webkit-transform: scale(.3); transform: scale(.3); } 15% { opacity: 1; } 100% { opacity: 0; -webkit-transform: translate3d(var(--tx), var(--ty), 0) rotate(120deg) scale(1); transform: translate3d(var(--tx), var(--ty), 0) rotate(120deg) scale(1); } }
+@keyframes spark { 0% { opacity: 0; -webkit-transform: scale(.3); transform: scale(.3); } 15% { opacity: 1; } 100% { opacity: 0; -webkit-transform: translate3d(var(--tx), var(--ty), 0) rotate(120deg) scale(1); transform: translate3d(var(--tx), var(--ty), 0) rotate(120deg) scale(1); } }
+
+/* --- Эффекты от прокрутки: их двигает сама прокрутка на стороне браузера.
+   Где браузер этого не умеет, блоки просто стоят на месте --- */
+@supports (animation-timeline: view()) {
+  /* бегущая строка тематик разгоняется от прокрутки */
+  .fx .ticker__track { animation: tick 46s linear infinite, tick-push linear both; animation-timeline: auto, view(); animation-range: normal, cover 0% cover 100%; }
+  .fx .ticker:not(.is-live) .ticker__track { animation-play-state: paused, running; }
+  /* видео выпрямляется и вырастает, пока до него листают */
+  .fx .clip--one.rv { -webkit-transform: none; transform: none; }
+  .fx .clip--one { animation: clip-in linear both; animation-timeline: view(); animation-range: entry 0% cover 42%; }
+  /* телефон с экраном голосования плывёт и поворачивается */
+  .fx .phone { animation: phone-drift linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+  /* линия шагов «Как всё проходит» прорисовывается по мере чтения */
+  .fx .flow { view-timeline: --flow block; }
+  .fx .flow:before { -webkit-transform-origin: 50% 0; transform-origin: 50% 0; animation: flow-draw linear both; animation-timeline: --flow; animation-range: cover 12% cover 62%; }
+}
+@keyframes tick-push { from { translate: 6% 0; } to { translate: -6% 0; } }
+@keyframes clip-in { from { scale: .84; rotate: 6deg; } to { scale: 1; rotate: 0deg; } }
+@keyframes phone-drift { from { translate: 0 50px; rotate: 5deg; } to { translate: 0 -50px; rotate: -3deg; } }
+@keyframes flow-draw { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* --- Кто просит меньше движения, получает спокойную страницу --- */
+@media (prefers-reduced-motion: reduce) {
+  .js .receipt.rv .receipt__head, .js .receipt.rv h2, .js .receipt.rv li, .js .receipt.rv li b,
+  .js .flow li.rv:before, .js .why__list li.rv .why__n { opacity: 1; -webkit-transform: none; transform: none; -webkit-transition: none; transition: none; }
+  .js .receipt.rv .receipt__bar { opacity: .8; -webkit-transform: none; transform: none; -webkit-transition: none; transition: none; }
+}
+
+/* страховка: сдвиги во время анимаций не дают странице уехать вбок */
+main > section, main > nav, main > div, .next { overflow-x: clip; }
+
+/* «Коллекция 2026» на «Дизайнах»: после удалённого блока сверху было слишком пусто */
+.sec--coll { padding: 40px 0 30px; }
+@media (min-width: 960px) { .sec--coll { padding: 56px 0 34px; } }
+
+/* «Студия»: фото зон, пока их нет — блок не показываем */
+.zones:has(.pics:empty) { display: none; }
+/* --- Зоны студии: бегущая лента во всю ширину экрана.
+   Без скрипта (и для тех, кто отключил анимации) — полоса, которую листают пальцем.
+   Скрипт добавляет is-run: лента едет сама, копии фото замыкают её в кольцо --- */
+.zones { padding-bottom: 44px; }
+.zones .works-meta { margin-bottom: 0; }
+.marq {
+  --mh: 200px; --mg: 12px;
+  overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  -webkit-scroll-snap-type: x mandatory; scroll-snap-type: x mandatory; scroll-padding-left: 18px;
+}
+.marq::-webkit-scrollbar { display: none; }
+.marq .pics { display: flex; width: -webkit-max-content; width: max-content; margin: 0; gap: 0; padding: 16px 18px 22px; }
+/* отступ справа у каждого фото (а не gap): так половина ленты ровно равна одному кругу */
+.marq .pic, .marq .pic--wide { flex: 0 0 auto; height: var(--mh); width: auto; aspect-ratio: 2 / 3; margin-right: var(--mg); grid-column: auto; scroll-snap-align: start; box-shadow: 0 14px 30px -18px rgba(58, 35, 33, .55); }
+.marq .pic--wide { aspect-ratio: 3 / 2; }
+.marq.is-run {
+  overflow: hidden; -webkit-scroll-snap-type: none; scroll-snap-type: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+.marq.is-run .pics { padding-left: 0; padding-right: 0; will-change: transform; }
+@media (min-width: 720px) {
+  .marq { --mh: 340px; --mg: 16px; scroll-padding-left: 32px; }
+  .marq .pics { padding-left: 32px; padding-right: 32px; }
+}
+@media (min-width: 1280px) { .marq { --mh: 380px; } }
+
+
+/* «← На главную» вверху внутренних страниц (просьба Артура): стоит сразу, без анимации появления */
+.crumb {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px;
+  padding: 8px 14px 8px 11px; border: 1px solid var(--line); border-radius: 99px; background: rgba(255, 255, 255, .55);
+  font-size: 13.5px; font-weight: 700; line-height: 1; color: var(--ink); text-decoration: none;
+  -webkit-transition: border-color .25s, color .25s; transition: border-color .25s, color .25s;
+}
+.crumb i { font-style: normal; color: var(--wine); -webkit-transition: transform .25s var(--ease); transition: transform .25s var(--ease); }
+.crumb:hover { border-color: var(--wine); color: var(--wine); }
+.crumb:hover i { -webkit-transform: translateX(-3px); transform: translateX(-3px); }
+.ph__in > .crumb + .eyebrow { display: -webkit-box; display: -ms-flexbox; display: flex; }
+.js .ph__in > .crumb { opacity: 1; -webkit-transform: none; transform: none; -webkit-animation: none; animation: none; }
+
+/* «Что есть в студии»: между заголовком и текстом всегда есть воздух,
+   даже когда текста много (как в бордовой карточке «Свобода ваших действий») */
+.kit li { gap: 14px; }
+.kit li.kit--hl span { font-size: 14px; line-height: 1.35; opacity: .92; }

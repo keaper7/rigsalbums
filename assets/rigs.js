@@ -5,6 +5,8 @@
   var body = document.body;
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var hasIO = 'IntersectionObserver' in window;
+  var raf = window.requestAnimationFrame ? function (f) { return window.requestAnimationFrame(f); } : function (f) { return setTimeout(f, 16); };
+  var now = window.performance && performance.now ? function () { return performance.now(); } : function () { return Date.now(); };
 
   function $(sel, ctx) { return (ctx || document).querySelector(sel); }
   function $$(sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); }
@@ -15,40 +17,110 @@
     }
     return null;
   }
+  function supports(p, v) { return !!(window.CSS && CSS.supports && CSS.supports(p, v)); }
   function watch(els, cb, opts) {
     if (!els.length) return null;
     if (!hasIO) { els.forEach(function (el) { cb(el, true); }); return null; }
     var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) { cb(en.target, en.isIntersecting, io); });
+      entries.forEach(function (en) { cb(en.target, en.isIntersecting, io, en); });
     }, opts);
     els.forEach(function (el) { io.observe(el); });
     return io;
   }
-
-  // Шапка
-  var hd = $('.hd');
-  function onScroll() {
-    var y = window.pageYOffset, max = document.documentElement.scrollHeight - window.innerHeight;
-    hd.classList.toggle('is-scrolled', y > 8);
-    hd.style.setProperty('--p', max > 0 ? Math.min(1, y / max).toFixed(4) : 0);
+  // Появление: срабатывает, когда блок показался или уже остался выше экрана
+  function reveal(els, opts, onIn) {
+    watch(els, function (el, vis, io, en) {
+      var above = en && !vis && en.boundingClientRect.bottom < 0;
+      if (!vis && !above) return;
+      if (io) io.unobserve(el);
+      el.classList.add('in');
+      if (onIn) onIn(el, above);
+    }, opts);
   }
-  window.addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
 
-  // Плавающая кнопка записи: после первого экрана и до финального блока
+  // ---------- Сколько движения тянет устройство ----------
+  // fx — полный набор эффектов; lite — облегчённый для старых телефонов.
+  // Проверяем память (Chrome её сообщает) и короткий замер скорости процессора
+  function weakDevice() {
+    var q = location.search || '';
+    if (/[?&]lite=1/.test(q)) return true;
+    if (/[?&]fx=1/.test(q)) return false;
+    try {
+      var n = navigator, c = n.connection, mem = n.deviceMemory;
+      if (c && c.saveData) return true;
+      if (mem && mem <= 2) return true;
+      if (mem && mem >= 6) return false;
+    } catch (e) {}
+    var t = now(), x = 0;
+    for (var i = 0; i < 60000; i++) x += Math.sqrt(i) * .5;
+    window.__rigsB = x;
+    return now() - t > 8;
+  }
+  var fx = !reduce && hasIO && !weakDevice();
+  root.classList.add(fx ? 'fx' : 'lite');
+  var sdaScroll = supports('animation-timeline', 'scroll()');
+
+  // Если на деле прокрутка всё равно проседает — переходим на облегчённый набор
+  function downgrade() {
+    if (!fx) return;
+    fx = false;
+    root.classList.remove('fx');
+    root.classList.add('lite');
+  }
+
+  // ---------- Прокрутка: один обработчик на кадр ----------
+  var hd = $('.hd');
+  var maxY = 1, needMeasure = true, ticking = false, lastY = -1, lastP = -1, scrolled = null;
+  var perFrame = [];
+  var lastT = 0, slow = 0, fast = 0;
+  function measure() { maxY = Math.max(1, root.scrollHeight - window.innerHeight); needMeasure = false; }
+  function frame(t) {
+    ticking = false;
+    t = t || now();
+    // Сторож плавности: считаем только кадры непрерывной прокрутки
+    if (fx && lastT) {
+      var dt = t - lastT;
+      if (dt < 40) fast++;
+      else if (dt < 260) slow++;
+      if (fast + slow >= 90) {
+        if (slow / (fast + slow) > .25) downgrade();
+        fast = slow = 0;
+      }
+    }
+    lastT = t;
+    if (needMeasure) measure();
+    var y = window.pageYOffset;
+    if (y === lastY) return;
+    lastY = y;
+    var s = y > 8;
+    if (s !== scrolled) { scrolled = s; hd.classList.toggle('is-scrolled', s); }
+    if (!sdaScroll) {
+      var p = Math.min(1, y / maxY);
+      if (Math.abs(p - lastP) > .002) { lastP = p; hd.style.setProperty('--p', p.toFixed(3)); }
+    }
+    for (var i = 0; i < perFrame.length; i++) perFrame[i](y);
+  }
+  window.addEventListener('scroll', function () { if (!ticking) { ticking = true; raf(frame); } }, { passive: true });
+  window.addEventListener('resize', function () { needMeasure = true; if (!ticking) { ticking = true; raf(frame); } });
+  if ('ResizeObserver' in window) new ResizeObserver(function () { needMeasure = true; }).observe(body);
+  frame();
+  // Прокрутка остановилась — не считаем паузу медленным кадром
+  window.addEventListener('scroll', function () { clearTimeout(frame.idle); frame.idle = setTimeout(function () { lastT = 0; }, 180); }, { passive: true });
+
+  // ---------- Плавающая кнопка записи: после первого экрана и до финального блока ----------
   var dock = $('.dock');
   var heroEl = $('.hero, .ph');
   var endEl = $('#end');
-  function dockUpd() {
-    if (!dock) return;
-    var h = window.innerHeight;
-    var show = heroEl && heroEl.getBoundingClientRect().bottom < h * 0.25 && (!endEl || endEl.getBoundingClientRect().top > h * 0.85);
-    dock.classList.toggle('is-on', !!show && !body.classList.contains('menu-open'));
+  var heroOn = true, endOn = false;
+  function updateDock() {
+    if (dock) dock.classList.toggle('is-on', !heroOn && !endOn && !body.classList.contains('menu-open'));
   }
-  window.addEventListener('scroll', dockUpd, { passive: true });
-  dockUpd();
+  if (dock && hasIO) {
+    if (heroEl) new IntersectionObserver(function (en) { heroOn = en[0].isIntersecting; updateDock(); }, { rootMargin: '-25% 0px 0px 0px' }).observe(heroEl);
+    if (endEl) new IntersectionObserver(function (en) { endOn = en[0].isIntersecting || en[0].boundingClientRect.top < 0; updateDock(); }, { rootMargin: '0px 0px -15% 0px' }).observe(endEl);
+  }
 
-  // Меню
+  // ---------- Меню ----------
   var menuBtn = $('.hd__menu');
   var menu = $('#menu');
   function setMenu(open) {
@@ -58,7 +130,7 @@
     var lbl = $('span', menuBtn);
     if (lbl) lbl.textContent = open ? 'Закрыть' : 'Меню';
     root.style.overflow = open ? 'hidden' : '';
-    dockUpd();
+    updateDock();
   }
   if (menuBtn && menu) {
     menuBtn.addEventListener('click', function () { setMenu(!body.classList.contains('menu-open')); });
@@ -66,7 +138,7 @@
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setMenu(false); });
   }
 
-  // Колода обложек на главной
+  // ---------- Колода обложек на главной ----------
   var deck = $('.deck');
   if (deck) {
     var cards = $$('.deck__card', deck);
@@ -195,44 +267,57 @@
     setTimeout(function () { if (!reduce) next(); auto(); }, 1300);
   }
 
-  // Счётчики
+  // ---------- Счётчики ----------
+  var group = function (n, sep) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, sep); };
+  // Число «набегает» от нуля. Шаги по таймеру, а не каждый кадр: старым телефонам так легче
+  function countUp(el, to, fmt, dur, delay) {
+    var t0 = Date.now() + (delay || 0);
+    el.textContent = fmt(0);
+    setTimeout(function tick() {
+      var p = Math.min(1, Math.max(0, (Date.now() - t0) / dur));
+      el.textContent = fmt(Math.round(to * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) setTimeout(tick, 40);
+    }, 40);
+  }
   var counters = $$('[data-count]');
   if (counters.length && !reduce) {
-    var fmt = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + '+'; };
-    counters.forEach(function (el) { el.textContent = fmt(0); });
+    var plus = function (n) { return group(n, ' ') + '+'; };
+    counters.forEach(function (el) { el.textContent = plus(0); });
     watch(counters, function (el, vis, io) {
       if (!vis) return;
       if (io) io.unobserve(el);
-      var to = +el.getAttribute('data-count'), t0 = Date.now();
-      setTimeout(function tick() {
-        var p = Math.min(1, (Date.now() - t0 - 400) / 1400);
-        if (p < 0) p = 0;
-        el.textContent = fmt(Math.round(to * (1 - Math.pow(1 - p, 3))));
-        if (p < 1) setTimeout(tick, 30);
-      }, 30);
+      countUp(el, +el.getAttribute('data-count'), plus, 1400, 400);
     }, { threshold: .6 });
   }
 
-  // Картинки проявляются по мере загрузки
+  // ---------- Картинки проявляются по мере загрузки ----------
+  // Блик бежит только по плиткам, которые видно на экране, и только пока фото грузится
+  var LD_BOX = /(^|\s)(pic|book__cover|deck__card|clip__frame)(\s|$)/;
+  var ldBoxes = [];
   $$('img').forEach(function (img) {
     if (img.complete && img.naturalWidth) return;
-    var box = img.parentNode;
     img.classList.add('ld');
-    if (box && box.classList) box.classList.add('is-ld');
+    var box = img.parentNode;
     var done = function () {
       img.classList.remove('ld');
       if (box && box.classList) box.classList.remove('is-ld');
+      if (ldIO && box) ldIO.unobserve(box);
     };
     img.addEventListener('load', done);
     img.addEventListener('error', done);
+    if (box && LD_BOX.test(box.className)) ldBoxes.push(box);
   });
+  var ldIO = !reduce && ldBoxes.length ? watch(ldBoxes, function (box, vis) {
+    var img = $('img', box);
+    box.classList.toggle('is-ld', vis && !!img && img.classList.contains('ld'));
+  }, { rootMargin: '60px 0px' }) : null;
 
-  // Липкая строка тематик подсвечивает ту, что сейчас на экране
+  // ---------- Липкая строка тематик подсвечивает ту, что сейчас на экране ----------
   var jb = $('.jumpbar__in');
   if (jb) {
     var chips = {};
     $$('a', jb).forEach(function (a) { chips[a.getAttribute('href').slice(1)] = a; });
-    watch($$('.tcard'), function (el, vis) {
+    watch($('.tcard, .wsec'), function (el, vis) {
       if (!vis) return;
       var a = chips[el.id];
       if (!a || a.classList.contains('is-on')) return;
@@ -243,36 +328,237 @@
     }, { rootMargin: '-45% 0px -50% 0px' });
   }
 
-  // Появление блоков. Внутри [data-stagger] элементы выезжают по очереди
+  // ---------- Заголовки выезжают по словам ----------
+  // Режем только обычные пробелы: неразрывные остаются внутри слова
+  function splitWords(el) {
+    var n = 0;
+    var walk = function (node) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (c) {
+        if (c.nodeType === 3) {
+          var parts = c.nodeValue.split(/([ \t\n\r]+)/);
+          if (parts.length === 1 && !parts[0]) return;
+          var frag = document.createDocumentFragment();
+          parts.forEach(function (p) {
+            if (!p) return;
+            if (/^[ \t\n\r]+$/.test(p)) { frag.appendChild(document.createTextNode(' ')); return; }
+            var w = document.createElement('span');
+            w.className = 'w';
+            var i = document.createElement('span');
+            i.textContent = p;
+            i.style.setProperty('--wi', n++);
+            w.appendChild(i);
+            frag.appendChild(w);
+          });
+          c.parentNode.replaceChild(frag, c);
+        } else if (c.nodeType === 1 && !/^(BR|SMALL|SVG)$/i.test(c.tagName)) walk(c);
+      });
+    };
+    walk(el);
+    el.classList.add('split');
+  }
+  if (fx) {
+    var heads = $$('.h2, .end h2, .ph h1, .next b, .why__quote');
+    heads.forEach(splitWords);
+    reveal(heads, { threshold: .25, rootMargin: '0px 0px -6% 0px' });
+  }
+
+  // ---------- Появление блоков ----------
+  // Внутри [data-stagger] элементы выезжают по очереди
+  $$('.receipt li').forEach(function (li, i) { li.style.setProperty('--ri', i); });
+
   $$('[data-stagger]').forEach(function (box) {
     for (var i = 0; i < box.children.length; i++) box.children[i].style.setProperty('--i', Math.min(i, 9));
   });
-  watch($$('.rv'), function (el, vis, io) {
-    if (vis) { el.classList.add('in'); if (io) io.unobserve(el); }
-  }, { threshold: .12, rootMargin: '0px 0px -6% 0px' });
+  reveal($$('.rv'), { threshold: .12, rootMargin: '0px 0px -6% 0px' });
   // Галереи бывают выше экрана: для них хватает, чтобы показался край
-  watch($$('[data-stagger]'), function (el, vis, io) {
-    if (vis) { el.classList.add('in'); if (io) io.unobserve(el); }
-  }, { threshold: 0, rootMargin: '0px 0px -8% 0px' });
+  reveal($$('[data-stagger]'), { threshold: 0, rootMargin: '0px 0px -8% 0px' });
 
-  // Карточки «Альбом собирают сами ребята»: та, на которую наезжает следующая, уходит вглубь
+  // Карточки «Альбом собирают сами ребята»
+  reveal($$('.perk'), { threshold: .3 });
+
+  // ---------- Бесконечные анимации идут, только пока их видно ----------
+  var LIVE = '.ticker, .me, .offer__card, .phone, .next';
+  var lives = $$(LIVE);
+  if (!hasIO) lives.forEach(function (el) { el.classList.add('is-live'); });
+  else watch(lives, function (el, vis) { el.classList.toggle('is-live', vis); });
+
+  // ---------- Карточки-слои: нижняя уходит вглубь, когда на неё наезжает следующая ----------
   var perks = $$('.perk');
-  if (perks.length > 1 && !reduce && 'CSS' in window && CSS.supports && CSS.supports('--k', '0')) {
-    var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
-    var ticking = false;
+  if (perks.length > 1 && !reduce && supports('--k', '0')) {
+    var stackOn = false;
     var depth = function () {
-      ticking = false;
+      if (!stackOn || !fx) return;
+      // Сначала все замеры, потом все записи: так браузер не пересчитывает раскладку по кругу
+      var r = perks.map(function (p) { return p.getBoundingClientRect(); });
       for (var i = 0; i < perks.length - 1; i++) {
-        var a = perks[i].getBoundingClientRect(), b = perks[i + 1].getBoundingClientRect();
-        var cover = Math.min(1, Math.max(0, (a.bottom - b.top) / a.height));
-        perks[i].style.setProperty('--k', cover.toFixed(3));
+        var cover = Math.min(1, Math.max(0, (r[i].bottom - r[i + 1].top) / r[i].height));
+        var v = cover.toFixed(3);
+        if (perks[i].__k !== v) { perks[i].__k = v; perks[i].style.setProperty('--k', v); }
       }
     };
-    window.addEventListener('scroll', function () { if (!ticking) { ticking = true; raf(depth); } }, { passive: true });
-    depth();
+    watch([$('.stack') || perks[0].parentNode], function (el, vis) { stackOn = vis; if (vis) depth(); });
+    perFrame.push(depth);
   }
 
-  // Видео: подгружаются рядом с экраном и играют без звука, пока видны
+  // ---------- Экран голосования в телефоне: таймер идёт по-настоящему ----------
+  var clock = $('.phone__bar span');
+  if (fx && clock) {
+    var m = /(\d+):(\d\d)/.exec(clock.textContent);
+    var left = m ? +m[1] * 60 + +m[2] : 0, tickT = null;
+    var draw = function () { clock.textContent = 'до конца ' + Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2); };
+    watch([closest(clock, '.phone') || clock], function (el, vis) {
+      clearInterval(tickT);
+      if (vis && left) tickT = setInterval(function () { left = left > 1 ? left - 1 : 12 * 60 + 40; draw(); }, 1000);
+    });
+  }
+
+  // ---------- Финал страницы: искры у кнопки записи ----------
+  var endCta = $('.end__cta');
+  if (fx && endCta) {
+    watch([endCta], function (el, vis, io) {
+      if (!vis || !fx) return;
+      if (io) io.unobserve(el);
+      var btn = $('.btn', el);
+      if (!btn) return;
+      var box = document.createElement('span');
+      box.className = 'sparks';
+      box.setAttribute('aria-hidden', 'true');
+      box.style.left = (btn.offsetLeft + btn.offsetWidth / 2) + 'px';
+      box.style.top = (btn.offsetTop + btn.offsetHeight / 2) + 'px';
+      for (var i = 0; i < 14; i++) {
+        var s = document.createElement('i');
+        var a = (i / 14) * Math.PI * 2 + Math.random() * .4;
+        var d = 60 + Math.random() * 40;
+        s.style.setProperty('--tx', Math.round(Math.cos(a) * d * 1.2) + 'px');
+        s.style.setProperty('--ty', Math.round(Math.sin(a) * d * .75) + 'px');
+        s.style.setProperty('--sd', Math.round(Math.random() * 160) + 'ms');
+        s.textContent = i % 3 ? '✦' : '•';
+        box.appendChild(s);
+      }
+      el.appendChild(box);
+      setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 2200);
+    }, { threshold: .6 });
+  }
+
+  // ---------- Лента «Зоны студии»: едет сама, при наведении или касании плавно встаёт ----------
+  // Позицию считает сам скрипт и каждый кадр ставит один сдвиг (transform): страница при этом
+  // не перерисовывается, а лента не может «прыгнуть» — других часов, кроме этих, у неё нет.
+  // Копии фото замыкают ленту в кольцо. Их не видят программы чтения с экрана,
+  // а нажатие по копии открывает оригинал, поэтому в просмотре по-прежнему «1 / 8»
+  $$('[data-marquee]').forEach(function (box) {
+    var track = $('.pics', box);
+    var originals = track ? $$('.pic', track) : [];
+    if (!originals.length || reduce) return;
+    // Скорость от размера фото: каждое проезжает примерно за 4,5 секунды на любом экране
+    var speed = 60;
+    var hasPointer = 'PointerEvent' in window;
+    var pos = 0, dist = 0, rate = 1, target = 1, last = 0, looping = false, visible = !hasIO;
+    var holdT = null, lastW = 0, lastTouch = 0, lastPress = 0;
+
+    var copyOf = function (o, i) {
+      var c = o.cloneNode(true);
+      c.classList.add('is-copy');
+      c.classList.remove('is-ld');
+      c.removeAttribute('data-lb');
+      c.setAttribute('aria-hidden', 'true');
+      c.setAttribute('tabindex', '-1');
+      c.setAttribute('data-copy', i);
+      var im = $('img', c);
+      if (im) {
+        im.alt = '';
+        if (im.classList.contains('ld')) {
+          var done = function () { im.classList.remove('ld'); };
+          if (im.complete && im.naturalWidth) done();
+          else { im.addEventListener('load', done); im.addEventListener('error', done); }
+        }
+      }
+      return c;
+    };
+
+    var paint = function () { track.style.transform = 'translate3d(' + (-pos).toFixed(2) + 'px,0,0)'; };
+    var frame = function (t) {
+      looping = false;
+      if (!visible || !dist) { last = 0; return; }
+      var dt = last ? Math.min(50, t - last) : 0; // после паузы вкладки не догоняем рывком
+      last = t;
+      // плавный разгон и торможение примерно за полсекунды
+      rate += (target - rate) * Math.min(1, dt / 160);
+      if (Math.abs(target - rate) < .01) rate = target;
+      pos = (pos + speed * rate * dt / 1000) % dist;
+      paint();
+      if (rate === 0 && target === 0) { last = 0; return; } // стоим — кадры не тратим
+      loop();
+    };
+    var loop = function () { if (!looping) { looping = true; raf(frame); } };
+    var setRate = function (to) { target = to; loop(); };
+
+    var build = function () {
+      var w = box.clientWidth;
+      if (!w || w === lastW) return;
+      lastW = w;
+      $$('.is-copy', track).forEach(function (c) { track.removeChild(c); });
+      box.classList.add('is-run');
+      // Один круг — все фото подряд. Если круг уже экрана, повторяем его, чтобы не было дыры
+      var one = track.offsetWidth;
+      if (!one) return;
+      var first = originals[0].offsetWidth + 12;
+      speed = Math.max(50, first / 3);
+      var reps = Math.max(1, Math.ceil(w / one));
+      for (var r = 0; r < reps * 2 - 1; r++) originals.forEach(function (o, i) { track.appendChild(copyOf(o, i)); });
+      var prev = dist;
+      dist = one * reps;
+      // ширина поменялась — продолжаем с того же места круга, а не с начала
+      pos = prev ? (pos / prev * dist) % dist : 0;
+      paint();
+      loop();
+    };
+
+    // После касания ждём пару секунд. Пока открыт просмотр фото или фокус с клавиатуры внутри, лента стоит
+    var keyFocus = function () {
+      var a = document.activeElement;
+      if (!a || !box.contains(a) || Date.now() - lastPress < 800) return false;
+      try { return a.matches(':focus-visible'); } catch (e) { return true; }
+    };
+    var resume = function () {
+      clearTimeout(holdT);
+      holdT = setTimeout(function () {
+        if ($('.lb.is-open') || keyFocus()) return resume();
+        setRate(1);
+      }, 1800);
+    };
+    var stop = function () { clearTimeout(holdT); setRate(0); };
+    var isMouse = function (e) { return (!e.pointerType || e.pointerType === 'mouse') && Date.now() - lastTouch > 800; };
+
+    box.addEventListener(hasPointer ? 'pointerdown' : 'mousedown', function () { lastPress = Date.now(); });
+    box.addEventListener(hasPointer ? 'pointerenter' : 'mouseenter', function (e) { if (isMouse(e)) stop(); });
+    // Мышь ушла — сразу плавно трогаемся (если не открыт просмотр фото)
+    box.addEventListener(hasPointer ? 'pointerleave' : 'mouseleave', function (e) {
+      if (!isMouse(e)) return;
+      clearTimeout(holdT);
+      if ($('.lb.is-open') || keyFocus()) resume(); else setRate(1);
+    });
+    box.addEventListener('touchstart', function () { lastTouch = lastPress = Date.now(); stop(); }, { passive: true });
+    box.addEventListener('touchend', function () { lastTouch = Date.now(); resume(); });
+    box.addEventListener('touchcancel', function () { lastTouch = Date.now(); resume(); });
+    box.addEventListener('focusin', function () { if (keyFocus()) stop(); });
+    box.addEventListener('focusout', resume);
+    // Нажатие по копии открывает то же фото из оригинального ряда
+    box.addEventListener('click', function (e) {
+      var c = closest(e.target, '.is-copy');
+      if (!c) return;
+      e.preventDefault();
+      stop();
+      originals[+c.getAttribute('data-copy')].click();
+      resume();
+    });
+
+    // Лента едет, только пока её видно
+    watch([box], function (el, vis) { visible = vis; if (vis) loop(); }, { rootMargin: '100px 0px' });
+    build();
+    window.addEventListener('resize', build);
+  });
+
+  // ---------- Видео: подгружаются рядом с экраном и играют без звука, пока видны ----------
   var vids = $$('.clip video').filter(function (v) { return v.getAttribute('data-src'); });
   vids.forEach(function (v) {
     var frame = v.parentNode;
@@ -287,8 +573,8 @@
     } else if (v.src) v.pause();
   }, { rootMargin: '200px 0px' });
 
-  // Просмотр фото на весь экран: плавно открывается, листается пальцем,
-  // закрывается жестом вниз и кнопкой «Назад» на телефоне
+  // ---------- Просмотр фото на весь экран ----------
+  // Плавно открывается, листается пальцем, закрывается жестом вниз и кнопкой «Назад» на телефоне
   var lb = $('.lb');
   if (lb) {
     var lbImg = $('img', lb), lbCap = $('figcaption', lb), lbFig = $('figure', lb), lbList = [], lbI = 0, pushed = false;
@@ -390,7 +676,7 @@
     lb.addEventListener('touchcancel', touchEnd);
   }
 
-  // Сколько дней ещё действует скидка. Дату подставляет сервер из админки
+  // ---------- Сколько дней ещё действует скидка. Дату подставляет сервер из админки ----------
   (function () {
     var els = $$('[data-until]');
     if (!els.length) return;

@@ -40,8 +40,9 @@
   </div>
   <nav class="steps" aria-label="Этапы">
     <a href="#s-theme" data-step="theme"><i>1</i>Тематика</a>
-    <a href="#s-wear" data-step="wear"><i>2</i>Одежда</a>
-    <a href="#s-color" data-step="color"><i>3</i>Цвет</a>
+    <a href="#s-place" data-step="place"><i>2</i>Место</a>
+    <a href="#s-wear" data-step="wear"><i>3</i>Одежда</a>
+    <a href="#s-color" data-step="color"><i>4</i>Цвет</a>
   </nav>
 </header>
 
@@ -54,10 +55,11 @@
   <p class="hero__lead">Привет, ребят, это личная страничка вашего класса для альбомов. Тут вы выберете понравившийся вариант, а потом останется только ваш выбор и вся основная информация по альбому. Короче, ваша шпаргалка.</p>
   <ol class="hero__steps">
     <li><b>1</b><span>Тематика альбома</span><small>9 вариантов</small></li>
-    <li><b>2</b><span>Стиль одежды</span><small>4 варианта</small></li>
-    <li><b>3</b><span>Цвет одежды</span><small>4 варианта</small></li>
+    <li><b>2</b><span>Место для групповых</span><small>3 варианта</small></li>
+    <li><b>3</b><span>Стиль одежды</span><small>4 варианта</small></li>
+    <li><b>4</b><span>Цвет одежды</span><small>4 варианта</small></li>
   </ol>
-  <p class="hero__small">Локацию для групповых выбираем в чате. Если у тематики на выбор две обложки, вариант тоже утверждаем в чате.</p>
+  <p class="hero__small">Если у тематики на выбор две обложки, вариант утверждаем в чате.</p>
   <div class="hero__meta"><span><b id="voters">22</b> уже проголосовали</span><a class="btn" href="#s-theme">Начать выбор</a></div>
 </section>
 
@@ -65,7 +67,7 @@
 
 <section class="step" id="s-theme" data-step="theme">
   <header class="step__head">
-    <p class="step__n">Этап 1 из 3</p>
+    <p class="step__n">Этап 1 из 4</p>
     <h2>Тематика альбома</h2>
     <p>Листай развороты вбок, нажми на фото, чтобы рассмотреть. Выбери одну тематику.</p>
   </header>
@@ -161,12 +163,40 @@
       <details class="more"><summary>Подробнее о стиле</summary><p>Кому надоели обычные красивые фоточки, кто хочет чего-то реально интересного. Тут простор для фантазии ещё больше, чем в американском стиле.</p><p>Не бойтесь, вы не будете с разноцветными лицами: цвет падающего света на лицо и на фон выбираете сами.</p><p>Фортуна любит смелых, рискуйте.</p><p class="loc">Групповые: спортплощадка или студия</p></details>
       <div class="opt__foot"><button class="pick" type="button" data-label="NEON">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
     </article>
-  <p class="step__ok">Голос за тематику учтён. <a href="#s-wear">Дальше одежда</a></p>
+  <p class="step__ok">Голос за тематику учтён. <a href="#s-place">Дальше место</a><button class="undo" type="button">Переголосовать</button></p>
+</section>
+
+<section class="step" id="s-place" data-step="place">
+  <header class="step__head">
+    <p class="step__n">Этап 2 из 4</p>
+    <h2>Место для групповых</h2>
+    <p>Где снимаем групповые фото всем классом. Листай примеры, больше фото в галерее по ссылке.</p>
+  </header>
+  
+    <article class="opt wear place" id="p-nature" data-id="nature" data-name="Природа">
+      <div class="wear__head"><h3>Природа</h3><p>Парк, лес, зелень. Весной и осенью</p></div>
+      <div class="strip strip--tall" data-carousel data-auto="3600"><a class="ph" href="assets/gallery/p34-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p34-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p46-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p46-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p55-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p55-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p64-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p64-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p15-lg.jpg" style="--ar:0.6667"><img src="assets/gallery/p15-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p18-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p18-sm.jpg" alt="" loading="lazy" decoding="async"></a></div>
+      <a class="pin" href="works.html#nature" target="_blank" rel="noopener">Больше фото в галерее</a>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Природа">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt wear place" id="p-school" data-id="school" data-name="Школа">
+      <div class="wear__head"><h3>Школа</h3><p>Двор, стадион, спортплощадка, ваши любимые места</p></div>
+      <div class="strip strip--tall" data-carousel data-auto="3600"><a class="ph" href="assets/gallery/p04-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p04-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p06-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p06-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p26-lg.jpg" style="--ar:1.7763"><img src="assets/gallery/p26-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p61-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p61-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p23-lg.jpg" style="--ar:0.6673"><img src="assets/gallery/p23-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p58-lg.jpg" style="--ar:1.7763"><img src="assets/gallery/p58-sm.jpg" alt="" loading="lazy" decoding="async"></a></div>
+      <a class="pin" href="works.html#school" target="_blank" rel="noopener">Больше фото в галерее</a>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Школа">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+    <article class="opt wear place" id="p-studio" data-id="studio" data-name="Студия">
+      <div class="wear__head"><h3>Студия</h3><p>Моя фотостудия в Нальчике, не зависит от погоды</p></div>
+      <div class="strip strip--tall" data-carousel data-auto="3600"><a class="ph" href="assets/gallery/p49-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p49-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p53-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p53-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p62-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p62-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p38-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p38-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p51-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p51-sm.jpg" alt="" loading="lazy" decoding="async"></a><a class="ph" href="assets/gallery/p59-lg.jpg" style="--ar:1.5"><img src="assets/gallery/p59-sm.jpg" alt="" loading="lazy" decoding="async"></a></div>
+      <a class="pin" href="works.html#studio" target="_blank" rel="noopener">Больше фото в галерее</a>
+      <div class="opt__foot"><button class="pick" type="button" data-label="Студия">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
+    </article>
+  <p class="step__ok">Голос за место учтён. <a href="#s-wear">Дальше одежда</a><button class="undo" type="button">Переголосовать</button></p>
 </section>
 
 <section class="step" id="s-wear" data-step="wear">
   <header class="step__head">
-    <p class="step__n">Этап 2 из 3</p>
+    <p class="step__n">Этап 3 из 4</p>
     <h2>Стиль одежды</h2>
     <p>Во что одеваемся на съёмку. Примеры можно листать.</p>
   </header>
@@ -195,12 +225,12 @@
       <a class="pin" href="https://pin.it/47t20V8SU" target="_blank" rel="noopener">Больше примеров в Pinterest</a>
       <div class="opt__foot"><button class="pick" type="button" data-label="Урбан-спорт">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
     </article>
-  <p class="step__ok">Голос за одежду учтён. <a href="#s-color">Дальше цвет</a></p>
+  <p class="step__ok">Голос за одежду учтён. <a href="#s-color">Дальше цвет</a><button class="undo" type="button">Переголосовать</button></p>
 </section>
 
 <section class="step" id="s-color" data-step="color">
   <header class="step__head">
-    <p class="step__n">Этап 3 из 3</p>
+    <p class="step__n">Этап 4 из 4</p>
     <h2>Цвет одежды</h2>
     <p>Нужно, чтобы у всех была одна цветовая гамма, поэтому выбираем акцентный оттенок, который будет у всех. К любому цвету можно чёрный и белый, но оттенок, который выберет класс, должен быть обязательно.</p>
   </header>
@@ -230,30 +260,24 @@
       <p class="color__plus"><i></i><i></i>+ чёрный и белый</p>
       <div class="opt__foot"><button class="pick" type="button" data-label="Бежевый, коричневый, кофейный, молочный">Выбрать</button><div class="res"><div class="res__bar"><i></i></div><b class="res__pct">0%</b></div></div>
     </article></div>
-  <p class="step__ok">Голос за цвет учтён.</p>
+  <p class="step__ok">Голос за цвет учтён.<button class="undo" type="button">Переголосовать</button></p>
 </section>
 
 <section class="done" id="done">
   <p class="eyebrow">Готово</p>
-  <h2>Все три голоса учтены</h2>
+  <h2>Все четыре голоса учтены</h2>
   <p>Когда голосование закроется, на этой странице останется выбор класса и всё, что нужно знать перед съёмкой. Ссылка та же.</p>
 </section>
 
 </div>
 
 <section class="result" id="result">
-  <header class="result__head">
+  <header class="result__head result__head--cheat">
     <p class="eyebrow">Голосование закрыто</p>
-    <h2>Выбор класса</h2>
-    <p>Проголосовали <b data-fill="total">22</b> человека. Теперь это ваша шпаргалка по альбому.</p>
+    <h2>Шпаргалка к съёмке</h2>
+    <p>Всё, что нужно знать перед съёмкой. Ссылка та же, заглядывайте сюда.</p>
   </header>
-  <div class="result__slot" data-slot="theme"></div>
-  <div class="result__pair">
-    <div class="result__slot" data-slot="wear"></div>
-    <div class="result__slot" data-slot="color"></div>
-  </div>
   <div class="cheat">
-    <h3>Шпаргалка к съёмке</h3>
     <dl>
       <div><dt>Тематика</dt><dd data-fill="theme"></dd></div>
       <div><dt>Одежда</dt><dd data-fill="wear"></dd></div>
@@ -262,6 +286,16 @@
       <div class="is-admin"><dt>Адрес студии</dt><dd>Сообщу в чате класса</dd></div>
       <div class="is-admin"><dt>Что взять с собой</dt><dd>Сообщу в чате класса</dd></div>
     </dl>
+  </div>
+  <header class="result__head result__head--pick">
+    <h2>Выбор класса</h2>
+    <p>Проголосовали <b data-fill="total">22</b> человека.</p>
+  </header>
+  <div class="result__slot" data-slot="theme"></div>
+  <div class="result__slot" data-slot="place"></div>
+  <div class="result__pair">
+    <div class="result__slot" data-slot="wear"></div>
+    <div class="result__slot" data-slot="color"></div>
   </div>
 </section>
 

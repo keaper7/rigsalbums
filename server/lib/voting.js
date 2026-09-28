@@ -2,7 +2,7 @@
 
 const { STEPS } = require('./db');
 
-const STEP_NAMES = { theme: 'Тематика', wear: 'Стиль одежды', color: 'Цвет одежды' };
+const STEP_NAMES = { theme: 'Тематика', place: 'Место для групповых', wear: 'Стиль одежды', color: 'Цвет одежды' };
 const LATER = 'Сообщу в чате класса';
 
 // draft: ссылка уже работает, варианты видно, но голосовать нельзя
@@ -79,7 +79,10 @@ function cheat(cls, res) {
     else v = 'Скоро выберу и напишу в чате';
     rows.push({ label: 'Одежда', value: v });
   }
-  if (res.theme) rows.push({ label: 'Групповые', value: (th && th.loc ? 'Рекомендуемая локация: ' + th.loc + '. ' : '') + 'Место выбираем в чате' });
+  if (res.place) {
+    const pl = res.place.option;
+    rows.push({ label: 'Групповые', value: pl ? pl.name + '. Точное место обсудим в чате' : 'Скоро выберу место и напишу в чате' });
+  } else if (res.theme) rows.push({ label: 'Групповые', value: (th && th.loc ? 'Рекомендуемая локация: ' + th.loc + '. ' : '') + 'Место выбираем в чате' });
   rows.push({ label: 'Дата и время съёмки', value: cls.shoot || LATER, muted: !cls.shoot });
   rows.push({ label: 'Адрес студии', value: cls.address || LATER, muted: !cls.address });
   rows.push({ label: 'Что взять с собой', value: cls.bring || LATER, muted: !cls.bring });

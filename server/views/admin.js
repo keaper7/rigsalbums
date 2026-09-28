@@ -3,7 +3,7 @@
 const { html, raw, plural, fmtTime, fmtDate, fmtWhen, toLocalInput, tzParts } = require('../lib/util');
 const { STEP_NAMES, status, opensAt, visibleOptions, activeSteps, resolve } = require('../lib/voting');
 const { STEPS } = require('../lib/db');
-const { SLOTS, GALLERIES, TEXTS, TOGGLES, THEMES, isWide } = require('../lib/site');
+const { SLOTS, GALLERIES, TEXTS, TOGGLES, isWide } = require('../lib/site');
 
 const MSG = {
   saved: 'Сохранено',
@@ -29,6 +29,7 @@ const MSG = {
   video: 'Видео загружено, на сайте оно уже стоит',
   restored: 'Вернули как было',
   removed: 'Фото убрано',
+  moved: 'Фото перенесено',
   optdeleted: 'Вариант удалён',
   opthidden: 'Вариант убран с сайта и у новых классов. Его уже выбирали, поэтому в их итогах он сохранится',
   optcreated: 'Вариант создан и пока скрыт. Добавьте фото и тексты, потом снимите галочку «Скрыть»'
@@ -36,6 +37,7 @@ const MSG = {
 
 const ERR = {
   last: 'Последнее фото убрать нельзя. Сначала добавьте новые',
+  full: 'В том разделе уже максимум фото',
   lastphoto: 'Последнее фото убрать нельзя, пока вариант показан классам',
   name: 'Напишите название',
   used: 'Этот вариант уже выбирали классы, поэтому удалить его нельзя: сломаются их итоги. Поставьте галочку «Скрыть у всех классов», и новые классы его не увидят',
@@ -404,11 +406,11 @@ ${resultsBlock(o)}
 <form class="card form" method="post" action="/admin/c/${c.id}/cheat" id="cheat">
   ${csrf(o.sess)}
   <div class="card__h"><h2 class="h">Шпаргалка</h2></div>
-  <p class="muted small">Класс увидит это после голосования. Пустые поля покажутся как «Сообщу в чате класса».</p>
-  <label class="field"><span>Дата и время съёмки</span><input name="shoot" value="${c.shoot}" placeholder="Суббота, 12 октября, 15:00" maxlength="120"></label>
-  <label class="field"><span>Адрес студии</span><input name="address" value="${c.address}" maxlength="160"></label>
-  <label class="field"><span>Что взять с собой</span><textarea name="bring" rows="3" maxlength="600">${c.bring}</textarea></label>
-  <label class="field"><span>Ещё (по желанию)</span><textarea name="note" rows="2" maxlength="600">${c.note}</textarea></label>
+  <p class="muted small">Класс увидит это после голосования. Шпаргалка общая для всех классов, её пишут один раз в <a href="/admin/settings">настройках</a>. Серым показан общий текст. Поле здесь заполняйте, только если этому классу нужно другое.</p>
+  <label class="field"><span>Дата и время съёмки${c.shoot || !o.defaults.shoot ? '' : html` <small class="muted">общая</small>`}</span><input name="shoot" value="${c.shoot}" placeholder="${o.defaults.shoot || 'Суббота, 12 октября, 15:00'}" maxlength="120"></label>
+  <label class="field"><span>Адрес студии${c.address ? '' : html` <small class="muted">общий</small>`}</span><input name="address" value="${c.address}" placeholder="${o.defaults.address || 'Сообщу в чате класса'}" maxlength="160"></label>
+  <label class="field"><span>Что взять с собой${c.bring ? '' : html` <small class="muted">общий</small>`}</span><textarea name="bring" rows="3" maxlength="600" placeholder="${o.defaults.bring || 'Сообщу в чате класса'}">${c.bring}</textarea></label>
+  <label class="field"><span>Ещё (по желанию)${c.note || !o.defaults.note ? '' : html` <small class="muted">общее</small>`}</span><textarea name="note" rows="2" maxlength="600" placeholder="${o.defaults.note || ''}">${c.note}</textarea></label>
   <button class="b b--main" type="submit">Сохранить шпаргалку</button>
 </form>
 
@@ -483,18 +485,6 @@ function slotRow(o, key) {
   </div>`;
 }
 
-function coverTile(o, key) {
-  const def = SLOTS[key];
-  const value = o.values[key];
-  return html`<div class="cover" id="${key}">
-    ${slotPic(key, value, o.defaults.media[key], 'cover')}
-    <b>${def.label}</b>
-    ${uploadButton({ mode: 'slot', url: '/admin/api/site/' + key, back: '/admin/site?m=photo#' + key, label: 'Заменить', sm: true, wide: true })}
-    ${value ? html`<form method="post" action="/admin/site/reset/${key}" data-confirm="Вернуть исходную обложку ${def.label}?">${csrf(o.sess)}<button class="link" type="submit">Вернуть как было</button></form>` : ''}
-    ${uploadState()}
-  </div>`;
-}
-
 function galleryCard(o, key) {
   const def = GALLERIES[key];
   const g = o.galleries[key];
@@ -508,8 +498,7 @@ function galleryCard(o, key) {
 function sitePage(o) {
   const video = o.values['home.video'];
   const vdef = SLOTS['home.video'];
-  const coverKeys = THEMES.map(t => 'cover.' + t[0]);
-  const photoKeys = ['arthur', 'album', 'studio.main', 'studio.rest', 'studio.extra'];
+  const photoKeys = ['arthur', 'album', 'studio.main'];
   const t = o.texts;
   return layout({
     title: 'Сайт', nav: 'site', sess: o.sess, msg: o.msg, err: o.err,
@@ -518,7 +507,7 @@ function sitePage(o) {
 </div>
 <p class="muted intro">Здесь меняются фото, видео и цены на сайте. Всё видно на сайте сразу после сохранения. Фото с телефона сами уменьшаются перед загрузкой, ничего готовить не нужно.</p>
 <nav class="toc">
-  <a href="#prices">Цены</a><a href="#home.video">Видео</a><a href="#galleries">Работы</a><a href="#covers">Обложки</a><a href="#photos">Другие фото</a>
+  <a href="#prices">Цены</a><a href="#home.video">Видео</a><a href="#galleries">Работы</a><a href="#photos">Другие фото</a>
 </nav>
 
 <form class="card form" method="post" action="/admin/site/texts" id="prices">
@@ -575,18 +564,12 @@ function sitePage(o) {
   ${Object.keys(GALLERIES).map(k => galleryCard(o, k))}
 </section>
 
-<section class="card" id="covers">
-  <div class="card__h"><h2 class="h">Обложки тематик</h2></div>
-  <p class="muted small">Вертикальные, как обложка альбома. Видны на первом экране главной и на полке «Каждый год новый уникальный дизайн».</p>
-  <div class="covers">${coverKeys.map(k => coverTile(o, k))}</div>
-</section>
-
 <section class="card" id="photos">
   <div class="card__h"><h2 class="h">Другие фото</h2></div>
   ${photoKeys.map(k => slotRow(o, k))}
 </section>
 
-<p class="muted small">Фото разворотов в карточках тематик меняются в разделе <a href="/admin/catalog">«Варианты»</a>: там они сразу обновятся и на странице «Дизайны», и у классов.</p>`
+<p class="muted small">Тематики с обложками и фото разворотов меняются в разделе <a href="/admin/catalog">«Варианты»</a>: там же добавляются новые и убираются старые. Всё сразу обновится на главной, на странице «Дизайны» и у классов.</p>`
   });
 }
 
@@ -597,7 +580,15 @@ function galleryPage(o) {
     title: o.def.label, nav: 'site', sess: o.sess, msg: o.msg, errCode: o.errCode,
     body: html`<a class="back" href="/admin/site#galleries">← Сайт</a>
 <h1 class="h1">${o.def.label}</h1>
-<p class="muted">${o.def.where} · ${photosN(n)}</p>
+<p class="muted">${o.def.where} · ${photosN(n)}${o.def.empty && !n ? ' · пока пустой раздел на сайте не виден' : ''}</p>
+${o.link ? html`<div class="card share">
+  <p class="muted small">Ссылка прямо на этот раздел. Её можно отправить родителям как пример.</p>
+  <p class="share__url">${o.link}</p>
+  <div class="share__btns">
+    <button class="b b--main" type="button" data-copy="${o.link}">Скопировать ссылку</button>
+    <a class="b" href="${o.link}" target="_blank" rel="noopener">Открыть</a>
+  </div>
+</div>` : ''}
 <div class="card">
   <p class="muted small">${o.def.hint} Можно выбрать сразу несколько фото. Стрелками меняется порядок, крестиком фото убирается с сайта.</p>
   ${uploadButton({ mode: 'gallery', url: '/admin/api/site/g/' + o.key, back: '/admin/site/g/' + o.key + '?m=photos', label: '+ Добавить фото', main: true, multiple: true, wide: true })}
@@ -614,6 +605,7 @@ function galleryPage(o) {
       <button class="gi__b gi__b--del" type="submit" name="op" value="del:${i}" aria-label="Убрать фото" data-confirm="Убрать это фото с сайта?">✕</button>
       <button class="gi__b" type="submit" name="op" value="down:${i}" aria-label="Позже"${i === n - 1 ? raw(' disabled') : ''}>→</button>
     </div>
+    ${o.sections && o.sections.length ? html`<details class="gi__move"><summary>Перенести</summary>${o.sections.map(s => html`<button type="submit" name="op" value="to:${i}:${s.key}">${s.label}</button>`)}</details>` : ''}
   </div>`)}
 </form>`
   });
@@ -627,18 +619,18 @@ function optionThumb(x) {
   return p ? html`<img class="thumb" src="/${p.src}-sm.jpg" alt="" loading="lazy">` : html`<span class="thumb"></span>`;
 }
 
-const ADD_LABEL = { theme: 'Новая тематика', wear: 'Новый стиль одежды', color: 'Новый цвет' };
+const ADD_LABEL = { theme: 'Новая тематика', place: 'Новое место', wear: 'Новый стиль одежды', color: 'Новый цвет' };
 
 function catalogPage(o) {
   return layout({
     title: 'Варианты', nav: 'catalog', sess: o.sess, msg: o.msg, errCode: o.errCode,
     body: html`<h1 class="h1">Варианты</h1>
-<p class="muted">Тематики, стили и цвета, из которых выбирают классы. Изменения сразу видны на страницах классов и на странице «Дизайны».</p>
+<p class="muted">Тематики, места для групповых, стили и цвета, из которых выбирают классы. Изменения сразу видны на страницах классов и на странице «Дизайны».</p>
 ${STEPS.map(step => html`<section class="group">
   <h2 class="group__h">${STEP_NAMES[step]} <span>${o.catalog[step].length}</span></h2>
   <div class="rows">${o.catalog[step].map((x, i, arr) => html`<div class="row row--opt${x.hidden ? ' is-off' : ''}">
     ${optionThumb(x)}
-    <a class="row__main" href="/admin/o/${x.id}"><b>${x.name}</b><small>${x.hidden ? 'Скрыт у всех классов' : step === 'theme' ? (x.tag || '') : step === 'wear' ? (x.sub || '') : (x.plus ? '+ чёрный и белый' : '')}</small></a>
+    <a class="row__main" href="/admin/o/${x.id}"><b>${x.name}</b><small>${x.hidden ? 'Скрыт у всех классов' : step === 'theme' ? (x.tag || '') : step === 'wear' || step === 'place' ? (x.sub || '') : (x.plus ? '+ чёрный и белый' : '')}</small></a>
     <span class="row__tools">
       <form method="post" action="/admin/o/${x.id}/move">${csrf(o.sess)}<input type="hidden" name="dir" value="-1"><button class="ic" type="submit" aria-label="Выше"${i === 0 ? raw(' disabled') : ''}>↑</button></form>
       <form method="post" action="/admin/o/${x.id}/move">${csrf(o.sess)}<input type="hidden" name="dir" value="1"><button class="ic" type="submit" aria-label="Ниже"${i === arr.length - 1 ? raw(' disabled') : ''}>↓</button></form>
@@ -668,6 +660,11 @@ function optionPage(o) {
   <p class="muted small">Абзацы разделяйте пустой строкой.</p>
   <label class="field"><span>Локация для групповых</span><input name="loc" value="${x.loc || ''}" maxlength="80" placeholder="студия или улица"></label>
   <label class="check"><input type="checkbox" name="covers" value="2"${x.covers === 2 ? raw(' checked') : ''}><span>Две обложки на выбор</span></label>`;
+  } else if (x.step === 'place') {
+    fields = html`<label class="field"><span>Название</span><input name="name" value="${x.name}" required maxlength="40"></label>
+  <label class="field"><span>Подпись</span><input name="sub" value="${x.sub || ''}" maxlength="120"></label>
+  <label class="field"><span>Ссылка «Больше фото»</span><input name="link" value="${x.link || ''}" maxlength="300" placeholder="works.html#school"></label>
+  <p class="muted small">Раздел страницы «Работы»: works.html#nature (природа, весна и осень), works.html#spring, works.html#autumn, works.html#school, works.html#studio.</p>`;
   } else if (x.step === 'wear') {
     fields = html`<label class="field"><span>Название</span><input name="name" value="${x.name}" required maxlength="40"></label>
   <label class="field"><span>Подпись</span><input name="sub" value="${x.sub || ''}" maxlength="80"></label>
@@ -683,7 +680,7 @@ function optionPage(o) {
 <form class="card form photos-card" method="post" action="/admin/o/${x.id}/photos" id="photos">
   ${csrf(o.sess)}
   <div class="card__h"><h2 class="h">Фото</h2><span class="muted">${photosN(photos.length)}</span></div>
-  <p class="muted small">${theme ? 'Первое фото показывается как обложка тематики. ' : ''}Можно выбрать сразу несколько фото. Стрелками меняется порядок.</p>
+  <p class="muted small">${theme ? 'Развороты альбома: их листают в карточке тематики. ' : ''}Можно выбрать сразу несколько фото. Стрелками меняется порядок.</p>
   ${theme && photos.length ? html`<button class="b b--main photos-card__save" type="submit" name="op" value="save">Сохранить подписи</button>` : ''}
   ${photos.length ? html`<div class="photos">${photos.map((p, i) => html`<div class="photo">
       <img src="/${p.src}-sm.jpg" alt="" loading="lazy">
@@ -697,11 +694,31 @@ function optionPage(o) {
   ${uploadButton({ mode: 'photos', url: '/admin/api/o/' + x.id + '/photos', back: '/admin/o/' + x.id + '?m=photos#photos', label: '+ Добавить фото', multiple: true, wide: true })}
   ${uploadState()}
 </form>`;
+  const cv = o.cover;
+  const coverKey = 'cover.' + x.key;
+  const coverCard = cv ? html`
+<section class="card" id="cover">
+  <div class="card__h"><h2 class="h">Обложка</h2></div>
+  <div class="slotrow">
+    <span class="pic pic--cover">${cv.own || cv.src ? html`<img src="${u(cv.own ? cv.own.sm : cv.src)}" alt="" loading="lazy">` : html`<span class="pic__empty">Обложки ещё нет</span>`}</span>
+    <div class="slotrow__body">
+      <b>Вертикальная, как обложка альбома</b>
+      <small>Главная: колода обложек на первом экране и полка «Каждый год новый уникальный дизайн»</small>
+      ${!cv.own && !cv.src ? html`<small class="hint">Пока обложки нет, на главной тематика будет без картинки</small>` : ''}
+      <div class="slotrow__btns">
+        ${uploadButton({ mode: 'slot', url: '/admin/api/site/' + coverKey, back: '/admin/o/' + x.id + '?m=photo#cover', label: cv.own || cv.src ? 'Заменить обложку' : 'Загрузить обложку', main: true, sm: true })}
+        ${cv.own ? html`<form method="post" action="/admin/site/reset/${coverKey}" data-confirm="Вернуть обложку, которая была изначально?">${csrf(o.sess)}<input type="hidden" name="from" value="${x.id}"><button class="link" type="submit">Вернуть как было</button></form>` : ''}
+      </div>
+      ${uploadState()}
+    </div>
+  </div>
+</section>` : '';
   return layout({
     title: x.name, nav: 'catalog', sess: o.sess, msg: o.msg, err: o.err, errCode: o.errCode,
     body: html`<a class="back" href="/admin/catalog">← Варианты</a>
 <h1 class="h1">${x.name}</h1>
 <p class="muted">${STEP_NAMES[x.step]}${x.hidden ? ' · скрыт у всех классов' : ''}</p>
+${coverCard}
 ${photoCard}
 <form class="card form" method="post" action="/admin/o/${x.id}">
   ${csrf(o.sess)}
@@ -728,13 +745,17 @@ function settingsPage(o) {
 <form class="card form" method="post" action="/admin/settings">
   ${csrf(o.sess)}
   <div class="card__h"><h2 class="h">Для новых классов</h2></div>
-  <p class="muted small">Подставляется при создании класса. У уже созданных классов не меняется.</p>
+  <p class="muted small">Подставляется при создании класса.</p>
   <div class="two">
     <label class="field"><span>Год выпуска</span><input name="year" type="number" inputmode="numeric" min="2020" max="2100" value="${d.year}" required></label>
     <label class="field"><span>Голосование длится</span>${durationSelect('duration_min', d.duration_min)}</label>
   </div>
+  <div class="card__h"><h2 class="h">Шпаргалка для всех классов</h2></div>
+  <p class="muted small">Видят все классы после голосования, и уже созданные тоже. Если у какого-то класса своё значение, оно важнее общего.</p>
+  <label class="field"><span>Дата и время съёмки</span><input name="shoot" value="${d.shoot}" placeholder="Можно оставить пустым: у каждого класса своя" maxlength="120"></label>
   <label class="field"><span>Адрес студии</span><input name="address" value="${d.address}" maxlength="160"></label>
   <label class="field"><span>Что взять с собой</span><textarea name="bring" rows="3" maxlength="600">${d.bring}</textarea></label>
+  <label class="field"><span>Ещё (по желанию)</span><textarea name="note" rows="2" maxlength="600">${d.note}</textarea></label>
   <button class="b b--main" type="submit">Сохранить</button>
 </form>
 

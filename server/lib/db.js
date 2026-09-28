@@ -11,7 +11,8 @@ process.emitWarning = function (w, ...rest) {
 };
 const { DatabaseSync } = require('node:sqlite');
 
-const STEPS = ['theme', 'wear', 'color'];
+// Порядок этапов голосования. place — место для групповой съёмки (добавлен 2026-09-28)
+const STEPS = ['theme', 'place', 'wear', 'color'];
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -114,6 +115,34 @@ class Store {
     this.db.exec(SCHEMA);
     this.db.exec('PRAGMA user_version = 2');
     if (!this.db.prepare('SELECT COUNT(*) n FROM options').get().n) this.seedCatalog();
+    else this.seedNewSteps();
+  }
+
+  // Этап, которого не было, когда база создавалась: добавляем его варианты один раз.
+  // Классам, которые уже начали голосовать, новый этап не показываем
+  seedNewSteps() {
+    const done = this.getSetting('steps', null) || ['theme', 'wear', 'color'];
+    const fresh = STEPS.filter(s => done.indexOf(s) === -1);
+    if (!fresh.length) return;
+    const cat = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'seed', 'catalog.json'), 'utf8'));
+    const ins = this.db.prepare('INSERT OR IGNORE INTO options (step, key, sort, data) VALUES (?, ?, ?, ?)');
+    this.tx(() => {
+      fresh.forEach(step => {
+        const list = cat[step] || [];
+        list.forEach((o, i) => {
+          const data = Object.assign({}, o);
+          delete data.key;
+          ins.run(step, o.key, (i + 1) * 10, JSON.stringify(data));
+        });
+        const off = list.map(o => step + ':' + o.key);
+        this.db.prepare('SELECT id, hidden FROM classes WHERE opened_at IS NOT NULL AND opened_at <= ?').all(Date.now()).forEach(r => {
+          let h = [];
+          try { h = JSON.parse(r.hidden) || []; } catch (e) {}
+          this.db.prepare('UPDATE classes SET hidden = ? WHERE id = ?').run(JSON.stringify(h.concat(off.filter(k => h.indexOf(k) === -1))), r.id);
+        });
+      });
+      this.setSetting('steps', STEPS);
+    });
   }
 
   close() { this.db.close(); }
@@ -147,6 +176,7 @@ class Store {
     const cat = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'seed', 'catalog.json'), 'utf8'));
     const ins = this.db.prepare('INSERT INTO options (step, key, sort, data) VALUES (?, ?, ?, ?)');
     this.tx(() => {
+      this.setSetting('steps', STEPS);
       STEPS.forEach(step => {
         (cat[step] || []).forEach((o, i) => {
           const data = Object.assign({}, o);
@@ -159,7 +189,8 @@ class Store {
 
   listOptions() {
     const rows = this.db.prepare('SELECT * FROM options ORDER BY sort, id').all();
-    const out = { theme: [], wear: [], color: [] };
+    const out = {};
+    STEPS.forEach(s => { out[s] = []; });
     rows.forEach(r => { if (out[r.step]) out[r.step].push(parseOption(r)); });
     return out;
   }
@@ -269,8 +300,14 @@ class Store {
     return r.changes > 0;
   }
 
+  // Ученик передумал: убираем его голос на этом этапе, чтобы проголосовать заново
+  removeVote(classId, voter, step) {
+    return this.db.prepare('DELETE FROM votes WHERE class_id = ? AND voter = ? AND step = ?').run(classId, voter, step).changes > 0;
+  }
+
   counts(classId) {
-    const out = { theme: {}, wear: {}, color: {} };
+    const out = {};
+    STEPS.forEach(s => { out[s] = {}; });
     this.db.prepare('SELECT step, option, COUNT(*) n FROM votes WHERE class_id = ? GROUP BY step, option').all(classId)
       .forEach(r => { if (out[r.step]) out[r.step][r.option] = r.n; });
     return out;

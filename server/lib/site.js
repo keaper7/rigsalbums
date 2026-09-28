@@ -29,17 +29,28 @@ const SLOTS = {
   'home.video': { type: 'video', label: 'Видео «Как это выглядит вживую»', where: 'Главная, сразу после первого экрана', hint: 'Вертикальное 9:16, от 20 секунд до минуты. На сайте играет без звука.' },
   'arthur': { type: 'image', label: 'Личная', where: 'Главная (в конце) и «Контакты»', shape: 'circle', hint: 'Лицо по центру: фото обрежется в круг.' },
   'album': { type: 'image', label: 'Фото альбома', where: '«Альбомы и цены», самый верх', shape: 'wide', hint: 'Лучше на белом фоне: белый растворится в странице.' },
-  'studio.main': { type: 'image', label: 'Студия общим планом', where: '«Студия», самый верх', shape: 'wide', hint: 'Горизонтальное, лучше с ребятами в кадре.' },
-  'studio.rest': { type: 'image', label: 'Зона отдыха', where: '«Студия», блок «Что есть в студии»', shape: 'square' },
-  'studio.extra': { type: 'image', label: 'Ещё одно фото студии', where: '«Студия», блок «Что есть в студии»', shape: 'square' }
+  'studio.main': { type: 'image', label: 'Студия общим планом', where: '«Студия», самый верх', shape: 'wide', hint: 'Горизонтальное, лучше с ребятами в кадре.' }
 };
-THEMES.forEach(t => {
-  SLOTS['cover.' + t[0]] = { type: 'image', label: t[1], where: 'Главная: колода обложек и полка дизайнов', shape: 'cover', group: 'covers' };
-});
+// Обложка тематики живёт в разделе «Варианты», но хранится как место на сайте cover.<ключ>.
+// Так обложки, загруженные раньше, остаются на месте
+const COVER = { type: 'image', label: 'Обложка', where: 'Главная: колода обложек и полка дизайнов', shape: 'cover' };
+// Обложки, которые лежат в самом сайте, пока в админке не загрузили свою
+const COVER_FILES = {
+  classic: 'cover-classic-a', siren: 'cover-siren-b', american: 'cover-american-b', canon: 'cover-canon-a', white: 'cover-white-a',
+  grey: 'cover-grey-a', aesthetic: 'cover-aesthetic-a', money: 'cover-money-a', neon: 'cover-neon-a'
+};
+function coverKey(key) { return /^cover\.[a-z0-9]+$/.test(key); }
 
 const GALLERIES = {
+  'studio.zones': { label: 'Зоны студии', where: 'Страница «Студия», под «Что есть в студии»', hint: 'Фото разных зон студии. Первое фото показывается крупнее. Если убрать все, блок на сайте пропадёт.', lb: 'zones', max: 60, empty: true },
   'home.works': { label: 'Работы на главной', where: 'Главная, блок «Вот так я снимаю выпускников»', hint: 'Лучше 8–12 фото. Горизонтальные фото займут всю ширину.', lb: 'home', max: 16 },
-  'works': { label: 'Все работы', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'shoots', max: 300 }
+  // Разделы страницы «Работы». У каждого своя ссылка, её можно отправить родителям.
+  // Пустой раздел на сайте не показывается
+  'works': { label: 'Индивидуальная фотосессия', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'shoots', max: 300, section: 'individual', empty: true },
+  'works.spring': { label: 'Групповая на природе: весна', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'spring', max: 300, section: 'spring', empty: true },
+  'works.autumn': { label: 'Групповая на природе: осень', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'autumn', max: 300, section: 'autumn', empty: true },
+  'works.school': { label: 'Групповая в школе', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'school', max: 300, section: 'school', empty: true },
+  'works.studio': { label: 'Групповая в студии', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'studio', max: 300, section: 'studio', empty: true }
 };
 
 const TEXTS = {
@@ -75,6 +86,8 @@ const TOGGLES = {
 
 const MARK = /<!--@(media|gallery|text|count|catalog) ([a-z0-9.]+)(?: (sm|lg))?-->([\s\S]*?)<!--@end-->/g;
 const SHOW = /<([a-z]+)([^>]*?) data-show="([a-z0-9.]+)"([^>]*)>/g;
+// Блок, который виден, только пока в галерее есть фото
+const NEED = /<([a-z]+)([^>]*?) data-need="([a-z0-9.]+)"([^>]*?)( hidden)?>/g;
 
 function decode(s) {
   return String(s).replace(/&nbsp;/g, ' ').replace(/&laquo;/g, '«').replace(/&raquo;/g, '»')
@@ -137,6 +150,39 @@ function themeCards(themes) {
       (o.loc ? '    <p class="tcard__loc">Групповые: ' + esc(o.loc) + '</p>\n' : '') +
       '  </article>';
   }).join('') + '\n';
+}
+
+// Картинка обложки: своя из админки, потом из сайта, потом первое фото тематики
+function coverSrc(o, vals) {
+  const v = vals['cover.' + o.key];
+  if (v && v.sm) return v.sm;
+  if (COVER_FILES[o.key]) return 'assets/home/' + COVER_FILES[o.key] + '-sm.jpg';
+  const p = (o.photos || [])[0];
+  return p ? p.src + '-sm.jpg' : '';
+}
+
+function coverPart(name, cat, vals) {
+  const list = visible(cat.theme);
+  const img = (o, attrs) => {
+    const src = coverSrc(o, vals);
+    return src ? '<img src="' + esc(src) + '" alt="' + attrs.alt + '"' + attrs.more + '>' : '';
+  };
+  if (name === 'deck') {
+    return list.map((o, i) => '<figure class="deck__card" data-name="' + esc(o.name) + '" data-f="' + esc(o.key) + '">' +
+      img(o, { alt: 'Обложка ' + esc(o.name), more: i === 0 ? ' fetchpriority="high"' : '' }) + '</figure>').join('\n        ');
+  }
+  if (name === 'decklabel') {
+    return list.length ? '<span class="deck__name f-' + esc(list[0].key) + '">' + esc(list[0].name) + '</span>' : '<span class="deck__name"></span>';
+  }
+  if (name === 'ticker') {
+    const once = list.map(o => '<span class="f-' + esc(o.key) + '">' + esc(o.name) + '</span>').join('');
+    return once + '\n    ' + once;
+  }
+  if (name === 'shelf') {
+    return list.map(o => '<a class="book" href="designs.html#' + esc(o.key) + '"><span class="book__cover">' + img(o, { alt: '', more: ' loading="lazy"' }) +
+      '</span><span class="book__name f-' + esc(o.key) + '">' + esc(o.name) + '</span>' + (o.tag ? '<span class="book__tag">' + esc(o.tag) + '</span>' : '') + '</a>').join('\n    ');
+  }
+  return null;
 }
 
 function catalogPart(name, cat) {
@@ -292,10 +338,14 @@ class Site {
         return TEXTS[key].nbsp ? t.replace(/ /g, '&nbsp;') : t;
       }
       if (type === 'catalog' && catalog) {
-        const part = catalogPart(key, catalog);
+        const part = coverPart(key, catalog, vals) || catalogPart(key, catalog);
         return part === null ? inner : part;
       }
       return inner;
+    });
+    out = out.replace(NEED, (m, tag, a, key, b) => {
+      const n = Array.isArray(vals[key]) ? vals[key].length : (this.defaults().gallery[key] || []).length;
+      return '<' + tag + a + ' data-need="' + key + '"' + b + (n ? '' : ' hidden') + '>';
     });
     out = out.replace(SHOW, (m, tag, a, key, b) => (vals[key] === false ? '<' + tag + a + ' data-show="' + key + '"' + b + ' hidden>' : m));
     out = out.replace(/ data-until="[^"]*"/g, ' data-until="' + this.priceUntil() + '"');
@@ -305,4 +355,4 @@ class Site {
   }
 }
 
-module.exports = { PRICE_UNTIL, DATE_RE, Site, SLOTS, GALLERIES, TEXTS, TOGGLES, THEMES, PAGES, galleryItems, isWide };
+module.exports = { PRICE_UNTIL, DATE_RE, Site, SLOTS, COVER, coverKey, coverSrc, GALLERIES, TEXTS, TOGGLES, THEMES, PAGES, galleryItems, isWide };

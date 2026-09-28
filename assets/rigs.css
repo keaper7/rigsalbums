@@ -145,7 +145,7 @@ ol, ul { padding: 0; list-style: none; }
   letter-spacing: -.045em; color: var(--ink);
 }
 .hero__title .l { display: block; overflow: hidden; padding-bottom: .06em; margin-bottom: -.06em; }
-.hero__title .l > span { display: inline-block; }
+.hero__title .l > span { display: inline-block; white-space: nowrap; }
 .hero__title em { font-size: 1.28em; line-height: .9; }
 .js .hero__title .l > span { -webkit-transform: translateY(105%); transform: translateY(105%); -webkit-animation: up 1s var(--ease) forwards; animation: up 1s var(--ease) forwards; }
 .js .hero__title .l:nth-child(2) > span { -webkit-animation-delay: .08s; animation-delay: .08s; }

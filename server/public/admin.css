@@ -317,6 +317,9 @@ a.row:active { background: var(--paper-2); }
 .slotrow__body small.hint { color: var(--ink); opacity: .75; }
 .slotrow__btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; }
 .slotrow__btns form { margin: 0; }
+/* обложка тематики в строке с текстом: узкая, как книжка, текст рядом на всю оставшуюся ширину */
+.slotrow .pic--cover { width: 104px; flex: 0 0 104px; }
+@media (min-width: 720px) { .slotrow .pic--cover { width: 132px; flex-basis: 132px; } }
 
 .upl { position: relative; overflow: hidden; cursor: pointer; }
 .upl input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; }

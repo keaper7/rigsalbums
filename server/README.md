@@ -133,11 +133,23 @@ server/
    30 3 * * * cd /srv/rigsalbums/server && /usr/bin/node cli.js backup >/dev/null 2>&1
    ```
    Иногда стоит скачивать `server/data/backups` к себе: бэкап на том же сервере не спасёт, если пропадёт сам сервер. В копии лежат и база, и загруженные фото.
+7. Сторож с уведомлениями в Telegram (`deploy/monitor.js`). Токен бота хранится только в `/etc/rigs-monitor.env`:
+   ```bash
+   sudo install -o root -g root -m 755 /srv/rigsalbums/server/deploy/monitor.js /usr/local/bin/rigs-monitor
+   read -rsp 'Токен бота: ' TG_TOKEN; echo; sudo TG_TOKEN="$TG_TOKEN" rigs-monitor setup; unset TG_TOKEN
+   ```
+   И в `sudo crontab -e`:
+   ```
+   */5 * * * * /usr/local/bin/rigs-monitor check >>/var/log/rigs-monitor.log 2>&1
+   */30 * * * * /usr/local/bin/rigs-monitor russia >>/var/log/rigs-monitor.log 2>&1
+   0 10 * * * /usr/local/bin/rigs-monitor daily >>/var/log/rigs-monitor.log 2>&1
+   ```
+   После обновления `monitor.js` в репозитории повторить `install`.
 
 Обновление после изменений в репозитории:
 
 ```bash
-cd /srv/rigsalbums && sudo git pull && sudo systemctl restart rigsalbums
+sudo -u rigs git -C /srv/rigsalbums pull && sudo systemctl restart rigsalbums
 ```
 
 Логи: `sudo journalctl -u rigsalbums -f`.

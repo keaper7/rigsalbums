@@ -1519,3 +1519,132 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
    даже когда текста много (как в бордовой карточке «Свобода ваших действий») */
 .kit li { gap: 14px; }
 .kit li.kit--hl span { font-size: 14px; line-height: 1.35; opacity: .92; }
+
+/* =========================================================
+   Появления со смыслом (только полный набор эффектов .fx).
+   Каждый эффект — отдельный кусок: убирается целиком, не задевая остальные
+   ========================================================= */
+
+/* --- «Вживую»: бордовый блок раскрывается на всю ширину, как экран перед видео.
+   Раскрывается подложка (transform), текст и видео не масштабируются --- */
+@supports (animation-timeline: view()) {
+  .fx .live { background: none; isolation: isolate; view-timeline: --live block; }
+  .fx .live:before {
+    content: ''; position: absolute; z-index: -1; top: -14px; bottom: -14px; left: -14px; right: -14px; border-radius: 14px;
+    background-color: var(--wine-2);
+    background-image: radial-gradient(ellipse at 20% 0%, rgba(232, 201, 168, .16), rgba(232, 201, 168, 0) 55%), radial-gradient(ellipse at 100% 100%, rgba(0, 0, 0, .22), rgba(0, 0, 0, 0) 60%);
+    will-change: transform;
+    animation: live-open linear both; animation-timeline: --live; animation-range: cover 0% cover 40%;
+  }
+  @media (min-width: 720px) { .fx .live:before { top: -24px; bottom: -24px; left: -24px; right: -24px; border-radius: 24px; animation-name: live-open-wide; } }
+}
+@keyframes live-open { from { transform: scale(.76, .86); } to { transform: none; } }
+@keyframes live-open-wide { from { transform: scale(.86, .88); } to { transform: none; } }
+
+/* --- «Вот так я снимаю выпускников»: фото наводятся на резкость, как объектив,
+   а при прокрутке чуть сдвигаются внутри рамки — появляется глубина --- */
+.fx .gallery .pics[data-stagger].in > * { -webkit-animation-name: pic-in; animation-name: pic-in; -webkit-animation-duration: .9s; animation-duration: .9s; -webkit-animation-delay: calc(var(--i, 0) * 90ms); animation-delay: calc(var(--i, 0) * 90ms); }
+.fx .gallery .pics[data-stagger].in > * img { -webkit-animation: pic-focus 1.6s cubic-bezier(.2, .7, .2, 1) backwards; animation: pic-focus 1.6s cubic-bezier(.2, .7, .2, 1) backwards; -webkit-animation-delay: calc(var(--i, 0) * 90ms); animation-delay: calc(var(--i, 0) * 90ms); }
+@-webkit-keyframes pic-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pic-in { from { opacity: 0; } to { opacity: 1; } }
+@-webkit-keyframes pic-focus { from { -webkit-filter: blur(14px); filter: blur(14px); -webkit-transform: scale(1.16); transform: scale(1.16); } 60% { -webkit-filter: blur(0); filter: blur(0); } to { -webkit-filter: blur(0); filter: blur(0); -webkit-transform: none; transform: none; } }
+@keyframes pic-focus { from { -webkit-filter: blur(14px); filter: blur(14px); -webkit-transform: scale(1.16); transform: scale(1.16); } 60% { -webkit-filter: blur(0); filter: blur(0); } to { -webkit-filter: blur(0); filter: blur(0); -webkit-transform: none; transform: none; } }
+@supports (animation-timeline: view()) {
+  .fx .gallery .pic img { animation: pic-depth linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
+  .fx .gallery .pics[data-stagger].in > * img {
+    animation: pic-depth linear both, pic-focus 1.6s cubic-bezier(.2, .7, .2, 1) backwards;
+    animation-timeline: view(), auto; animation-range: cover 0% cover 100%, normal; animation-delay: 0s, calc(var(--i, 0) * 90ms);
+  }
+}
+@keyframes pic-depth { from { translate: 0 -3.5%; scale: 1.08; } to { translate: 0 3.5%; scale: 1.08; } }
+
+/* --- «Как всё проходит» на телефоне: номер шага загорается, когда до него дошла линия.
+   Класс is-sync и is-lit ставит скрипт, только там, где линию рисует сама прокрутка --- */
+.fx .flow.is-sync li:before, .fx .flow.is-sync li.rv:before, .fx .flow.is-sync li.rv.in:before {
+  opacity: .3; -webkit-transform: scale(.66); transform: scale(.66);
+  -webkit-transition: -webkit-transform .55s cubic-bezier(.34, 1.56, .64, 1), opacity .25s ease; transition: transform .55s cubic-bezier(.34, 1.56, .64, 1), opacity .25s ease;
+  -webkit-transition-delay: 0s; transition-delay: 0s;
+}
+.fx .flow.is-sync li.is-lit:before, .fx .flow.is-sync li.rv.in.is-lit:before { opacity: 1; -webkit-transform: none; transform: none; }
+
+/* --- Чек: когда он напечатан, по штрихкоду один раз проходит лазер кассы --- */
+.receipt__bar { position: relative; }
+.fx .receipt__bar:after {
+  content: ''; position: absolute; left: -8%; right: -8%; top: -2px; height: 2px; border-radius: 2px;
+  background: #E5372F; box-shadow: 0 0 8px 1px rgba(229, 55, 47, .6); opacity: 0; pointer-events: none;
+}
+.fx .receipt.in .receipt__bar:after { -webkit-animation: scan 1.3s ease-in-out 2.3s both; animation: scan 1.3s ease-in-out 2.3s both; }
+@-webkit-keyframes scan { 0% { opacity: 0; -webkit-transform: none; transform: none; } 12% { opacity: 1; } 50% { -webkit-transform: translate3d(0, 42px, 0); transform: translate3d(0, 42px, 0); } 88% { opacity: 1; } 100% { opacity: 0; -webkit-transform: none; transform: none; } }
+@keyframes scan { 0% { opacity: 0; -webkit-transform: none; transform: none; } 12% { opacity: 1; } 50% { -webkit-transform: translate3d(0, 42px, 0); transform: translate3d(0, 42px, 0); } 88% { opacity: 1; } 100% { opacity: 0; -webkit-transform: none; transform: none; } }
+
+/* Студия: плитки «Что есть в студии» раздаются на стол, как карты */
+.fx .kit[data-stagger].in > * {
+  -webkit-animation: deal .85s cubic-bezier(.2, .8, .25, 1) backwards; animation: deal .85s cubic-bezier(.2, .8, .25, 1) backwards;
+  -webkit-animation-delay: calc(var(--i, 0) * 120ms); animation-delay: calc(var(--i, 0) * 120ms);
+}
+.kit > :nth-child(1) { --dx: -30px; --dr: -9deg; }
+.kit > :nth-child(2) { --dx: 26px; --dr: 7deg; }
+.kit > :nth-child(3) { --dx: -22px; --dr: 6deg; }
+.kit > :nth-child(4) { --dx: 18px; --dr: -5deg; }
+@-webkit-keyframes deal {
+  from { opacity: 0; -webkit-transform: translate3d(var(--dx, 0), 90px, 0) rotate(var(--dr, 0)) scale(.9); transform: translate3d(var(--dx, 0), 90px, 0) rotate(var(--dr, 0)) scale(.9); }
+  55% { opacity: 1; }
+  to { opacity: 1; -webkit-transform: none; transform: none; }
+}
+@keyframes deal {
+  from { opacity: 0; -webkit-transform: translate3d(var(--dx, 0), 90px, 0) rotate(var(--dr, 0)) scale(.9); transform: translate3d(var(--dx, 0), 90px, 0) rotate(var(--dr, 0)) scale(.9); }
+  55% { opacity: 1; }
+  to { opacity: 1; -webkit-transform: none; transform: none; }
+}
+
+/* Работы: меню разделов с кружком-превью, числом фото и плашкой, которая едет к выбранному */
+.jumpbar--thumbs .jumpbar__in { position: relative; gap: 6px; }
+.jumpbar--thumbs a {
+  position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 12px 4px 4px; background: #fff; border-color: var(--line);
+  -webkit-transition: color .35s, border-color .35s, background .35s; transition: color .35s, border-color .35s, background .35s;
+}
+.jumpbar--thumbs a.is-on { background: transparent; border-color: transparent; color: #fff; }
+.jb__th { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; overflow: hidden; background: var(--paper-2); box-shadow: 0 0 0 2px #fff; }
+.jb__th img { width: 100%; height: 100%; object-fit: cover; }
+.jb__n { font-size: 12px; font-weight: 800; opacity: .5; }
+.jumpbar--thumbs a.is-on .jb__n { opacity: .75; }
+.jb__pill {
+  position: absolute; left: 0; top: 10px; bottom: 10px; z-index: 0; border-radius: 99px;
+  background: var(--wine); box-shadow: 0 8px 18px -10px rgba(110, 31, 42, .8); opacity: 0;
+  -webkit-transition: transform .5s cubic-bezier(.3, 1.3, .5, 1), width .5s cubic-bezier(.3, 1.3, .5, 1), opacity .3s;
+  transition: transform .5s cubic-bezier(.3, 1.3, .5, 1), width .5s cubic-bezier(.3, 1.3, .5, 1), opacity .3s;
+}
+.jb__pill.is-on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .jb__pill { -webkit-transition: none; transition: none; } }
+
+/* Цены — тема печати. Цитата проступает чернилами по мере прокрутки (слова темнеют по очереди) */
+.fx .why__quote.is-ink .ink { opacity: .16; -webkit-transition: opacity .45s ease; transition: opacity .45s ease; }
+.fx .why__quote.is-ink .ink.on { opacity: 1; }
+/* …а римские цифры ставятся, как оттиск штампа: падают крупно и с наклоном, прижимаются и чуть отскакивают */
+.why__n { display: inline-block; -webkit-transform-origin: 50% 60%; transform-origin: 50% 60%; }
+.fx .why__list li.rv .why__n { opacity: 0; }
+.fx .why__list li.rv.in .why__n { -webkit-animation: stamp .62s cubic-bezier(.55, 0, .7, .2) .28s both; animation: stamp .62s cubic-bezier(.55, 0, .7, .2) .28s both; }
+@-webkit-keyframes stamp {
+  0% { opacity: 0; -webkit-transform: scale(2.4) rotate(-14deg); transform: scale(2.4) rotate(-14deg); }
+  62% { opacity: 1; -webkit-transform: scale(.9) rotate(-3deg); transform: scale(.9) rotate(-3deg); }
+  80% { -webkit-transform: scale(1.05) rotate(-5deg); transform: scale(1.05) rotate(-5deg); }
+  100% { opacity: 1; -webkit-transform: rotate(-4deg); transform: rotate(-4deg); }
+}
+@keyframes stamp {
+  0% { opacity: 0; -webkit-transform: scale(2.4) rotate(-14deg); transform: scale(2.4) rotate(-14deg); }
+  62% { opacity: 1; -webkit-transform: scale(.9) rotate(-3deg); transform: scale(.9) rotate(-3deg); }
+  80% { -webkit-transform: scale(1.05) rotate(-5deg); transform: scale(1.05) rotate(-5deg); }
+  100% { opacity: 1; -webkit-transform: rotate(-4deg); transform: rotate(-4deg); }
+}
+
+/* Обо мне — цифры на барабанах, как счётчик кадров плёнки */
+.sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.facts b.odo { position: relative; display: -webkit-inline-box; display: inline-flex; -ms-flex-item-align: start; align-self: flex-start; height: 1em; line-height: 1; overflow: hidden; white-space: nowrap; }
+.facts b.odo span { font: inherit; line-height: 1; letter-spacing: inherit; }
+.odo__reel, .odo__ch, .odo__sp { display: inline-block; height: 1em; line-height: 1; }
+.odo__col { display: block; -webkit-transition: -webkit-transform 1.9s cubic-bezier(.16, .8, .12, 1); transition: transform 1.9s cubic-bezier(.16, .8, .12, 1); -webkit-transition-delay: calc(var(--n, 0) * 140ms); transition-delay: calc(var(--n, 0) * 140ms); }
+.odo__col > span { display: block; height: 1em; line-height: 1; text-align: center; }
+.odo.in .odo__col { -webkit-transform: translate3d(0, calc(var(--to) * -1em), 0); transform: translate3d(0, calc(var(--to) * -1em), 0); }
+.odo__ch { -webkit-transform: translate3d(0, 105%, 0); transform: translate3d(0, 105%, 0); -webkit-transition: -webkit-transform .7s cubic-bezier(.2, .9, .25, 1.15); transition: transform .7s cubic-bezier(.2, .9, .25, 1.15); -webkit-transition-delay: calc(.35s + var(--n, 0) * 90ms); transition-delay: calc(.35s + var(--n, 0) * 90ms); }
+.odo.in .odo__ch { -webkit-transform: none; transform: none; }

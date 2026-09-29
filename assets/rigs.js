@@ -279,6 +279,80 @@
       if (p < 1) setTimeout(tick, 40);
     }, 40);
   }
+  // ---------- «Обо мне»: цифры прокручиваются барабанами, как счётчик кадров на плёнке ----------
+  // Каждая цифра — барабан 0–9, который делает полный оборот и встаёт на своё число;
+  // «+» и слово «своя» выезжают снизу по буквам. Читалкам экрана — обычный текст
+  var odo = fx ? $$('.facts b') : [];
+  odo.forEach(function (b) {
+    var txt = b.textContent;
+    b.removeAttribute('data-count');
+    b.classList.add('odo');
+    b.textContent = '';
+    var sr = document.createElement('span');
+    sr.className = 'sr';
+    sr.textContent = txt;
+    b.appendChild(sr);
+    txt.split('').forEach(function (ch, n) {
+      var s = document.createElement('span');
+      s.setAttribute('aria-hidden', 'true');
+      s.style.setProperty('--n', n);
+      if (/\d/.test(ch)) {
+        s.className = 'odo__reel';
+        var col = document.createElement('span');
+        col.className = 'odo__col';
+        for (var i = 0; i <= 10 + +ch; i++) {
+          var d = document.createElement('span');
+          d.textContent = i % 10;
+          col.appendChild(d);
+        }
+        col.style.setProperty('--to', 10 + +ch);
+        s.appendChild(col);
+      } else if (/\s/.test(ch)) {
+        s.className = 'odo__sp';
+        s.textContent = ' ';
+      } else {
+        s.className = 'odo__ch';
+        s.textContent = ch;
+      }
+      b.appendChild(s);
+    });
+  });
+  if (odo.length) reveal(odo, { threshold: .6 });
+
+  // ---------- Цены: цитата проступает чернилами по мере прокрутки ----------
+  var inkQ = fx ? $('.why__quote') : null;
+  if (inkQ) {
+    var inks = [];
+    Array.prototype.slice.call(inkQ.childNodes).forEach(function (c) {
+      if (c.nodeType !== 3 || !c.nodeValue) return;
+      var frag = document.createDocumentFragment();
+      c.nodeValue.split(/([ \t\n\r]+)/).forEach(function (p) {
+        if (!p) return;
+        if (/^[ \t\n\r]+$/.test(p)) { frag.appendChild(document.createTextNode(' ')); return; }
+        var w = document.createElement('span');
+        w.className = 'ink';
+        w.textContent = p;
+        frag.appendChild(w);
+        inks.push(w);
+      });
+      inkQ.replaceChild(frag, c);
+    });
+    inkQ.classList.add('is-ink');
+    var inkNear = false, inkLit = -1;
+    var inkUp = function () {
+      if (!inkNear) return;
+      var V = window.innerHeight, r = inkQ.getBoundingClientRect();
+      // Первое слово темнеет, когда цитата поднялась до 85% экрана, последнее — к 45%
+      var p = Math.min(1, Math.max(0, (V * .85 - r.top) / (V * .4 + r.height * .5)));
+      var lit = fx ? Math.round(p * inks.length) : inks.length;
+      if (lit === inkLit) return;
+      inkLit = lit;
+      inks.forEach(function (w, i) { w.classList.toggle('on', i < lit); });
+    };
+    watch([inkQ], function (el, vis) { inkNear = vis; inkUp(); }, { rootMargin: '10% 0px' });
+    perFrame.push(inkUp);
+  }
+
   var counters = $$('[data-count]');
   if (counters.length && !reduce) {
     var plus = function (n) { return group(n, ' ') + '+'; };
@@ -317,11 +391,50 @@
   if (jb) {
     var chips = {};
     $$('a', jb).forEach(function (a) { chips[a.getAttribute('href').slice(1)] = a; });
-    watch($('.tcard, .wsec'), function (el, vis) {
+    // На странице работ у каждого раздела кружок с первым фото и число снимков,
+    // а под выбранным разделом едет бордовая плашка
+    var pill = null;
+    var sections = Object.keys(chips).map(function (id) { return document.getElementById(id); });
+    if (sections.every(function (s) { return s && $('.pics', s); })) {
+      Object.keys(chips).forEach(function (id) {
+        var a = chips[id], sec = document.getElementById(id), im = $('.pics img', sec), cnt = $('.works-meta span', sec);
+        var n = cnt ? parseInt(cnt.textContent, 10) : 0;
+        if (im) {
+          var th = document.createElement('span');
+          th.className = 'jb__th';
+          var ti = document.createElement('img');
+          ti.src = im.getAttribute('src');
+          ti.alt = '';
+          ti.decoding = 'async';
+          th.appendChild(ti);
+          a.insertBefore(th, a.firstChild);
+        }
+        if (n > 0) {
+          var c = document.createElement('small');
+          c.className = 'jb__n';
+          c.textContent = n;
+          a.appendChild(c);
+        }
+      });
+      jb.parentNode.classList.add('jumpbar--thumbs');
+      pill = document.createElement('i');
+      pill.className = 'jb__pill';
+      pill.setAttribute('aria-hidden', 'true');
+      jb.insertBefore(pill, jb.firstChild);
+    }
+    var movePill = function (a) {
+      if (!pill || !a) return;
+      pill.style.width = a.offsetWidth + 'px';
+      pill.style.transform = 'translate3d(' + a.offsetLeft + 'px,0,0)';
+      pill.classList.add('is-on');
+    };
+    window.addEventListener('resize', function () { movePill($('a.is-on', jb)); });
+    watch($$('.tcard, .wsec'), function (el, vis) {
       if (!vis) return;
       var a = chips[el.id];
       if (!a || a.classList.contains('is-on')) return;
       $$('a', jb).forEach(function (x) { x.classList.toggle('is-on', x === a); });
+      movePill(a);
       var left = a.offsetLeft - 18;
       if (jb.scrollTo) { try { jb.scrollTo({ left: left, behavior: reduce ? 'auto' : 'smooth' }); } catch (e) { jb.scrollLeft = left; } }
       else jb.scrollLeft = left;
@@ -398,6 +511,31 @@
     };
     watch([$('.stack') || perks[0].parentNode], function (el, vis) { stackOn = vis; if (vis) depth(); });
     perFrame.push(depth);
+  }
+
+  // ---------- «Как всё проходит»: номер шага загорается, когда до него дошла линия ----------
+  // Линию на телефоне рисует сама прокрутка (CSS, диапазон cover 12%–62%). Здесь той же формулой
+  // считаем, где сейчас её кончик, и зажигаем номера, до которых она дотянулась
+  var flow = $('.flow');
+  if (flow && fx && supports('animation-timeline', 'view()') && window.matchMedia) {
+    var flowMq = window.matchMedia('(max-width: 959px)');
+    var steps = $$('li', flow), flowNear = false, flowSync = false;
+    var lightSteps = function () {
+      var on = flowNear && fx && flowMq.matches;
+      if (on !== flowSync) { flowSync = on; flow.classList.toggle('is-sync', on); }
+      if (!on) return;
+      // Сначала все замеры, потом записи
+      var V = window.innerHeight, r = flow.getBoundingClientRect();
+      var f = Math.min(1, Math.max(0, ((V - r.top) / (V + r.height) - .12) / .5));
+      var tip = r.top + 10 + f * (r.height - 40);
+      var ys = steps.map(function (li) { return li.getBoundingClientRect().top + 22; });
+      steps.forEach(function (li, i) {
+        var v = ys[i] <= tip + 2;
+        if (li.__lit !== v) { li.__lit = v; li.classList.toggle('is-lit', v); }
+      });
+    };
+    watch([flow], function (el, vis) { flowNear = vis; lightSteps(); }, { rootMargin: '20% 0px' });
+    perFrame.push(lightSteps);
   }
 
   // ---------- Экран голосования в телефоне: таймер идёт по-настоящему ----------

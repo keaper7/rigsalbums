@@ -729,14 +729,8 @@
     var iris = $('.shutter__iris', sh);
     if (iris) iris.addEventListener('animationend', function (e) { if (e.target === iris) end(); });
     ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, end, true); });
-    setTimeout(end, 1600);
+    setTimeout(end, 2800);
   })();
-
-  // ---------- Переход между страницами ----------
-  // Анимацию перехода задают стили (@view-transition). На слабых устройствах её пропускаем
-  var skipVT = function (e) { if (e.viewTransition && !fx) e.viewTransition.skipTransition(); };
-  window.addEventListener('pageswap', skipVT);
-  window.addEventListener('pagereveal', skipVT);
 
   // ---------- Просмотр фото на весь экран ----------
   // Плавно открывается, листается пальцем, закрывается жестом вниз и кнопкой «Назад» на телефоне

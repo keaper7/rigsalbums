@@ -1017,15 +1017,6 @@ p, li { text-wrap: pretty; }
 
 .lb img { max-height: calc(100vh - 170px); max-height: calc(100dvh - 170px); }
 
-/* мягкий переход между страницами (где браузер умеет) */
-@view-transition { navigation: auto; }
-.hd { view-transition-name: hd; }
-/* Только короткая смена прозрачности, без сдвига: страница сама «выезжает» своими заголовками,
-   и второе движение поверх выглядело как двойная загрузка */
-::view-transition-old(root) { -webkit-animation: vt-out .18s ease both; animation: vt-out .18s ease both; }
-::view-transition-new(root) { -webkit-animation: vt-in .22s ease both; animation: vt-in .22s ease both; }
-@keyframes vt-out { to { opacity: 0; } }
-@keyframes vt-in { from { opacity: 0; } }
 
 @media (min-width: 720px) {
   .rail { margin-left: 32px; margin-right: 32px; }
@@ -1037,7 +1028,6 @@ p, li { text-wrap: pretty; }
   .me svg { -webkit-animation: none; animation: none; }
   .rail__seg.is-on b { -webkit-animation: none; animation: none; -webkit-transform: scaleX(1); transform: scaleX(1); }
   .js .works a { opacity: 1; -webkit-transform: none; transform: none; }
-  ::view-transition-old(root), ::view-transition-new(root) { -webkit-animation: none; animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1665,17 +1655,17 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
    Заставка «затвор камеры» при первом заходе на главную.
    Шесть лепестков — полуплоскости, повёрнутые через 60°: когда они отъезжают от центра,
    между ними открывается шестиугольное отверстие, а поворот всей диафрагмы даёт «закрутку», как у объектива.
-   Всё на transform и opacity, меньше секунды
+   Всё на transform и opacity, около двух секунд: логотип держится, потом вспышка и раскрытие
    ========================================================= */
 .shutter { display: none; }
 .intro .shutter { display: block; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200; overflow: hidden; pointer-events: none; }
-.shutter__iris { position: absolute; top: 0; left: 0; right: 0; bottom: 0; -webkit-animation: iris-turn .78s cubic-bezier(.65, 0, .25, 1) .22s both; animation: iris-turn .78s cubic-bezier(.65, 0, .25, 1) .22s both; }
+.shutter__iris { position: absolute; top: 0; left: 0; right: 0; bottom: 0; -webkit-animation: iris-turn 1.25s cubic-bezier(.6, 0, .2, 1) .75s both; animation: iris-turn 1.25s cubic-bezier(.6, 0, .2, 1) .75s both; }
 .shutter__iris i {
   position: absolute; left: 50%; top: 50%; width: 160vmax; height: 320vmax; margin-top: -160vmax;
   -webkit-transform-origin: 0 50%; transform-origin: 0 50%; background: #221615;
   box-shadow: inset 2px 0 0 rgba(233, 200, 168, .16), -18px 0 40px rgba(0, 0, 0, .35);
   will-change: transform;
-  -webkit-animation: blade .78s cubic-bezier(.65, 0, .25, 1) .22s both; animation: blade .78s cubic-bezier(.65, 0, .25, 1) .22s both;
+  -webkit-animation: blade 1.25s cubic-bezier(.6, 0, .2, 1) .75s both; animation: blade 1.25s cubic-bezier(.6, 0, .2, 1) .75s both;
 }
 .shutter__iris i:nth-child(even) { background: #2B1C1A; }
 .shutter__iris i:nth-child(1) { --a: 0deg; }
@@ -1691,16 +1681,18 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .shutter__mark {
   position: absolute; top: 50%; left: 0; right: 0; margin-top: -.5em; text-align: center;
   font: 800 22px/1 var(--disp); letter-spacing: .02em; color: var(--champ);
-  -webkit-animation: shutter-mark .3s ease .1s both; animation: shutter-mark .3s ease .1s both;
+  -webkit-animation: shutter-mark-in .35s ease both, shutter-mark .35s ease .6s forwards; animation: shutter-mark-in .35s ease both, shutter-mark .35s ease .6s forwards;
 }
 @-webkit-keyframes shutter-mark { to { opacity: 0; -webkit-transform: scale(.92); transform: scale(.92); } }
 @keyframes shutter-mark { to { opacity: 0; transform: scale(.92); } }
-.shutter__flash { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #fff; opacity: 0; -webkit-animation: shutter-flash .5s ease-out .22s both; animation: shutter-flash .5s ease-out .22s both; }
+@-webkit-keyframes shutter-mark-in { from { opacity: 0; -webkit-transform: scale(1.06); transform: scale(1.06); } }
+@keyframes shutter-mark-in { from { opacity: 0; transform: scale(1.06); } }
+.shutter__flash { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #fff; opacity: 0; -webkit-animation: shutter-flash .6s ease-out .75s both; animation: shutter-flash .6s ease-out .75s both; }
 @-webkit-keyframes shutter-flash { 0% { opacity: 0; } 12% { opacity: .55; } 100% { opacity: 0; } }
 @keyframes shutter-flash { 0% { opacity: 0; } 12% { opacity: .55; } 100% { opacity: 0; } }
 /* Заголовок первого экрана выезжает, когда затвор уже открывается, а не под ним */
-.intro .hero__title .l > span { -webkit-animation-delay: .5s; animation-delay: .5s; }
-.intro .hero__title .l:nth-child(2) > span { -webkit-animation-delay: .58s; animation-delay: .58s; }
-.intro .hero__title .l:nth-child(3) > span { -webkit-animation-delay: .66s; animation-delay: .66s; }
-.intro .hero__title .l:nth-child(4) > span { -webkit-animation-delay: .76s; animation-delay: .76s; }
+.intro .hero__title .l > span { -webkit-animation-delay: 1.15s; animation-delay: 1.15s; }
+.intro .hero__title .l:nth-child(2) > span { -webkit-animation-delay: 1.23s; animation-delay: 1.23s; }
+.intro .hero__title .l:nth-child(3) > span { -webkit-animation-delay: 1.31s; animation-delay: 1.31s; }
+.intro .hero__title .l:nth-child(4) > span { -webkit-animation-delay: 1.41s; animation-delay: 1.41s; }
 @media (prefers-reduced-motion: reduce) { .intro .shutter { display: none; } }

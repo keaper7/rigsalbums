@@ -1020,10 +1020,12 @@ p, li { text-wrap: pretty; }
 /* мягкий переход между страницами (где браузер умеет) */
 @view-transition { navigation: auto; }
 .hd { view-transition-name: hd; }
-::view-transition-old(root) { -webkit-animation: vt-out .22s ease both; animation: vt-out .22s ease both; }
-::view-transition-new(root) { -webkit-animation: vt-in .38s var(--ease) both; animation: vt-in .38s var(--ease) both; }
+/* Только короткая смена прозрачности, без сдвига: страница сама «выезжает» своими заголовками,
+   и второе движение поверх выглядело как двойная загрузка */
+::view-transition-old(root) { -webkit-animation: vt-out .18s ease both; animation: vt-out .18s ease both; }
+::view-transition-new(root) { -webkit-animation: vt-in .22s ease both; animation: vt-in .22s ease both; }
 @keyframes vt-out { to { opacity: 0; } }
-@keyframes vt-in { from { opacity: 0; -webkit-transform: translateY(14px); transform: translateY(14px); } }
+@keyframes vt-in { from { opacity: 0; } }
 
 @media (min-width: 720px) {
   .rail { margin-left: 32px; margin-right: 32px; }
@@ -1659,17 +1661,46 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .lb.is-zoom.is-open .lb__count, .lb.is-zoom.is-open .lb__close, .lb.is-zoom.is-open .lb__nav, .lb.is-zoom.is-open figcaption { opacity: 1; -webkit-transition: opacity .3s .28s; transition: opacity .3s .28s; }
 .lb.is-zoom img { will-change: transform; }
 
-/* Переход между страницами: новая страница выезжает листом снизу со скруглёнными краями,
-   старая отступает вглубь и темнеет. Шапка и кнопка записи внизу стоят на месте */
-.dock { view-transition-name: dock; }
-::view-transition-group(root) { -webkit-animation-duration: .6s; animation-duration: .6s; }
-::view-transition-old(root) { -webkit-animation: vt-back .6s cubic-bezier(.4, 0, .2, 1) both; animation: vt-back .6s cubic-bezier(.4, 0, .2, 1) both; }
-::view-transition-new(root) { -webkit-animation: vt-sheet .6s cubic-bezier(.22, .9, .2, 1) both; animation: vt-sheet .6s cubic-bezier(.22, .9, .2, 1) both; }
-@keyframes vt-back { to { opacity: .35; -webkit-transform: scale(.94); transform: scale(.94); -webkit-filter: brightness(.7); filter: brightness(.7); } }
-@keyframes vt-sheet {
-  from { -webkit-clip-path: inset(100% 0 0 0 round 28px 28px 0 0); clip-path: inset(100% 0 0 0 round 28px 28px 0 0); -webkit-transform: translateY(60px); transform: translateY(60px); }
-  to { -webkit-clip-path: inset(0 0 0 0 round 0); clip-path: inset(0 0 0 0 round 0); -webkit-transform: none; transform: none; }
+/* =========================================================
+   Заставка «затвор камеры» при первом заходе на главную.
+   Шесть лепестков — полуплоскости, повёрнутые через 60°: когда они отъезжают от центра,
+   между ними открывается шестиугольное отверстие, а поворот всей диафрагмы даёт «закрутку», как у объектива.
+   Всё на transform и opacity, меньше секунды
+   ========================================================= */
+.shutter { display: none; }
+.intro .shutter { display: block; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200; overflow: hidden; pointer-events: none; }
+.shutter__iris { position: absolute; top: 0; left: 0; right: 0; bottom: 0; -webkit-animation: iris-turn .78s cubic-bezier(.65, 0, .25, 1) .22s both; animation: iris-turn .78s cubic-bezier(.65, 0, .25, 1) .22s both; }
+.shutter__iris i {
+  position: absolute; left: 50%; top: 50%; width: 160vmax; height: 320vmax; margin-top: -160vmax;
+  -webkit-transform-origin: 0 50%; transform-origin: 0 50%; background: #221615;
+  box-shadow: inset 2px 0 0 rgba(233, 200, 168, .16), -18px 0 40px rgba(0, 0, 0, .35);
+  will-change: transform;
+  -webkit-animation: blade .78s cubic-bezier(.65, 0, .25, 1) .22s both; animation: blade .78s cubic-bezier(.65, 0, .25, 1) .22s both;
 }
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root), ::view-transition-new(root) { -webkit-animation: none; animation: none; }
+.shutter__iris i:nth-child(even) { background: #2B1C1A; }
+.shutter__iris i:nth-child(1) { --a: 0deg; }
+.shutter__iris i:nth-child(2) { --a: 60deg; }
+.shutter__iris i:nth-child(3) { --a: 120deg; }
+.shutter__iris i:nth-child(4) { --a: 180deg; }
+.shutter__iris i:nth-child(5) { --a: 240deg; }
+.shutter__iris i:nth-child(6) { --a: 300deg; }
+@-webkit-keyframes blade { from { -webkit-transform: rotate(var(--a)) translate3d(-3px, 0, 0); transform: rotate(var(--a)) translate3d(-3px, 0, 0); } to { -webkit-transform: rotate(var(--a)) translate3d(120vmax, 0, 0); transform: rotate(var(--a)) translate3d(120vmax, 0, 0); } }
+@keyframes blade { from { transform: rotate(var(--a)) translate3d(-3px, 0, 0); } to { transform: rotate(var(--a)) translate3d(120vmax, 0, 0); } }
+@-webkit-keyframes iris-turn { to { -webkit-transform: rotate(-40deg); transform: rotate(-40deg); } }
+@keyframes iris-turn { to { transform: rotate(-40deg); } }
+.shutter__mark {
+  position: absolute; top: 50%; left: 0; right: 0; margin-top: -.5em; text-align: center;
+  font: 800 22px/1 var(--disp); letter-spacing: .02em; color: var(--champ);
+  -webkit-animation: shutter-mark .3s ease .1s both; animation: shutter-mark .3s ease .1s both;
 }
+@-webkit-keyframes shutter-mark { to { opacity: 0; -webkit-transform: scale(.92); transform: scale(.92); } }
+@keyframes shutter-mark { to { opacity: 0; transform: scale(.92); } }
+.shutter__flash { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #fff; opacity: 0; -webkit-animation: shutter-flash .5s ease-out .22s both; animation: shutter-flash .5s ease-out .22s both; }
+@-webkit-keyframes shutter-flash { 0% { opacity: 0; } 12% { opacity: .55; } 100% { opacity: 0; } }
+@keyframes shutter-flash { 0% { opacity: 0; } 12% { opacity: .55; } 100% { opacity: 0; } }
+/* Заголовок первого экрана выезжает, когда затвор уже открывается, а не под ним */
+.intro .hero__title .l > span { -webkit-animation-delay: .5s; animation-delay: .5s; }
+.intro .hero__title .l:nth-child(2) > span { -webkit-animation-delay: .58s; animation-delay: .58s; }
+.intro .hero__title .l:nth-child(3) > span { -webkit-animation-delay: .66s; animation-delay: .66s; }
+.intro .hero__title .l:nth-child(4) > span { -webkit-animation-delay: .76s; animation-delay: .76s; }
+@media (prefers-reduced-motion: reduce) { .intro .shutter { display: none; } }

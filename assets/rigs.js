@@ -711,6 +711,27 @@
     } else if (v.src) v.pause();
   }, { rootMargin: '200px 0px' });
 
+  // ---------- Заставка «затвор камеры» (класс intro ставит скрипт в <head> главной) ----------
+  // Убираем, как только лепестки раскрылись; нажатие или клавиша — сразу. Запасной таймер — на случай,
+  // если анимация не запустилась, чтобы заставка никогда не закрыла сайт
+  (function () {
+    var sh = $('.shutter');
+    if (!sh) return;
+    if (!root.classList.contains('intro')) { sh.parentNode.removeChild(sh); return; }
+    var done = false;
+    var end = function () {
+      if (done) return;
+      done = true;
+      // Класс intro оставляем: от него зависят задержки заголовка, и снимать его посреди анимации нельзя
+      if (sh.parentNode) sh.parentNode.removeChild(sh);
+      ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) { window.removeEventListener(ev, end, true); });
+    };
+    var iris = $('.shutter__iris', sh);
+    if (iris) iris.addEventListener('animationend', function (e) { if (e.target === iris) end(); });
+    ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, end, true); });
+    setTimeout(end, 1600);
+  })();
+
   // ---------- Переход между страницами ----------
   // Анимацию перехода задают стили (@view-transition). На слабых устройствах её пропускаем
   var skipVT = function (e) { if (e.viewTransition && !fx) e.viewTransition.skipTransition(); };

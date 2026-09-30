@@ -1776,11 +1776,12 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .tshut.is-on + section { position: relative; z-index: 1; margin-top: -100vh; }
 .tshut__pin { position: -webkit-sticky; position: sticky; top: 0; height: 100vh; overflow: hidden; }
 .tshut__iris { position: absolute; top: 0; left: 0; right: 0; bottom: 0; will-change: transform; }
+/* Лепесток 40×80vmax, скрипт растягивает его в 4 раза (до 160×320vmax); тени поэтому в четыре раза меньше нужных */
 .tshut__iris i {
-  position: absolute; left: 50%; top: 50%; width: 160vmax; height: 320vmax; margin-top: -160vmax;
+  position: absolute; left: 50%; top: 50%; width: 40vmax; height: 80vmax; margin-top: -40vmax;
   -webkit-transform-origin: 0 50%; transform-origin: 0 50%; background: #221615; will-change: transform;
-  -webkit-transform: translate3d(200vmax, 0, 0); transform: translate3d(200vmax, 0, 0);
-  box-shadow: inset 2px 0 0 rgba(233, 200, 168, .16), -18px 0 40px rgba(0, 0, 0, .35);
+  -webkit-transform: translate3d(200vmax, 0, 0) scale(4); transform: translate3d(200vmax, 0, 0) scale(4);
+  box-shadow: inset .5px 0 0 rgba(233, 200, 168, .16), -4.5px 0 10px rgba(0, 0, 0, .35);
 }
 .tshut__iris i:nth-child(even) { background: #2B1C1A; }
 .tshut__mark { position: absolute; top: 50%; left: 0; right: 0; margin-top: -.5em; text-align: center; font: 800 22px/1 var(--disp); letter-spacing: .02em; color: var(--champ); opacity: 0; }
@@ -1829,6 +1830,7 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 /* Снимок обрезан по линии щели, пока не вышел целиком */
 .print__feed { position: absolute; left: 0; right: 0; top: 0; height: calc(var(--slot, 60vh) + 11px); z-index: 3; overflow: hidden; }
 .print.is-free .print__feed { overflow: visible; }
+.print.is-free .print__photo { position: fixed; top: 0; }
 .print__photo {
   position: absolute; left: 50%; top: 100%; width: var(--pw, 240px); height: var(--ph, 360px); margin-left: calc(var(--pw, 240px) / -2);
   -webkit-transform-origin: 50% 50%; transform-origin: 50% 50%; will-change: transform;

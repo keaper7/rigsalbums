@@ -73,6 +73,12 @@
   var maxY = 1, needMeasure = true, ticking = false, lastY = -1, lastP = -1, scrolled = null;
   var perFrame = [];
   var lastT = 0, slow = 0, fast = 0;
+  // Сглаженная прокрутка для переходов, прилипших к экрану (затвор, принтер, влёт в букву).
+  // Колесо мыши двигает страницу ступеньками по ~100px, и переход прыгал бы на каждый щелчок.
+  // Поэтому переходы смотрят не на саму прокрутку, а на её плавно догоняющую копию:
+  // lag() — насколько она отстаёт, её прибавляют к getBoundingClientRect().top
+  var smoothY = -1, lastS = -1, lastFT = 0;
+  function lag() { return smoothY < 0 ? 0 : window.pageYOffset - smoothY; }
   function measure() { maxY = Math.max(1, root.scrollHeight - window.innerHeight); needMeasure = false; }
   function frame(t) {
     ticking = false;
@@ -90,15 +96,27 @@
     lastT = t;
     if (needMeasure) measure();
     var y = window.pageYOffset;
-    if (y === lastY) return;
-    lastY = y;
-    var s = y > 8;
-    if (s !== scrolled) { scrolled = s; hd.classList.toggle('is-scrolled', s); }
-    if (!sdaScroll) {
-      var p = Math.min(1, y / maxY);
-      if (Math.abs(p - lastP) > .002) { lastP = p; hd.style.setProperty('--p', p.toFixed(3)); }
+    var fdt = lastFT ? Math.min(64, t - lastFT) : 16;
+    lastFT = t;
+    if (smoothY < 0 || !fx || Math.abs(y - smoothY) > window.innerHeight * 2) smoothY = y;
+    else {
+      smoothY += (y - smoothY) * (1 - Math.exp(-fdt / 90));
+      if (Math.abs(y - smoothY) < .3) smoothY = y;
+    }
+    if (y === lastY && smoothY === lastS) { lastFT = 0; return; }
+    var moved = y !== lastY;
+    lastY = y; lastS = smoothY;
+    if (moved) {
+      var s = y > 8;
+      if (s !== scrolled) { scrolled = s; hd.classList.toggle('is-scrolled', s); }
+      if (!sdaScroll) {
+        var p = Math.min(1, y / maxY);
+        if (Math.abs(p - lastP) > .002) { lastP = p; hd.style.setProperty('--p', p.toFixed(3)); }
+      }
     }
     for (var i = 0; i < perFrame.length; i++) perFrame[i](y);
+    // Копия ещё догоняет прокрутку — следующий кадр нужен, даже если страница уже стоит
+    if (smoothY !== y && !ticking) { ticking = true; raf(frame); }
   }
   window.addEventListener('scroll', function () { if (!ticking) { ticking = true; raf(frame); } }, { passive: true });
   window.addEventListener('resize', function () { needMeasure = true; if (!ticking) { ticking = true; raf(frame); } });
@@ -990,7 +1008,7 @@
       if (!zoomOn) return;
       if (!origin) setOrigin();
       var V = window.innerHeight, r = zoom.getBoundingClientRect();
-      var p = Math.min(1, Math.max(0, -r.top / (r.height - V)));
+      var p = Math.min(1, Math.max(0, -(r.top + lag()) / (r.height - V)));
       var k = p.toFixed(4);
       if (k === lastZ) return;
       lastZ = k;
@@ -1023,15 +1041,17 @@
     var move = function () {
       if (!on) return;
       var V = window.innerHeight, r = box.getBoundingClientRect();
-      var p = Math.min(1, Math.max(0, -r.top / (r.height - V)));
+      var p = Math.min(1, Math.max(0, -(r.top + lag()) / (r.height - V)));
       var k = p.toFixed(4);
       if (k === last) return;
       last = k;
       // open: 1 — лепестки ушли за край экрана, 0 — закрыты
       var open = p < .42 ? 1 - ease(p / .42) : p > .58 ? ease((p - .58) / .42) : 0;
+      // Лепестки свёрстаны маленькими (40vmax) и растянуты в 4 раза: сплошной цвет от этого не мылится,
+      // а браузеру рисовать в 16 раз меньше, чем лепесток в полный размер
       var D = Math.max(window.innerWidth, V) * 1.2;
       var d = open * D - 3 * (1 - open);
-      blades.forEach(function (b, i) { b.style.transform = 'rotate(' + (i * 60) + 'deg) translate3d(' + d.toFixed(1) + 'px,0,0)'; });
+      blades.forEach(function (b, i) { b.style.transform = 'rotate(' + (i * 60) + 'deg) translate3d(' + d.toFixed(1) + 'px,0,0) scale(4)'; });
       iris.style.transform = 'rotate(' + (-40 * (1 - open)).toFixed(2) + 'deg)';
       mark.style.opacity = Math.max(0, 1 - open * 6).toFixed(3);
       // Щелчок со вспышкой — один раз за проход через закрытый затвор
@@ -1055,7 +1075,7 @@
     if (!fx || !src) { box.parentNode.removeChild(box); return; }
     box.classList.add('is-on');
     var photo = $('.print__photo', box), img = $('img', photo), paper = $('.print__paper', photo), dev = $('.print__dev', photo);
-    var pbox = $('.print__box', box), lcd = $('.print__lcd', box);
+    var pbox = $('.print__box', box), lcd = $('.print__lcd', box), pin = $('.print__pin', box);
     img.src = src.currentSrc || src.src;
     var on = false, last = '', size = null, lastLcd = '';
     var clamp = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
@@ -1076,32 +1096,34 @@
     var move = function () {
       if (!on) return;
       if (!size) fit();
-      var V = window.innerHeight, r = box.getBoundingClientRect();
-      var p = clamp(-r.top / (r.height - V));
-      var k = p.toFixed(4) + '|' + Math.round(Math.max(0, r.top));
+      var V = window.innerHeight, r = box.getBoundingClientRect(), pr = pin.getBoundingClientRect(), t = tile.getBoundingClientRect();
+      var p = clamp(-(r.top + lag()) / (r.height - V));
+      var k = p.toFixed(4) + '|' + pr.top.toFixed(1) + '|' + (t.top + lag()).toFixed(1);
       if (k === last) return;
       last = k;
-      var t = tile.getBoundingClientRect();
-      // Принтер поднимается снизу, пока переход выезжает на экран, и держится у нижнего края;
-      // когда снимок готов — уезжает обратно вниз
-      var rise = ease(clamp((V * .95 - r.top) / (V * .95))), out = ease(clamp((p - .46) / .16));
-      var down = V - size.slot + 60;
-      pbox.style.transform = 'translate3d(0,' + (-Math.max(0, r.top) + (1 - rise) * down + out * down).toFixed(1) + 'px,0)';
-      // Подача рывками: 12 шажков, каждый с разгоном и остановкой
-      var N = 12, fp = clamp((p - .04) / .4) * N, i = Math.floor(fp), fr = fp - i;
-      var fed = i >= N ? 1 : (i + ease(fr)) / N;
+      // Принтер въезжает вместе с блоком и стоит на нижнем краю экрана; когда снимок готов — уезжает вниз
+      var out = ease(clamp((p - .46) / .16));
+      pbox.style.transform = 'translate3d(0,' + (out * (V - size.slot + 60)).toFixed(1) + 'px,0)';
+      // Подача ровная, с мягким стартом и остановкой
+      var fed = ease(clamp((p - .04) / .4));
       var y = 12 - (size.h + 66) * fed;
       dev.style.opacity = (1 - clamp((p - .12) / .42)).toFixed(3);
       box.classList.toggle('is-busy', p > .03 && p < .44);
-      box.classList.toggle('is-free', p >= .44);
       var text = fed >= 1 ? 'ГОТОВО' : 'ПЕЧАТЬ ' + Math.round(fed * 100) + '%';
       if (text !== lastLcd) { lastLcd = text; lcd.textContent = text; }
-      // Готовый снимок выскакивает с наклоном и летит в свою плитку
+      // Готовый снимок выскакивает с наклоном и летит в свою плитку. Плитка едет вместе со страницей
+      // ступеньками колеса, поэтому цель — её сглаженное место (+ lag), иначе снимок дёргался бы за ней
       var pop = ease(clamp((p - .44) / .06)), q = ease(clamp((p - .5) / .5));
       y -= pop * 18;
-      var lx = window.innerWidth / 2, ly = r.top < 0 ? size.slot + 11 + size.h / 2 : r.top + size.slot + 11 + size.h / 2;
+      // Вышедший снимок закреплён на экране (position: fixed): блок под ним может ехать со страницей,
+      // а снимок двигает только сглаженный расчёт. ly — где был бы его центр без сдвига
+      var free = p >= .44;
+      box.classList.toggle('is-free', free);
+      var base = free ? size.h / 2 : pr.top + size.slot + 11 + size.h / 2;
+      if (free) y += size.slot + 11;
+      var lx = window.innerWidth / 2, ly = base, tTop = t.top + lag();
       var tx = (t.left + t.width / 2 - lx) * q + Math.sin(Math.PI * q) * 24;
-      var ty = y + (t.top + t.height / 2 - ly - y) * q;
+      var ty = y + (tTop + t.height / 2 - ly - y) * q;
       var sc = 1 + (t.width / size.w - 1) * q, rot = 3 * pop * (1 - q) - Math.sin(Math.PI * q) * 2;
       photo.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')';
       paper.style.opacity = (1 - clamp((p - .68) / .24)).toFixed(3);
@@ -1112,7 +1134,7 @@
     };
     watch([box], function (el, vis) {
       on = vis; last = '';
-      if (vis) move(); else tile.style.opacity = '';
+      if (vis) move(); else { tile.style.opacity = ''; photo.style.opacity = '0'; }
     }, { rootMargin: '100px 0px' });
     perFrame.push(move);
     window.addEventListener('resize', function () { size = null; move(); });

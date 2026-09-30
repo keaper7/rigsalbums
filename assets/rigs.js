@@ -711,6 +711,12 @@
     } else if (v.src) v.pause();
   }, { rootMargin: '200px 0px' });
 
+  // ---------- Переход между страницами ----------
+  // Анимацию перехода задают стили (@view-transition). На слабых устройствах её пропускаем
+  var skipVT = function (e) { if (e.viewTransition && !fx) e.viewTransition.skipTransition(); };
+  window.addEventListener('pageswap', skipVT);
+  window.addEventListener('pagereveal', skipVT);
+
   // ---------- Просмотр фото на весь экран ----------
   // Плавно открывается, листается пальцем, закрывается жестом вниз и кнопкой «Назад» на телефоне
   var lb = $('.lb');
@@ -724,13 +730,36 @@
       var im = new Image();
       im.src = lbList[i].getAttribute('href');
     };
-    var show = function () {
+    // thumb — уже загруженная плитка: пока грузится большое фото, показываем её, растянутую до
+    // размера большого (пропорции те же), и незаметно подменяем, когда большое загрузится
+    var show = function (thumb) {
       var a = lbList[lbI];
       var href = a.getAttribute('href');
-      lb.classList.add('is-loading');
-      lbImg.onload = lbImg.onerror = function () { lb.classList.remove('is-loading'); };
-      lbImg.src = href;
-      if (lbImg.complete && lbImg.naturalWidth) lb.classList.remove('is-loading');
+      lbImg.style.width = '';
+      if (thumb) {
+        var ar = thumb.naturalWidth / thumb.naturalHeight;
+        var maxW = lb.clientWidth - 24, maxH = lb.clientHeight - 170;
+        lbImg.style.width = Math.round(Math.min(maxW, maxH * ar)) + 'px';
+        lbImg.onload = lbImg.onerror = null;
+        lbImg.src = thumb.currentSrc || thumb.src;
+        // Подмена — только когда крупное фото уже раскодировано и полёт закончился,
+        // иначе декодирование большой картинки совпадает с анимацией и даёт заметный фриз
+        var big = new Image();
+        var swap = function () {
+          if (lbList[lbI] !== a || lb.hidden || !lb.classList.contains('is-open')) return;
+          if (flying) { swapLater = swap; return; }
+          lbImg.src = href;
+        };
+        big.onload = function () {
+          if (big.decode) big.decode().then(swap, swap); else swap();
+        };
+        big.src = href;
+      } else {
+        lb.classList.add('is-loading');
+        lbImg.onload = lbImg.onerror = function () { lb.classList.remove('is-loading'); };
+        lbImg.src = href;
+        if (lbImg.complete && lbImg.naturalWidth) lb.classList.remove('is-loading');
+      }
       lbCap.textContent = a.getAttribute('data-cap') || '';
       $('.lb__count', lb).textContent = (lbI + 1) + ' / ' + lbList.length;
       $('.lb__prev', lb).style.visibility = lbI > 0 ? '' : 'hidden';
@@ -747,21 +776,112 @@
       lbFig.classList.add(d > 0 ? 'is-next' : 'is-prev');
       show();
     };
+    // Фото вырастает из своей плитки и при закрытии возвращается в неё (только полный набор эффектов).
+    // Плитка обрезана (object-fit: cover), поэтому фото масштабируется целиком, а лишнее по краям
+    // срезается рамкой clip-path, которая раскрывается вместе с полётом
+    var ZOOM_MS = 480, zoomT = 0, flying = false, swapLater = null;
+    // r — где лежит сама картинка плитки (с учётом её увеличения внутри рамки),
+    // f — видимая часть: рамка ссылки, если она обрезает картинку (.pic), иначе сама картинка
+    var tile = function (a) {
+      var t = a && $('img', a);
+      if (!t || !t.complete || !t.naturalWidth) return null;
+      var r = t.getBoundingClientRect();
+      var clips = getComputedStyle(a).overflow !== 'visible';
+      var fr = clips ? a.getBoundingClientRect() : r;
+      var f = { left: Math.max(fr.left, r.left), top: Math.max(fr.top, r.top), right: Math.min(fr.right, r.right), bottom: Math.min(fr.bottom, r.bottom) };
+      if (f.right - f.left < 20 || f.bottom - f.top < 20 || f.bottom < 0 || f.top > window.innerHeight || f.right < 0 || f.left > window.innerWidth) return null;
+      return { img: t, r: r, f: f, rad: parseFloat(getComputedStyle(clips ? a : t).borderTopLeftRadius) || 0 };
+    };
+    // Большое фото накрывает картинку плитки так же, как она заполняет свою рамку (object-fit: cover, по центру),
+    // а лишнее срезается clip-path ровно по видимой рамке. В конце полёта картинка совпадает с плиткой пиксель в пиксель
+    var flyStyle = function (t) {
+      var R = lbImg.getBoundingClientRect();
+      if (!R.width || !R.height) return null;
+      var s = Math.max(t.r.width / R.width, t.r.height / R.height);
+      var w = R.width * s, h = R.height * s;
+      var x = t.r.left + t.r.width / 2 - w / 2, y = t.r.top + t.r.height / 2 - h / 2;
+      var ins = [(t.f.top - y) / s, (x + w - t.f.right) / s, (y + h - t.f.bottom) / s, (t.f.left - x) / s].map(function (v) { return Math.max(0, v).toFixed(1) + 'px'; });
+      return {
+        transform: 'translate3d(' + (x - R.left).toFixed(1) + 'px,' + (y - R.top).toFixed(1) + 'px,0) scale(' + s.toFixed(4) + ')',
+        clip: 'inset(' + ins.join(' ') + ' round ' + (t.rad / s).toFixed(1) + 'px)'
+      };
+    };
+    var flyEase = 'cubic-bezier(.2, .8, .2, 1)';
+    var setFly = function (tf, clip, anim) {
+      var tr = anim ? 'transform ' + ZOOM_MS + 'ms ' + flyEase + ', clip-path ' + ZOOM_MS + 'ms ' + flyEase : 'none';
+      lbImg.style.webkitTransition = tr.replace(/transform/, '-webkit-transform').replace('clip-path', '-webkit-clip-path');
+      lbImg.style.transition = tr;
+      lbImg.style.transformOrigin = '0 0';
+      lbImg.style.transform = tf;
+      lbImg.style.webkitClipPath = clip;
+      lbImg.style.clipPath = clip;
+    };
+    var clearFly = function () {
+      ['transition', 'webkitTransition', 'transform', 'transformOrigin', 'clipPath', 'webkitClipPath'].forEach(function (k) { lbImg.style[k] = ''; });
+    };
+    var canZoom = function () { return fx && !reduce && supports('clip-path', 'inset(1px round 1px)'); };
     var open = function (a) {
       lbList = $$('[data-lb="' + a.getAttribute('data-lb') + '"]');
       lbI = lbList.indexOf(a);
-      show();
+      clearTimeout(zoomT);
+      clearFly();
+      flying = false;
+      swapLater = null;
+      lbFig.classList.remove('is-next', 'is-prev');
+      var t = canZoom() ? tile(a) : null;
+      lb.classList.toggle('is-zoom', !!t);
       lb.hidden = false;
+      show(t && t.img);
       root.style.overflow = 'hidden';
       void lb.offsetWidth;
+      var f = t && flyStyle(t);
+      if (f) {
+        setFly(f.transform, f.clip, false);
+        void lbImg.offsetWidth;
+        setFly('', 'inset(0px 0px 0px 0px round 4px)', true);
+        flying = true;
+        zoomT = setTimeout(function () {
+          clearFly();
+          flying = false;
+          var sw = swapLater;
+          swapLater = null;
+          if (sw) sw();
+        }, ZOOM_MS + 40);
+      }
       lb.classList.add('is-open');
       if (window.history && history.pushState) { history.pushState({ lb: 1 }, ''); pushed = true; }
     };
     var close = function (fromHistory) {
-      if (lb.hidden) return;
+      // Уже закрывается: кнопка «Закрыть» сама делает history.back(), и popstate зовёт close ещё раз
+      if (lb.hidden || !lb.classList.contains('is-open')) return;
+      clearTimeout(zoomT);
+      flying = false;
+      swapLater = null;
+      var t = lb.classList.contains('is-zoom') && canZoom() ? tile(lbList[lbI]) : null;
+      var f = null;
+      if (t) {
+        lbFig.classList.remove('is-next', 'is-prev');
+        clearFly();
+        f = flyStyle(t);
+      }
+      if (f) setFly(f.transform, f.clip, true);
+      else lb.classList.remove('is-zoom');
       lb.classList.remove('is-open');
       root.style.overflow = '';
-      setTimeout(function () { if (!lb.classList.contains('is-open')) { lb.hidden = true; lbImg.src = ''; } }, reduce ? 0 : 260);
+      // Прячем слой только когда фото долетело до плитки (transitionend), с запасным таймером
+      var hide = function () {
+        clearTimeout(zoomT);
+        lbImg.removeEventListener('transitionend', onEnd);
+        if (lb.classList.contains('is-open')) return;
+        lb.hidden = true;
+        lb.classList.remove('is-zoom');
+        lbImg.src = '';
+        lbImg.style.width = '';
+        clearFly();
+      };
+      var onEnd = function (e) { if (e.target === lbImg && /transform/.test(e.propertyName)) hide(); };
+      if (f) lbImg.addEventListener('transitionend', onEnd);
+      zoomT = setTimeout(hide, reduce ? 0 : f ? ZOOM_MS + 120 : 260);
       if (pushed && !fromHistory) { pushed = false; history.back(); }
       pushed = false;
     };

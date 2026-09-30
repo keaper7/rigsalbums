@@ -1648,3 +1648,28 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .odo.in .odo__col { -webkit-transform: translate3d(0, calc(var(--to) * -1em), 0); transform: translate3d(0, calc(var(--to) * -1em), 0); }
 .odo__ch { -webkit-transform: translate3d(0, 105%, 0); transform: translate3d(0, 105%, 0); -webkit-transition: -webkit-transform .7s cubic-bezier(.2, .9, .25, 1.15); transition: transform .7s cubic-bezier(.2, .9, .25, 1.15); -webkit-transition-delay: calc(.35s + var(--n, 0) * 90ms); transition-delay: calc(.35s + var(--n, 0) * 90ms); }
 .odo.in .odo__ch { -webkit-transform: none; transform: none; }
+
+/* Просмотр фото: фото вырастает из своей плитки. Сам слой не мигает прозрачностью —
+   темнеет только фон, а кнопки и подпись проявляются, когда фото долетело */
+.lb.is-zoom { opacity: 1; background-color: rgba(40, 26, 24, 0); -webkit-transition: background-color .42s ease; transition: background-color .42s ease; }
+.lb.is-zoom.is-open { background-color: rgba(40, 26, 24, .97); }
+.lb.is-zoom figure { -webkit-transform: none; transform: none; -webkit-transition: none; transition: none; }
+.lb.is-zoom figure.is-drag { -webkit-transition: none; transition: none; }
+.lb.is-zoom .lb__count, .lb.is-zoom .lb__close, .lb.is-zoom .lb__nav, .lb.is-zoom figcaption { opacity: 0; -webkit-transition: opacity .2s; transition: opacity .2s; }
+.lb.is-zoom.is-open .lb__count, .lb.is-zoom.is-open .lb__close, .lb.is-zoom.is-open .lb__nav, .lb.is-zoom.is-open figcaption { opacity: 1; -webkit-transition: opacity .3s .28s; transition: opacity .3s .28s; }
+.lb.is-zoom img { will-change: transform; }
+
+/* Переход между страницами: новая страница выезжает листом снизу со скруглёнными краями,
+   старая отступает вглубь и темнеет. Шапка и кнопка записи внизу стоят на месте */
+.dock { view-transition-name: dock; }
+::view-transition-group(root) { -webkit-animation-duration: .6s; animation-duration: .6s; }
+::view-transition-old(root) { -webkit-animation: vt-back .6s cubic-bezier(.4, 0, .2, 1) both; animation: vt-back .6s cubic-bezier(.4, 0, .2, 1) both; }
+::view-transition-new(root) { -webkit-animation: vt-sheet .6s cubic-bezier(.22, .9, .2, 1) both; animation: vt-sheet .6s cubic-bezier(.22, .9, .2, 1) both; }
+@keyframes vt-back { to { opacity: .35; -webkit-transform: scale(.94); transform: scale(.94); -webkit-filter: brightness(.7); filter: brightness(.7); } }
+@keyframes vt-sheet {
+  from { -webkit-clip-path: inset(100% 0 0 0 round 28px 28px 0 0); clip-path: inset(100% 0 0 0 round 28px 28px 0 0); -webkit-transform: translateY(60px); transform: translateY(60px); }
+  to { -webkit-clip-path: inset(0 0 0 0 round 0); clip-path: inset(0 0 0 0 round 0); -webkit-transform: none; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { -webkit-animation: none; animation: none; }
+}

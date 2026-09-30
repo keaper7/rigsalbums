@@ -25,15 +25,11 @@
 <link rel="stylesheet" href="assets/rigs.css">
 <script>document.documentElement.className += ' js';</script>
 <script>
-// Заставка «затвор камеры» — один раз, при первом заходе. Не на слабых телефонах, не при экономии трафика
-// и не тем, кто просит меньше движения. ?intro=1 — показать ещё раз
+// Заставка «затвор камеры» — при каждом открытии и перезагрузке главной, на любом устройстве.
+// Не показываем только тем, кто в настройках телефона попросил меньше движения (и при ?lite=1)
 (function () {
   try {
-    var q = location.search, n = navigator, c = n.connection;
-    var force = /[?&]intro=1/.test(q);
-    if (!force && (localStorage.getItem('rigs_intro') || /[?&]lite=1/.test(q) || (c && c.saveData) || (n.deviceMemory && n.deviceMemory <= 2) ||
-      (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches))) return;
-    localStorage.setItem('rigs_intro', '1');
+    if (/[?&]lite=1/.test(location.search) || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
     document.documentElement.className += ' intro';
   } catch (e) {}
 })();
@@ -118,6 +114,16 @@
   </div>
 </nav>
 
+<div class="clap" aria-hidden="true">
+  <div class="clap__pin">
+    <i class="clap__bg"></i>
+    <div class="clap__board">
+      <i class="clap__stick"></i><i class="clap__base"></i>
+      <div class="clap__slate"><b>RIGSARTHUR</b><p><span>ВЫПУСК</span><span>2026</span></p><p><span>СЦЕНА 1</span><span>ДУБЛЬ 1</span></p><p><span>НАЛЬЧИК</span><span>ВЖИВУЮ ▶</span></p></div>
+    </div>
+  </div>
+</div>
+
 <div class="ticker" aria-hidden="true">
   <div class="ticker__track">
     <!--@catalog ticker--><span class="f-classic">CLASSIC</span><span class="f-siren">OFFICE SIREN</span><span class="f-american">AMERICAN VIBE</span><span class="f-canon">CANON VIBE</span><span class="f-white">WHITE</span><span class="f-grey">GREY</span><span class="f-aesthetic">AESTHETIC</span><span class="f-money">NEW MONEY</span><span class="f-neon">NEON</span>
@@ -198,7 +204,7 @@
 <div class="print" aria-hidden="true">
   <div class="print__pin">
     <div class="print__feed"><div class="print__photo"><i class="print__paper"><b>RIGSARTHUR · выпуск</b></i><img alt="" decoding="async"><i class="print__dev"></i></div></div>
-    <div class="print__box"><i class="print__slot"></i><span class="print__brand">SONY</span><span class="print__model">Digital Photo Printer</span><span class="print__led"></span><span class="print__lcd">ПЕЧАТЬ 0%</span><i class="print__btn"></i></div>
+    <div class="print__box"><i class="print__slot"></i><i class="print__eye"></i><span class="print__brand">Canon</span><div class="print__face"><div class="print__screen"><img class="print__thumb" alt="" decoding="async"><span class="print__osd"><b>1/125</b><b>F2.8</b><b>ISO 100</b></span><div class="print__ui"><span class="print__lcd">ПЕЧАТЬ 0%</span><span class="print__bar"><i class="print__fill"></i></span></div></div><div class="print__side"><span class="print__key">AF-ON</span><span class="print__key print__key--r">✱</span><span class="print__dial"><b>SET</b></span><span class="print__key print__key--r">Q</span></div><div class="print__row"><span class="print__key">MENU</span><span class="print__key">INFO</span><span class="print__key print__key--r">▶</span></div><span class="print__lamp"><i class="print__led"></i></span></div></div>
   </div>
 </div>
 
@@ -223,6 +229,8 @@
     <a class="link" href="works.html">Смотреть все работы <i>&rarr;</i></a>
   </div>
 </section>
+
+<div class="desk" aria-hidden="true"><div class="desk__pin"><i class="desk__bg"></i><!--@pile works home.works--><!--@end--></div></div>
 
 <section class="perks">
   <div class="wrap perks__grid">
@@ -256,6 +264,19 @@
     </div>
   </div>
 </section>
+
+<div class="vf" aria-hidden="true">
+  <div class="vf__pin">
+    <i class="vf__dim"></i>
+    <div class="vf__frame">
+      <i class="vf__g vf__g--v1"></i><i class="vf__g vf__g--v2"></i><i class="vf__g vf__g--h1"></i><i class="vf__g vf__g--h2"></i>
+      <i class="vf__c vf__c--tl"></i><i class="vf__c vf__c--tr"></i><i class="vf__c vf__c--bl"></i><i class="vf__c vf__c--br"></i>
+      <i class="vf__af"></i><i class="vf__af vf__af--ok"></i>
+      <p class="vf__top"><span><b class="vf__rec"></b>RAW</span><span class="vf__cnt">248</span></p>
+      <div class="vf__bot"><div class="vf__ev"><i></i></div><p><span>1/125</span><span>F2.8</span><span>ISO 100</span></p></div>
+    </div>
+  </div>
+</div>
 
 <section class="sec sec--tint home-studio">
   <div class="wrap sec__split">
@@ -338,6 +359,25 @@
     </div>
   </div>
 </section>
+
+<div class="edit">
+  <div class="edit__pin">
+    <i class="edit__bg" aria-hidden="true"></i>
+    <div class="edit__win" role="group" aria-label="Попробуй обработать фото сам">
+      <div class="edit__bar" aria-hidden="true"><i></i><i></i><i></i><span>RIGSARTHUR · обработка</span></div>
+      <div class="edit__body">
+        <div class="edit__photo"><!--@retouch works home.works--><!--@end--></div>
+        <div class="edit__panel">
+          <p class="edit__hint">Потяни ползунки сам</p>
+          <label class="edit__sl"><span>Свет</span><b data-for="light">0</b><input type="range" min="0" max="100" value="22" data-k="light"></label>
+          <label class="edit__sl"><span>Контраст</span><b data-for="contrast">0</b><input type="range" min="0" max="100" value="28" data-k="contrast"></label>
+          <label class="edit__sl"><span>Тепло</span><b data-for="warm">0</b><input type="range" min="0" max="100" value="18" data-k="warm"></label>
+        </div>
+      </div>
+      <svg class="edit__cur" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2 L4 19 L8.5 15 L11.5 22 L14.5 20.7 L11.6 14 L18 14 Z"/></svg>
+    </div>
+  </div>
+</div>
 
 <section class="why">
   <div class="wrap why__grid">

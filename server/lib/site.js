@@ -85,7 +85,7 @@ const TOGGLES = {
   'price.early': { label: 'Показывать скидку: обычную цену, плашку и счётчик дней' }
 };
 
-const MARK = /<!--@(media|gallery|text|count|catalog|film) ([a-z0-9.]+)(?: (sm|lg|[a-z0-9.]+))?-->([\s\S]*?)<!--@end-->/g;
+const MARK = /<!--@(media|gallery|text|count|catalog|film|pile|retouch) ([a-z0-9.]+)(?: (sm|lg|[a-z0-9.]+))?-->([\s\S]*?)<!--@end-->/g;
 const SHOW = /<([a-z]+)([^>]*?) data-show="([a-z0-9.]+)"([^>]*)>/g;
 // Блок, который виден, только пока в галерее есть фото
 const NEED = /<([a-z]+)([^>]*?) data-need="([a-z0-9.]+)"([^>]*?)( hidden)?>/g;
@@ -131,10 +131,15 @@ function galleryHtml(key, items) {
 // (галерея сразу под плёнкой), — чтобы одни и те же снимки не шли подряд. Каждая лента повторена дважды,
 // чтобы анимация сдвигом на половину зацикливалась без стыка
 const FILM_MAX = 16;
-function filmHtml(items, skip) {
+const PILE_MAX = 7;
+// Фото из «Работ», которых нет в галерее главной (skip)
+function freshPool(items, skip) {
   const used = new Set();
   (skip || []).forEach(it => { used.add(it.sm); used.add(it.lg); });
-  let pool = items.filter(it => !used.has(it.sm) && !used.has(it.lg));
+  return items.filter(it => !used.has(it.sm) && !used.has(it.lg));
+}
+function filmHtml(items, skip) {
+  let pool = freshPool(items, skip);
   // Если почти всё уже есть внизу — лучше повтор, чем пустая плёнка
   if (pool.length < 6) pool = items.slice();
   pool = pool.slice(0, FILM_MAX);
@@ -147,6 +152,25 @@ function filmHtml(items, skip) {
   };
   const a = pool.slice(0, half), b = pool.slice(half);
   return '\n  ' + strip('film__strip--a', a) + '\n  ' + strip('film__strip--b', b.length ? b : a) + '\n';
+}
+
+// «Фото на стол» после галереи: вертикальные фото из «Работ», которых нет ни в галерее главной, ни на плёнке
+// (плёнка берёт первые FILM_MAX). Если таких мало — добираем из остальных, кроме галереи
+function pileHtml(items, skip) {
+  const pool = freshPool(items, skip).filter(it => !isWide(it));
+  let list = pool.slice(FILM_MAX, FILM_MAX + PILE_MAX);
+  if (list.length < PILE_MAX) list = list.concat(pool.slice(0, FILM_MAX).reverse()).slice(0, PILE_MAX);
+  if (list.length < 4) return null;
+  return list.map(it => '<figure class="desk__ph"><img src="' + esc(it.sm) + '" alt="" decoding="async"></figure>').join('');
+}
+
+// «Обработка» в начале главной: вертикальный снимок из «Работ», которого нет ни в галерее, ни на плёнке, ни на столе.
+// Посетитель сам крутит ему свет, контраст и тепло
+function retouchHtml(items, skip) {
+  const pool = freshPool(items, skip).filter(it => !isWide(it));
+  const it = pool[FILM_MAX + PILE_MAX] || pool[pool.length - 1] || items[0];
+  if (!it) return null;
+  return '<img class="edit__img" src="' + esc(it.sm) + '" alt="Фото выпускника для примера обработки" decoding="async">';
 }
 
 // ---------- тематики, одежда и цвета из раздела «Варианты» ----------
@@ -351,9 +375,9 @@ class Site {
         if (!GALLERIES[key] || !Array.isArray(vals[key])) return inner;
         return galleryHtml(key, vals[key]);
       }
-      if (type === 'film') {
+      if (type === 'film' || type === 'pile' || type === 'retouch') {
         const list = k => (Array.isArray(vals[k]) ? vals[k] : this.defaults().gallery[k] || []);
-        const part = filmHtml(list(key), variant ? list(variant) : []);
+        const part = ({ film: filmHtml, pile: pileHtml, retouch: retouchHtml })[type](list(key), variant ? list(variant) : []);
         return part === null ? inner : part;
       }
       if (type === 'count') {

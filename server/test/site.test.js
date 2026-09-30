@@ -607,3 +607,24 @@ test('плёнка на главной: фото из «Работ», без т�
   f = srcs(film(r.text));
   assert.strictEqual(f[0], 'media/' + a.id + '-sm.jpg');
 });
+
+test('«Фото на стол» и «Обработка»: снимки из «Работ» без повторов с галереей и плёнкой', async t => {
+  const { base, stop } = await start();
+  t.after(stop);
+  const guest = client(base);
+  const srcs = s => (s.match(/<img src="([^"]+)"/g) || []).map(x => x.slice(10, -1));
+  const r = await guest.req('GET', '/');
+  assert.doesNotMatch(r.text, /<!--@pile/);
+  const pile = srcs((/<div class="desk"[^>]*>([\s\S]*?)<\/div><\/div>/.exec(r.text) || [])[1] || '');
+  const film = srcs((/<div class="film"[^>]*>([\s\S]*?)<div class="print"/.exec(r.text) || [])[1] || '');
+  const home = srcs((/<div class="pics[^"]*"[^>]*>([\s\S]*?)<\/div>/.exec(r.text) || [])[1] || '');
+  assert.ok(pile.length >= 4, 'на столе есть снимки');
+  assert.ok(film.length > 0 && home.length > 0);
+  const seen = new Set(film.concat(home));
+  assert.ok(pile.every(s => !seen.has(s)), 'снимки на столе не повторяют галерею и плёнку');
+  // «Обработка» в начале: свой снимок, которого нет ни в галерее, ни на плёнке, ни на столе
+  assert.doesNotMatch(r.text, /<!--@retouch/);
+  const edit = (((/<div class="edit__photo">([\s\S]*?)<\/div>/.exec(r.text) || [])[1] || '').match(/ src="[^"]+"/g) || []).map(x => x.slice(6, -1));
+  assert.strictEqual(edit.length, 1, 'один снимок для обработки');
+  assert.ok(!seen.has(edit[0]) && !pile.includes(edit[0]), 'снимок обработки нигде на главной не повторяется');
+});

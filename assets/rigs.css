@@ -1696,3 +1696,150 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .intro .hero__title .l:nth-child(3) > span { -webkit-animation-delay: 1.31s; animation-delay: 1.31s; }
 .intro .hero__title .l:nth-child(4) > span { -webkit-animation-delay: 1.41s; animation-delay: 1.41s; }
 @media (prefers-reduced-motion: reduce) { .intro .shutter { display: none; } }
+
+/* =========================================================
+   Переходы между блоками
+   ========================================================= */
+/* «Плёнка»: две ленты крест-накрест между чеком и галереей */
+.film { position: relative; height: 250px; margin: 10px 0 -10px; overflow: hidden; pointer-events: none; }
+.film__strip {
+  position: absolute; left: -10%; right: -10%; top: 50%; height: 118px; margin-top: -59px;
+  background: #1E1413; box-shadow: 0 16px 34px -18px rgba(30, 15, 14, .7);
+}
+.film__strip:before, .film__strip:after {
+  content: ''; position: absolute; left: 0; right: 0; height: 9px; z-index: 1;
+  background: repeating-linear-gradient(90deg, transparent 0 8px, rgba(244, 239, 231, .85) 8px 16px, transparent 16px 24px);
+}
+.film__strip:before { top: 5px; }
+.film__strip:after { bottom: 5px; }
+.film__strip--a { -webkit-transform: rotate(-5deg); transform: rotate(-5deg); z-index: 1; }
+.film__strip--b { -webkit-transform: rotate(4deg); transform: rotate(4deg); background: #2A1B19; }
+.film__track { display: flex; gap: 8px; height: 100%; padding: 19px 0; width: -webkit-max-content; width: max-content; will-change: transform; }
+/* Кадры в ленте повторены дважды: сдвиг на половину длины незаметно зацикливает её */
+.film__track { -webkit-animation: film-a 22s linear infinite; animation: film-a 22s linear infinite; -webkit-animation-play-state: paused; animation-play-state: paused; }
+.film__strip--b .film__track { -webkit-animation-name: film-b; animation-name: film-b; -webkit-animation-duration: 26s; animation-duration: 26s; }
+.film.is-live .film__track { -webkit-animation-play-state: running; animation-play-state: running; }
+@-webkit-keyframes film-a { from { -webkit-transform: translate3d(0, 0, 0); transform: translate3d(0, 0, 0); } to { -webkit-transform: translate3d(-50%, 0, 0); transform: translate3d(-50%, 0, 0); } }
+@keyframes film-a { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+@-webkit-keyframes film-b { from { -webkit-transform: translate3d(-50%, 0, 0); transform: translate3d(-50%, 0, 0); } to { -webkit-transform: translate3d(0, 0, 0); transform: translate3d(0, 0, 0); } }
+@keyframes film-b { from { transform: translate3d(-50%, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+@media (prefers-reduced-motion: reduce) { .film__track { -webkit-animation: none; animation: none; } }
+.film__f { flex: 0 0 auto; width: 118px; height: 80px; border-radius: 3px; overflow: hidden; background: #3A2A28; }
+/* Кадр горизонтальный, а фото вертикальные: показываем верхнюю часть, где лицо, а не середину с телом */
+.film__f img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 14%; -webkit-filter: sepia(.15); filter: sepia(.15); }
+.film__f--w img { object-position: 50% 40%; }
+@media (min-width: 960px) {
+  .film { height: 330px; }
+  .film__strip { height: 150px; margin-top: -75px; }
+  .film__track { padding: 24px 0; gap: 10px; }
+  .film__f { width: 156px; height: 102px; }
+}
+
+/* «Приближение»: перед контактами влетаем в букву «О».
+   Буква того же цвета, что фон контактов (--wine-2), поэтому, когда она заполнила экран, шва нет.
+   Блок контактов заходит на последний экран перехода (margin-top: -100vh) с прозрачным верхом:
+   его текст выезжает прямо по приближенному бордовому, а ниже экрана у блока уже свой фон */
+.zoom { display: none; }
+.zoom.is-on { display: block; position: relative; height: 300vh; }
+.zoom__pin {
+  position: -webkit-sticky; position: sticky; top: 0; height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--paper);
+}
+.zoom__pin.is-full { background: var(--wine-2); }
+.zoom__pin:after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;
+  background: radial-gradient(ellipse at 90% 10%, rgba(232, 201, 168, .18), rgba(232, 201, 168, 0) 55%);
+  opacity: 0; opacity: var(--glow, 0);
+}
+.zoom__word {
+  margin: 0; text-align: center; font: 800 17vw/.86 var(--disp); letter-spacing: -.06em; color: var(--wine-2);
+  white-space: nowrap;
+}
+.zoom__pin.is-full .zoom__word { visibility: hidden; }
+.zoom__o { display: inline-block; }
+.zoom__sub { margin-top: 22px; font: 700 12px/1 var(--sans); letter-spacing: .3em; text-transform: uppercase; color: var(--ink-2); }
+.zoom.is-on + .end {
+  position: relative; z-index: 1; margin-top: -100vh; padding-top: 34vh;
+  background-color: transparent;
+  background-image: linear-gradient(transparent 100vh, var(--wine-2) 100vh);
+}
+@media (min-width: 960px) {
+  .zoom__word { font-size: 15vw; }
+  .zoom.is-on + .end { padding-top: 30vh; }
+}
+@media (prefers-reduced-motion: reduce) { .zoom.is-on { display: none; } }
+
+/* «Затвор между блоками»: лепестки закрывают уходящий блок и раскрываются на следующем.
+   Сам переход прозрачный и наезжает на соседей на экран с каждой стороны, поэтому места на странице не занимает лишнего */
+.tshut { display: none; }
+.tshut.is-on { display: block; position: relative; z-index: 5; height: 200vh; margin-top: -100vh; pointer-events: none; }
+.tshut.is-on + section { position: relative; z-index: 1; margin-top: -100vh; }
+.tshut__pin { position: -webkit-sticky; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.tshut__iris { position: absolute; top: 0; left: 0; right: 0; bottom: 0; will-change: transform; }
+.tshut__iris i {
+  position: absolute; left: 50%; top: 50%; width: 160vmax; height: 320vmax; margin-top: -160vmax;
+  -webkit-transform-origin: 0 50%; transform-origin: 0 50%; background: #221615; will-change: transform;
+  -webkit-transform: translate3d(200vmax, 0, 0); transform: translate3d(200vmax, 0, 0);
+  box-shadow: inset 2px 0 0 rgba(233, 200, 168, .16), -18px 0 40px rgba(0, 0, 0, .35);
+}
+.tshut__iris i:nth-child(even) { background: #2B1C1A; }
+.tshut__mark { position: absolute; top: 50%; left: 0; right: 0; margin-top: -.5em; text-align: center; font: 800 22px/1 var(--disp); letter-spacing: .02em; color: var(--champ); opacity: 0; }
+.tshut__flash { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #fff; opacity: 0; }
+.tshut__flash.is-go { -webkit-animation: shutter-flash .5s ease-out both; animation: shutter-flash .5s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .tshut.is-on { display: none; } .tshut.is-on + section { margin-top: 0; } }
+
+/* «Фото из принтера»: перед галереей снизу поднимается фотопринтер, снимок выходит вверх из щели,
+   проявляется и перелетает на место первого фото галереи. Галерея заходит на последний экран перехода (margin-top: -100vh),
+   сам переход прозрачный и не ловит нажатия, поэтому фото галереи под ним нажимаются как обычно.
+   --slot (верх принтера), --pw и --ph (размер снимка) считает скрипт под размер экрана */
+.print { display: none; }
+.print.is-on { display: block; position: relative; z-index: 2; height: 300vh; pointer-events: none; }
+.print.is-on + .gallery { position: relative; z-index: 1; margin-top: -100vh; }
+.print.is-on + .gallery .pics.rv { opacity: 1; -webkit-transform: none; transform: none; -webkit-transition: none; transition: none; }
+.print.is-on + .gallery .pics > :first-child, .print.is-on + .gallery .pics > :first-child img { opacity: 1; -webkit-animation: none; animation: none; }
+.print__pin { position: -webkit-sticky; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+/* Корпус стоит на нижнем краю экрана и уходит за него, поэтому не висит в воздухе */
+.print__box {
+  position: absolute; left: 50%; top: 60vh; top: var(--slot, 60vh); z-index: 2;
+  width: calc(var(--pw, 240px) + 84px); height: 100vh; margin-left: calc(var(--pw, 240px) / -2 - 42px);
+  border-radius: 30px 30px 0 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 28%, rgba(0, 0, 0, 0) 70%, rgba(0, 0, 0, .22)), linear-gradient(#34231F, #211513 38%, #1A100F);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 -14px 44px -24px rgba(30, 15, 14, .55);
+  will-change: transform;
+}
+/* Верхняя грань со щелью: из неё и выходит снимок */
+.print__box:before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 24px; border-radius: 30px 30px 0 0; background: linear-gradient(#5A4440, #3A2826); }
+.print__slot { position: absolute; top: 8px; left: 30px; right: 30px; height: 7px; border-radius: 4px; background: #080504; box-shadow: inset 0 2px 3px rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 255, 255, .14); }
+.print__brand { position: absolute; left: 26px; top: 44px; font: 700 19px/1 Georgia, 'Times New Roman', serif; letter-spacing: .14em; color: #E4DDD5; }
+.print__model { position: absolute; left: 27px; top: 69px; font: 700 7.5px/1 var(--sans); letter-spacing: .2em; text-transform: uppercase; color: rgba(232, 201, 168, .55); }
+.print__lcd {
+  position: absolute; right: 22px; top: 42px; min-width: 76px; padding: 6px 7px; border-radius: 5px; text-align: center;
+  background: #0B0706; box-shadow: inset 0 1px 3px rgba(0, 0, 0, .9);
+  font: 700 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .06em; color: #E9C8A8; font-variant-numeric: tabular-nums;
+}
+.print__led { position: absolute; right: 22px; top: 70px; width: 6px; height: 6px; border-radius: 50%; background: #4A3A36; }
+.print.is-busy .print__led { background: #9FD27A; box-shadow: 0 0 8px #9FD27A; -webkit-animation: print-led .7s steps(2, jump-none) infinite; animation: print-led .7s steps(2, jump-none) infinite; }
+@-webkit-keyframes print-led { to { opacity: .25; } }
+@keyframes print-led { to { opacity: .25; } }
+.print__btn {
+  position: absolute; left: 50%; top: 104px; width: 54px; height: 54px; margin-left: -27px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #3E2B28, #1C1210 70%);
+  box-shadow: 0 0 0 2px rgba(232, 201, 168, .45), 0 0 0 7px #1D1311, 0 0 0 8px rgba(255, 255, 255, .06), 0 6px 10px rgba(0, 0, 0, .5);
+}
+/* Снимок обрезан по линии щели, пока не вышел целиком */
+.print__feed { position: absolute; left: 0; right: 0; top: 0; height: calc(var(--slot, 60vh) + 11px); z-index: 3; overflow: hidden; }
+.print.is-free .print__feed { overflow: visible; }
+.print__photo {
+  position: absolute; left: 50%; top: 100%; width: var(--pw, 240px); height: var(--ph, 360px); margin-left: calc(var(--pw, 240px) / -2);
+  -webkit-transform-origin: 50% 50%; transform-origin: 50% 50%; will-change: transform;
+}
+/* Белая рамка снимка — отдельный слой вокруг фото: в полёте она тает, и фото садится в плитку галереи без рамки */
+.print__paper {
+  position: absolute; top: -10px; left: -10px; right: -10px; bottom: -44px; border-radius: 3px;
+  background: #FBF8F3; box-shadow: 0 18px 40px -16px rgba(30, 15, 14, .55);
+}
+.print__paper b { position: absolute; left: 0; right: 0; bottom: 15px; text-align: center; font: 700 9px/1 var(--sans); letter-spacing: .28em; color: var(--ink-2); }
+.print__photo img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 1px; }
+/* Проявка: снимок выходит тёмным и светлеет, пока выползает */
+.print__dev { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(160deg, #3B3230, #1D1716); }
+@media (prefers-reduced-motion: reduce) { .print.is-on { display: none; } .print.is-on + .gallery { margin-top: 0; } }

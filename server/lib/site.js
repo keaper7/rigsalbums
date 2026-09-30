@@ -8,6 +8,7 @@
 //   <!--@gallery works-->...плитки...<!--@end-->        список фото
 //   <!--@text price.main-->4 500<!--@end-->             текст
 //   <!--@count works-->65 фото<!--@end-->               число фото в галерее
+//   <!--@film works home.works-->...ленты...<!--@end-->  плёнка на главной: фото из works без тех, что уже в home.works
 //   <!--@catalog themes-->...<!--@end-->                тематики из раздела «Варианты»
 //   <div data-show="price.group">                        блок, который можно скрыть
 // Внутри комментариев лежит вариант по умолчанию. Сервер подставляет
@@ -46,7 +47,7 @@ const GALLERIES = {
   'home.works': { label: 'Работы на главной', where: 'Главная, блок «Вот так я снимаю выпускников»', hint: 'Лучше 8–12 фото. Горизонтальные фото займут всю ширину.', lb: 'home', max: 16 },
   // Разделы страницы «Работы». У каждого своя ссылка, её можно отправить родителям.
   // Пустой раздел на сайте не показывается
-  'works': { label: 'Индивидуальная фотосессия', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'shoots', max: 300, section: 'individual', empty: true },
+  'works': { label: 'Индивидуальная фотосессия', where: 'Страница «Работы» и плёнка на главной', hint: 'Новые фото встают в начало. Первые 16 фото, которых нет в «Работах на главной», едут на плёнке.', lb: 'shoots', max: 300, section: 'individual', empty: true },
   'works.spring': { label: 'Групповая на природе: весна', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'spring', max: 300, section: 'spring', empty: true },
   'works.autumn': { label: 'Групповая на природе: осень', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'autumn', max: 300, section: 'autumn', empty: true },
   'works.school': { label: 'Групповая в школе', where: 'Страница «Работы»', hint: 'Новые фото встают в начало.', lb: 'school', max: 300, section: 'school', empty: true },
@@ -84,7 +85,7 @@ const TOGGLES = {
   'price.early': { label: 'Показывать скидку: обычную цену, плашку и счётчик дней' }
 };
 
-const MARK = /<!--@(media|gallery|text|count|catalog) ([a-z0-9.]+)(?: (sm|lg))?-->([\s\S]*?)<!--@end-->/g;
+const MARK = /<!--@(media|gallery|text|count|catalog|film) ([a-z0-9.]+)(?: (sm|lg|[a-z0-9.]+))?-->([\s\S]*?)<!--@end-->/g;
 const SHOW = /<([a-z]+)([^>]*?) data-show="([a-z0-9.]+)"([^>]*)>/g;
 // Блок, который виден, только пока в галерее есть фото
 const NEED = /<([a-z]+)([^>]*?) data-need="([a-z0-9.]+)"([^>]*?)( hidden)?>/g;
@@ -124,6 +125,28 @@ function galleryHtml(key, items) {
   const lb = GALLERIES[key].lb;
   return '\n' + items.map(it => '      <a class="pic' + (isWide(it) ? ' pic--wide' : '') + '" href="' + esc(it.lg) + '" data-lb="' + lb +
     '"><img src="' + esc(it.sm) + '" alt="Фотосессия RIGSARTHUR" loading="lazy" decoding="async"></a>').join('\n') + '\n    ';
+}
+
+// Плёнка на главной: две ленты по кругу. Берём фото из галереи src, кроме тех, что уже есть в skip
+// (галерея сразу под плёнкой), — чтобы одни и те же снимки не шли подряд. Каждая лента повторена дважды,
+// чтобы анимация сдвигом на половину зацикливалась без стыка
+const FILM_MAX = 16;
+function filmHtml(items, skip) {
+  const used = new Set();
+  (skip || []).forEach(it => { used.add(it.sm); used.add(it.lg); });
+  let pool = items.filter(it => !used.has(it.sm) && !used.has(it.lg));
+  // Если почти всё уже есть внизу — лучше повтор, чем пустая плёнка
+  if (pool.length < 6) pool = items.slice();
+  pool = pool.slice(0, FILM_MAX);
+  if (pool.length < 2) return null;
+  const half = Math.ceil(pool.length / 2);
+  const frame = it => '<span class="film__f' + (isWide(it) ? ' film__f--w' : '') + '"><img src="' + esc(it.sm) + '" alt="" loading="lazy" decoding="async"></span>';
+  const strip = (cls, list) => {
+    const f = list.map(frame).join('');
+    return '<div class="film__strip ' + cls + '"><div class="film__track">' + f + f + '</div></div>';
+  };
+  const a = pool.slice(0, half), b = pool.slice(half);
+  return '\n  ' + strip('film__strip--a', a) + '\n  ' + strip('film__strip--b', b.length ? b : a) + '\n';
 }
 
 // ---------- тематики, одежда и цвета из раздела «Варианты» ----------
@@ -327,6 +350,11 @@ class Site {
       if (type === 'gallery') {
         if (!GALLERIES[key] || !Array.isArray(vals[key])) return inner;
         return galleryHtml(key, vals[key]);
+      }
+      if (type === 'film') {
+        const list = k => (Array.isArray(vals[k]) ? vals[k] : this.defaults().gallery[k] || []);
+        const part = filmHtml(list(key), variant ? list(variant) : []);
+        return part === null ? inner : part;
       }
       if (type === 'count') {
         if (!Array.isArray(vals[key])) return inner;

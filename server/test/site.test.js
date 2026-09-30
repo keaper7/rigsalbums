@@ -581,3 +581,29 @@ test('«Студия»: несколько фото зон, блок как на
   assert.match(r.text, new RegExp('media/' + a.id + '-lg\\.jpg" data-lb="zones"'));
   assert.strictEqual((r.text.match(/data-lb="zones"/g) || []).length, 10);
 });
+
+test('плёнка на главной: фото из «Работ», без тех, что в галерее под ней', async t => {
+  const { base, stop } = await start();
+  t.after(stop);
+  const admin = await adminLogin(base);
+  const guest = client(base);
+  const film = html => (/<div class="film"[^>]*>([\s\S]*?)<\/div>\s*<section class="gallery">/.exec(html) || [])[1] || '';
+  const srcs = s => (s.match(/<img src="([^"]+)"/g) || []).map(x => x.slice(10, -1));
+  const home = html => srcs((/<div class="pics[^"]*"[^>]*>([\s\S]*?)<\/div>/.exec(html) || [])[1] || '');
+
+  let r = await guest.req('GET', '/');
+  let f = srcs(film(r.text));
+  assert.ok(f.length >= 12, 'на плёнке есть кадры');
+  assert.doesNotMatch(r.text, /<!--@film/);
+  const below = new Set(home(r.text));
+  assert.ok(below.size > 0);
+  assert.ok(f.every(s => !below.has(s)), 'снимки из галереи под плёнкой на ней не повторяются');
+
+  // Новое фото в «Работах» сразу попадает на плёнку
+  const a = await admin.photo(JPEG_TALL);
+  r = await admin.api('/admin/api/site/g/works', { media: [a.id] });
+  assert.strictEqual(r.status, 200);
+  r = await guest.req('GET', '/');
+  f = srcs(film(r.text));
+  assert.strictEqual(f[0], 'media/' + a.id + '-sm.jpg');
+});

@@ -962,4 +962,160 @@
     var text = days === 1 ? 'Сегодня последний день' : 'Осталось ' + days + ' ' + word;
     els.forEach(function (el) { el.textContent = text; el.hidden = false; });
   })();
+
+  // ---------- Переходы между блоками ----------
+  // «Плёнка»: две ленты с кадрами крест-накрест сами едут в разные стороны.
+  // «Приближение»: перед контактами слово «ТВОЙ ВЫПУСК» стоит на месте, а прокрутка влетает в букву «О»,
+  // пока экран не станет бордовым — и под ним уже бордовый блок контактов. Только transform
+  (function () {
+    // Плёнка едет сама (CSS-анимация), на паузе, пока её нет на экране
+    var film = $('.film');
+    if (film) watch([film], function (el, vis) { film.classList.toggle('is-live', vis); }, { rootMargin: '100px 0px' });
+
+    var zoom = $('.zoom');
+    if (!zoom) return;
+    if (!fx) { zoom.parentNode.removeChild(zoom); return; }
+    zoom.classList.add('is-on');
+    var word = $('.zoom__word', zoom), o = $('.zoom__o', zoom), sub = $('.zoom__sub', zoom), pin = $('.zoom__pin', zoom);
+    var zoomOn = false, lastZ = '', origin = null;
+    // Точка приближения — середина левой стенки буквы «О»: в неё и влетаем, пока бордовый не заполнит экран
+    var setOrigin = function () {
+      word.style.transform = '';
+      var w = word.getBoundingClientRect(), b = o.getBoundingClientRect();
+      origin = { x: b.left - w.left + b.width * .16, y: b.top - w.top + b.height * .52 };
+      word.style.transformOrigin = origin.x.toFixed(1) + 'px ' + origin.y.toFixed(1) + 'px';
+      lastZ = '';
+    };
+    var moveZoom = function () {
+      if (!zoomOn) return;
+      if (!origin) setOrigin();
+      var V = window.innerHeight, r = zoom.getBoundingClientRect();
+      var p = Math.min(1, Math.max(0, -r.top / (r.height - V)));
+      var k = p.toFixed(4);
+      if (k === lastZ) return;
+      lastZ = k;
+      // Первая половина прокрутки — влёт в букву (к FULL бордовый закрывает экран),
+      // во второй по этому бордовому снизу выезжает блок контактов
+      var FULL = .46, q = Math.min(1, p / FULL), e = q * q * q;
+      word.style.transform = 'scale(' + (1 + e * 90).toFixed(3) + ')';
+      sub.style.opacity = Math.max(0, 1 - q * 3).toFixed(3);
+      pin.classList.toggle('is-full', q >= 1);
+      // Свечение, как у блока контактов, разгорается постепенно, пока контакты выезжают
+      pin.style.setProperty('--glow', Math.min(1, Math.max(0, (p - FULL) / (1 - FULL))).toFixed(3));
+    };
+    watch([zoom], function (el, vis) { zoomOn = vis; moveZoom(); }, { rootMargin: '100px 0px' });
+    perFrame.push(moveZoom);
+    window.addEventListener('resize', function () { origin = null; moveZoom(); });
+  })();
+
+  // ---------- «Затвор между блоками» ----------
+  // Блок-переход наезжает на последний экран предыдущего блока и на первый экран следующего.
+  // Пока он прилип к экрану, прокрутка закрывает лепестки поверх уходящего блока, на полпути — щелчок со вспышкой,
+  // и лепестки раскрываются уже на следующем блоке. Каждый кадр — только transform шести лепестков
+  (function () {
+    var box = $('.tshut');
+    if (!box) return;
+    if (!fx) { box.parentNode.removeChild(box); return; }
+    box.classList.add('is-on');
+    var iris = $('.tshut__iris', box), blades = $$('.tshut__iris i', box), mark = $('.tshut__mark', box), flash = $('.tshut__flash', box);
+    var on = false, last = '', shot = false;
+    var ease = function (t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+    var move = function () {
+      if (!on) return;
+      var V = window.innerHeight, r = box.getBoundingClientRect();
+      var p = Math.min(1, Math.max(0, -r.top / (r.height - V)));
+      var k = p.toFixed(4);
+      if (k === last) return;
+      last = k;
+      // open: 1 — лепестки ушли за край экрана, 0 — закрыты
+      var open = p < .42 ? 1 - ease(p / .42) : p > .58 ? ease((p - .58) / .42) : 0;
+      var D = Math.max(window.innerWidth, V) * 1.2;
+      var d = open * D - 3 * (1 - open);
+      blades.forEach(function (b, i) { b.style.transform = 'rotate(' + (i * 60) + 'deg) translate3d(' + d.toFixed(1) + 'px,0,0)'; });
+      iris.style.transform = 'rotate(' + (-40 * (1 - open)).toFixed(2) + 'deg)';
+      mark.style.opacity = Math.max(0, 1 - open * 6).toFixed(3);
+      // Щелчок со вспышкой — один раз за проход через закрытый затвор
+      var closed = p > .46 && p < .54;
+      if (closed && !shot) { shot = true; flash.classList.remove('is-go'); void flash.offsetWidth; flash.classList.add('is-go'); }
+      if (!closed && (p < .3 || p > .7)) shot = false;
+    };
+    watch([box], function (el, vis) { on = vis; last = ''; move(); }, { rootMargin: '100px 0px' });
+    perFrame.push(move);
+    window.addEventListener('resize', function () { last = ''; move(); });
+  })();
+
+  // ---------- «Фото из принтера» ----------
+  // Перед галереей снизу поднимается фотопринтер и печатает первый снимок галереи: он выходит вверх рывками,
+  // как из настоящего, проявляется из тёмного, выскакивает и перелетает точно на своё место в сетке.
+  // Каждый кадр — только transform и opacity
+  (function () {
+    var box = $('.print');
+    if (!box) return;
+    var gal = box.nextElementSibling, tile = gal && $('.pics > .pic', gal), src = tile && $('img', tile);
+    if (!fx || !src) { box.parentNode.removeChild(box); return; }
+    box.classList.add('is-on');
+    var photo = $('.print__photo', box), img = $('img', photo), paper = $('.print__paper', photo), dev = $('.print__dev', photo);
+    var pbox = $('.print__box', box), lcd = $('.print__lcd', box);
+    img.src = src.currentSrc || src.src;
+    var on = false, last = '', size = null, lastLcd = '';
+    var clamp = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
+    var ease = function (t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+    // Снимок тех же пропорций, что плитка, — тогда он садится в неё без искажений.
+    // Принтер ставим так, чтобы над ним целиком поместился вышедший снимок
+    var fit = function () {
+      var r = tile.getBoundingClientRect(), V = window.innerHeight;
+      var ratio = r.width ? r.height / r.width : 1.5;
+      var w = Math.min(Math.max(180, window.innerWidth * .6), 300, V * .46 / ratio), h = w * ratio;
+      var slot = Math.max(V * .58, 60 + h + 90);
+      size = { w: w, h: h, slot: slot };
+      box.style.setProperty('--pw', w.toFixed(1) + 'px');
+      box.style.setProperty('--ph', h.toFixed(1) + 'px');
+      box.style.setProperty('--slot', slot.toFixed(1) + 'px');
+      last = '';
+    };
+    var move = function () {
+      if (!on) return;
+      if (!size) fit();
+      var V = window.innerHeight, r = box.getBoundingClientRect();
+      var p = clamp(-r.top / (r.height - V));
+      var k = p.toFixed(4) + '|' + Math.round(Math.max(0, r.top));
+      if (k === last) return;
+      last = k;
+      var t = tile.getBoundingClientRect();
+      // Принтер поднимается снизу, пока переход выезжает на экран, и держится у нижнего края;
+      // когда снимок готов — уезжает обратно вниз
+      var rise = ease(clamp((V * .95 - r.top) / (V * .95))), out = ease(clamp((p - .46) / .16));
+      var down = V - size.slot + 60;
+      pbox.style.transform = 'translate3d(0,' + (-Math.max(0, r.top) + (1 - rise) * down + out * down).toFixed(1) + 'px,0)';
+      // Подача рывками: 12 шажков, каждый с разгоном и остановкой
+      var N = 12, fp = clamp((p - .04) / .4) * N, i = Math.floor(fp), fr = fp - i;
+      var fed = i >= N ? 1 : (i + ease(fr)) / N;
+      var y = 12 - (size.h + 66) * fed;
+      dev.style.opacity = (1 - clamp((p - .12) / .42)).toFixed(3);
+      box.classList.toggle('is-busy', p > .03 && p < .44);
+      box.classList.toggle('is-free', p >= .44);
+      var text = fed >= 1 ? 'ГОТОВО' : 'ПЕЧАТЬ ' + Math.round(fed * 100) + '%';
+      if (text !== lastLcd) { lastLcd = text; lcd.textContent = text; }
+      // Готовый снимок выскакивает с наклоном и летит в свою плитку
+      var pop = ease(clamp((p - .44) / .06)), q = ease(clamp((p - .5) / .5));
+      y -= pop * 18;
+      var lx = window.innerWidth / 2, ly = r.top < 0 ? size.slot + 11 + size.h / 2 : r.top + size.slot + 11 + size.h / 2;
+      var tx = (t.left + t.width / 2 - lx) * q + Math.sin(Math.PI * q) * 24;
+      var ty = y + (t.top + t.height / 2 - ly - y) * q;
+      var sc = 1 + (t.width / size.w - 1) * q, rot = 3 * pop * (1 - q) - Math.sin(Math.PI * q) * 2;
+      photo.style.transform = 'translate3d(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px,0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')';
+      paper.style.opacity = (1 - clamp((p - .68) / .24)).toFixed(3);
+      // В самом конце снимок растворяется в настоящей плитке, которая встала ровно под ним
+      var swap = clamp((q - .9) / .1);
+      photo.style.opacity = (1 - swap).toFixed(3);
+      tile.style.opacity = p > 0 && p < 1 ? swap.toFixed(3) : '';
+    };
+    watch([box], function (el, vis) {
+      on = vis; last = '';
+      if (vis) move(); else tile.style.opacity = '';
+    }, { rootMargin: '100px 0px' });
+    perFrame.push(move);
+    window.addEventListener('resize', function () { size = null; move(); });
+    if (!img.complete) img.addEventListener('load', function () { last = ''; move(); });
+  })();
 })();

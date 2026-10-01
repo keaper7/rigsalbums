@@ -268,7 +268,7 @@
       if (res && res.error === 'already') { renderStep(step); renderNav(); bar.classList.remove('is-on'); toast('На этом этапе твой голос уже учтён'); return; }
       if (res && res.error === 'closed') { toast('Голосование уже закрыто'); setTimeout(function () { location.reload(); }, 1500); return; }
       if (res && res.error === 'cookies') { toast('Браузер не сохраняет куки, поэтому голос не засчитать. Открой ссылку в обычном браузере'); return; }
-      if (res && res.error === 'busy') { toast('Слишком много голосов с этой сети, попробуй через пару минут'); return; }
+      if (res && res.error === 'busy') { toast('Слишком много нажатий подряд, подожди минуту и попробуй ещё раз'); return; }
       toast('Не получилось отправить, проверь интернет и нажми ещё раз');
     });
   }
@@ -294,7 +294,7 @@
       if (code === 200 && res && res.ok) { done(); if (res.state) applyState(res.state); return; }
       if (res && res.state) applyState(res.state);
       if (res && res.error === 'closed') { toast('Голосование уже закрыто'); setTimeout(function () { location.reload(); }, 1500); return; }
-      if (res && res.error === 'busy') { toast('Слишком много запросов с этой сети, попробуй через пару минут'); return; }
+      if (res && res.error === 'busy') { toast('Слишком много нажатий подряд, подожди минуту и попробуй ещё раз'); return; }
       toast('Не получилось, проверь интернет и нажми ещё раз');
     });
   }

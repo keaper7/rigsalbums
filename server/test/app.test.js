@@ -377,3 +377,40 @@ test('место для групповых: голосование, ссылка
   assert.strictEqual(s.listOptions().place.length, 3, 'второй раз не добавляется');
   s.close();
 });
+
+test('весь класс с одного адреса (школьный Wi‑Fi): голоса проходят у всех, флуд одного ученика отсекается', async t => {
+  const { app, server, base } = await start();
+  t.after(() => server.close());
+  const admin = await adminLogin(base);
+  const id = await createClass(admin, 'Школа №5', '11 «А»');
+  const slug = app.store.getClass(+id).slug;
+  await admin.post('/admin/c/' + id + '/open', { duration_min: '30' });
+  // 3 класса по 35 человек одновременно, каждый — все этапы, а каждый пятый ещё и переголосовывает
+  const kids = Array.from({ length: 105 }, () => client(base));
+  await Promise.all(kids.map(k => k.req('GET', '/k/' + slug)));
+  const results = await Promise.all(kids.map(async (k, i) => {
+    const out = [];
+    for (const [step, option] of [['theme', 'money'], ['wear', 'casual'], ['color', 'bw']]) {
+      out.push((await k.req('POST', '/k/' + slug + '/vote', { json: { step, option } })).status);
+    }
+    if (i % 5 === 0) {
+      out.push((await k.req('POST', '/k/' + slug + '/unvote', { json: { step: 'theme' } })).status);
+      out.push((await k.req('POST', '/k/' + slug + '/vote', { json: { step: 'theme', option: 'neon' } })).status);
+    }
+    return out;
+  }));
+  assert.ok(results.every(r => r.every(s => s === 200)), 'никому не отказано');
+  const c = app.store.counts(+id);
+  assert.strictEqual(c.theme.money + c.theme.neon, 105);
+  assert.strictEqual(app.store.voters(+id), 105);
+  // Один ученик, который жмёт без остановки, упирается в ограничение, остальные — нет
+  const spam = kids[1];
+  let busy = 0;
+  for (let i = 0; i < 70; i++) {
+    const r = await spam.req('POST', '/k/' + slug + '/unvote', { json: { step: 'color' } });
+    if (r.status === 429) busy++;
+  }
+  assert.ok(busy > 0, 'флуд ограничен');
+  const r = await kids[2].req('POST', '/k/' + slug + '/unvote', { json: { step: 'color' } });
+  assert.strictEqual(r.status, 200);
+});

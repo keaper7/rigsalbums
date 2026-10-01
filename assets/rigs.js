@@ -60,34 +60,17 @@
   root.classList.add(fx ? 'fx' : 'lite');
   var sdaScroll = supports('animation-timeline', 'scroll()');
 
-  // Если на деле прокрутка всё равно проседает — переходим на облегчённый набор
-  function downgrade() {
-    if (!fx) return;
-    fx = false;
-    root.classList.remove('fx');
-    root.classList.add('lite');
-  }
+  // Набор эффектов выбираем один раз при загрузке и посреди страницы не меняем: раньше здесь был «сторож»,
+  // который принимал очень медленную прокрутку пальцем за тормоза и переключал сайт на облегчённый набор —
+  // блоки от этого перескакивали, а лазер на чеке пропадал
 
   // ---------- Прокрутка: один обработчик на кадр ----------
   var hd = $('.hd');
   var maxY = 1, needMeasure = true, ticking = false, lastY = -1, lastP = -1, scrolled = null;
   var perFrame = [];
-  var lastT = 0, slow = 0, fast = 0;
   function measure() { maxY = Math.max(1, root.scrollHeight - window.innerHeight); needMeasure = false; }
-  function frame(t) {
+  function frame() {
     ticking = false;
-    t = t || now();
-    // Сторож плавности: считаем только кадры непрерывной прокрутки
-    if (fx && lastT) {
-      var dt = t - lastT;
-      if (dt < 40) fast++;
-      else if (dt < 260) slow++;
-      if (fast + slow >= 120) {
-        if (slow / (fast + slow) > .35) downgrade();
-        fast = slow = 0;
-      }
-    }
-    lastT = t;
     if (needMeasure) measure();
     var y = window.pageYOffset;
     if (y === lastY) return;
@@ -104,8 +87,6 @@
   window.addEventListener('resize', function () { needMeasure = true; if (!ticking) { ticking = true; raf(frame); } });
   if ('ResizeObserver' in window) new ResizeObserver(function () { needMeasure = true; }).observe(body);
   frame();
-  // Прокрутка остановилась — не считаем паузу медленным кадром
-  window.addEventListener('scroll', function () { clearTimeout(frame.idle); frame.idle = setTimeout(function () { lastT = 0; }, 180); }, { passive: true });
 
   // ---------- Плавающая кнопка записи: после первого экрана и до финального блока ----------
   var dock = $('.dock');
@@ -252,7 +233,10 @@
       auto();
     };
     deck.addEventListener('touchstart', function (e) { dragStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
-    deck.addEventListener('touchmove', function (e) { dragMove(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: false });
+    // Слушаем пассивно: иначе браузер перед каждой прокруткой, начатой на колоде (а она занимает почти весь
+    // первый экран), ждёт ответа скрипта, и прокрутка «залипает», пока скрипт занят. Вбок страницу и так
+    // никто не двигает — у колоды touch-action: pan-y, браузер сам берёт на себя только вертикаль
+    deck.addEventListener('touchmove', function (e) { dragMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
     deck.addEventListener('touchend', dragEnd);
     deck.addEventListener('touchcancel', dragEnd);
     deck.addEventListener('mousedown', function (e) {
@@ -377,7 +361,8 @@
       if (box && box.classList) box.classList.remove('is-ld');
       if (ldIO && box) ldIO.unobserve(box);
     };
-    img.addEventListener('load', done);
+    // Проявляем, когда фото уже раскодировано: иначе телефон раскодирует его в момент показа и прокрутка замирает
+    img.addEventListener('load', function () { if (img.decode) img.decode().then(done, done); else done(); });
     img.addEventListener('error', done);
     if (box && LD_BOX.test(box.className)) ldBoxes.push(box);
   });
@@ -385,6 +370,22 @@
     var img = $('img', box);
     box.classList.toggle('is-ld', vis && !!img && img.classList.contains('ld'));
   }, { rootMargin: '60px 0px' }) : null;
+
+  // ---------- Фото готовятся заранее ----------
+  // За два экрана до появления фото загружается и раскодируется в фоне (img.decode). Раньше фото галереи
+  // грузились и раскодировались в тот момент, когда до них долистывали, и прокрутка на мгновение замирала
+  var warmIO = hasIO ? new IntersectionObserver(function (ens) {
+    ens.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      var im = en.target;
+      if (!im.getAttribute('src')) return;
+      warmIO.unobserve(im);
+      if (im.loading === 'lazy') im.loading = 'eager';
+      if (im.decode) im.decode().catch(function () {});
+    });
+  }, { rootMargin: '200% 0px' }) : null;
+  function warm(imgs) { if (warmIO) imgs.forEach(function (im) { warmIO.unobserve(im); warmIO.observe(im); }); }
+  warm($$('img'));
 
   // ---------- Липкая строка тематик подсвечивает ту, что сейчас на экране ----------
   var jb = $('.jumpbar__in');
@@ -1168,8 +1169,7 @@
   //    от высоты самого перехода (диапазон exit-crossing: от «верх перехода у верха экрана»).
   // 3. Ничто не догоняет прокрутку расчётом. Снимок, который садится в плитку галереи, в конце полёта живёт
   //    в той же прокрутке, что и плитка, — поэтому садится пиксель в пиксель, как бы быстро ни листали.
-  // Мгновенные события (хлопок, щелчок затвора) — короткие анимации по времени: их запускает переход
-  // через порог, а проигрывает видеочип, ровно при любой прокрутке
+  // Мигание индикатора и проценты печати — от порогов, а не каждый кадр
   (function () {
     // Плёнка едет сама (CSS-анимация), на паузе, пока её нет на экране
     var film = $('.film');
@@ -1345,38 +1345,6 @@
   // Переход без анимаций (облегчённый режим, «меньше движения») убираем целиком
   function drop(box) { if (box && box.parentNode) box.parentNode.removeChild(box); }
 
-  // ---------- «Хлопушка» ----------
-  // После первого экрана: экран темнеет, снизу выезжает киношная хлопушка, планка поднимается, резко хлопает,
-  // доска вздрагивает и улетает вверх, а снизу по тёмному уже наезжают лента и «Вживую».
-  // Планка и дрожь — анимации по времени: хлопок всегда одинаково резкий, как бы ни листали
-  (function () {
-    var box = $('.clap');
-    if (!box) return;
-    if (!fx) return drop(box);
-    box.classList.add('is-on');
-    var st = stage(box);
-    var bg = $('.clap__bg', box), glow = $('.clap__glow', box), board = $('.clap__board', box);
-    var els = [bg, glow, board];
-    var at = function (p) {
-      var dark = ease2(clamp01(p / .18)), inP = ease2(clamp01(p / .28)), out = ease2(clamp01((p - .6) / .25));
-      return [
-        { opacity: (dark * .96).toFixed(3) },
-        { opacity: (dark * (1 - clamp01((p - .5) / .2))).toFixed(3) },
-        { transform: 'translate3d(0,' + len(0, (1 - inP) * .9 - out * 1.15) + ',0) rotate(' + ((1 - inP) * -8 - out * 12).toFixed(2) + 'deg) scale(' + (1 - out * .12).toFixed(3) + ')' }
-      ];
-    };
-    if (viewTl) onRebuild(scrollKeys(st, 'clap', els, at, 160));
-    var state = '';
-    st.fns.push(function (p) {
-      if (!viewTl) applyAt(els, at(p));
-      var s = p >= .4 ? 'snap' : p >= .14 ? 'open' : '';
-      if (s === state) return;
-      state = s;
-      box.classList.toggle('is-open', s !== '');
-      box.classList.toggle('is-snap', s === 'snap');
-    });
-  })();
-
   // ---------- «Фото из принтера» ----------
   // Перед галереей снизу поднимается камера Canon с моментальной печатью и печатает первый снимок галереи:
   // он выходит вверх из щели, проявляется, выскакивает и перелетает точно на своё место в сетке.
@@ -1394,6 +1362,7 @@
     var fly = $('.print__fly', box), flyPaper = $('.print__paper', fly);
     var pbox = $('.print__box', box), lcd = $('.print__lcd', box), fill = $('.print__fill', box), led = $('.print__led', box);
     $$('img', box).forEach(function (im) { im.src = src.currentSrc || src.src; });
+    warm($$('img', box));
     var els = [pbox, photo, dev, fly, flyPaper, fill, tile];
     var g = null;
     // Размер снимка (тех же пропорций, что плитка), верх камеры (--slot) и где плитка относительно перехода
@@ -1414,7 +1383,7 @@
     };
     var at = function (p) {
       // Камера стоит на нижнем краю экрана; когда снимок готов — уезжает вниз за край
-      var out = ease2(clamp01((p - .46) / .16));
+      var out = ease2(clamp01((p - .45) / .23));
       var fed = ease2(clamp01((p - .04) / .4));
       // Готовый снимок выскакивает с наклоном и летит в свою плитку; к p = .9 он на месте
       var pop = ease2(clamp01((p - .44) / .06)), q = ease2(clamp01((p - .5) / .4)), a = 1 - q;
@@ -1462,8 +1431,8 @@
   })();
 
   // ---------- «Фото на стол» ----------
-  // После галереи снимки из «Работ» один за другим падают сверху, кувыркаются и рассыпаются по экрану,
-  // как фотографии на столе. Потом разлетаются в стороны, и за ними уже следующий блок
+  // После галереи снимки из «Работ» один за другим ложатся на экран, как фотографии на стол.
+  // Потом разъезжаются в стороны, и за ними уже следующий блок
   (function () {
     var box = $('.desk');
     if (!box) return;
@@ -1476,124 +1445,31 @@
     var SPOT = [[-.2, -.2, -9], [.2, -.24, 7], [-.03, -.02, 3], [-.24, .17, -6], [.23, .12, 10], [.02, .26, -7], [.1, -.08, -3]];
     var backOut = function (t) { var c = 1.3; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
     var els = [bg].concat(cards);
+    // Снимки «бросают» на стол: каждый появляется крупным, как будто ещё в воздухе над столом, и садится на своё место
+    // с лёгким шлепком. Движение в основном — масштаб, на экране снимок почти не едет: при медленной прокрутке
+    // пальцем ничего не дёргается (снимок, пролетающий весь экран за пару сантиметров прокрутки, усиливает любую
+    // неровность движения пальца). Потом снимки плавно разъезжаются в стороны, не быстрее чем вдвое быстрее пальца
     var at = function (p) {
-      var v = [{ opacity: (clamp01((p - .16) / .2) * (1 - clamp01((p - .66) / .18))).toFixed(3) }];
+      var v = [{ opacity: (clamp01((p - .08) / .17) * (1 - clamp01((p - .72) / .16))).toFixed(3) }];
       cards.forEach(function (c, i) {
         var sp = SPOT[i % SPOT.length], dir = sp[0] < 0 ? -1 : 1;
-        // Падение: каждый следующий чуть позже, с лёгким «шлепком» в конце
-        var fall = clamp01((p - (.03 + i * .05)) / .2), f = backOut(fall);
-        var tyH = -.75 + (sp[1] + .75) * f, tyPx = -260 * (1 - f), txW = sp[0] * (.6 + .4 * f);
-        var rot = sp[2] + (1 - fall) * (i % 2 ? 50 : -50), sc = 1.18 - .18 * fall;
-        // Разлёт: в свою сторону, чуть вверх и с поворотом
-        var go = clamp01((p - (.56 + i * .03)) / .22);
-        go = go * go * go;
-        txW += go * dir * .95;
-        tyH -= go * .22;
-        rot += go * dir * 40;
-        v.push({ transform: 'translate3d(' + len(0, 0, txW) + ',' + len(tyPx, tyH) + ',0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(3) + ')' });
+        var t = clamp01((p - (.03 + i * .05)) / .2), f = backOut(t);
+        var txW = sp[0] + (1 - f) * dir * .06, tyH = sp[1] - (1 - f) * .05;
+        var rot = sp[2] + (1 - f) * (i % 2 ? 16 : -16), sc = 1 + (1 - f) * .5;
+        var go = clamp01((p - (.6 + i * .02)) / .24);
+        go = 1 - Math.cos(go * Math.PI / 2);
+        txW += go * dir * .9;
+        tyH -= go * .08;
+        rot += go * dir * 22;
+        v.push({
+          transform: 'translate3d(' + len(0, 0, txW) + ',' + len(0, tyH) + ',0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(3) + ')',
+          opacity: clamp01(t / .3).toFixed(3)
+        });
       });
       return v;
     };
     if (viewTl) onRebuild(scrollKeys(st, 'desk', els, at, 160));
     else st.fns.push(function (p) { applyAt(els, at(p)); });
-  })();
-
-  // ---------- «Видоискатель» ----------
-  // Перед студией экран становится видоискателем: слетаются уголки кадра, прорисовывается сетка,
-  // квадрат фокуса ищет резкость и загорается зелёным, шкала экспозиции подбирает свет.
-  // Потом кадр «снят»: сжимается в превью и уходит в угол, а за ним уже студия
-  (function () {
-    var box = $('.vf');
-    if (!box) return;
-    if (!fx) return drop(box);
-    box.classList.add('is-on');
-    var st = stage(box);
-    var q = function (sel) { return $(sel, box); };
-    var corners = $$('.vf__c', box), grid = $$('.vf__g', box), afs = $$('.vf__af', box);
-    var els = [q('.vf__dim'), q('.vf__frame')].concat(corners, grid, afs, [q('.vf__top'), q('.vf__bot'), q('.vf__ev i')]);
-    var cnt = q('.vf__cnt');
-    // Ломаная по точкам [p, значение] — для «поиска» фокуса
-    var path = function (pts, p) {
-      if (p <= pts[0][0]) return pts[0][1];
-      for (var i = 1; i < pts.length; i++) {
-        if (p <= pts[i][0]) {
-          var t = ease2((p - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]));
-          return pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t;
-        }
-      }
-      return pts[pts.length - 1][1];
-    };
-    var at = function (p) {
-      var inP = ease2(clamp01(p / .3)), k = 1 - inP;
-      var shot = ease2(clamp01((p - .6) / .2)), gone = clamp01((p - .72) / .1);
-      var v = [];
-      v.push({ opacity: (.58 * inP * (1 - clamp01((p - .7) / .2))).toFixed(3) });
-      // Кадр снят: сжимается к левому нижнему углу и гаснет
-      v.push({ transform: 'scale(' + (1 - .8 * shot).toFixed(4) + ')', opacity: (inP * (1 - gone)).toFixed(3) });
-      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function (d) {
-        v.push({ transform: 'translate3d(' + len(0, 0, d[0] * .42 * k) + ',' + len(0, d[1] * .38 * k) + ',0)' });
-      });
-      var gv = ease2(clamp01((p - .1) / .2)), gh = ease2(clamp01((p - .15) / .2));
-      v.push({ transform: 'scaleY(' + gv.toFixed(3) + ')' }, { transform: 'scaleY(' + gv.toFixed(3) + ')' });
-      v.push({ transform: 'scaleX(' + gh.toFixed(3) + ')' }, { transform: 'scaleX(' + gh.toFixed(3) + ')' });
-      // Фокус: большой квадрат сжимается, промахивается, возвращается и замирает
-      var s = path([[.18, 2.6], [.32, .78], [.4, 1.22], [.47, .94], [.52, 1]], p);
-      var x = path([[.18, 0], [.3, -.06], [.38, .05], [.46, -.015], [.52, 0]], p);
-      var y = path([[.18, 0], [.3, .03], [.38, -.02], [.52, 0]], p);
-      var af = 'translate3d(' + len(0, 0, x) + ',' + len(0, y) + ',0) scale(' + s.toFixed(3) + ')';
-      var ok = clamp01((p - .5) / .03), pulse = 1 + .14 * Math.sin(Math.PI * clamp01((p - .5) / .08));
-      v.push({ transform: af, opacity: (clamp01((p - .12) / .1) * (1 - ok)).toFixed(3) });
-      v.push({ transform: 'scale(' + pulse.toFixed(3) + ')', opacity: ok.toFixed(3) });
-      var hud = ease2(clamp01((p - .12) / .18));
-      v.push({ transform: 'translate3d(0,' + (-(1 - hud) * 24).toFixed(1) + 'px,0)', opacity: hud.toFixed(3) });
-      v.push({ transform: 'translate3d(0,' + ((1 - hud) * 24).toFixed(1) + 'px,0)', opacity: hud.toFixed(3) });
-      // Шкала экспозиции качается влево-вправо и встаёт по центру, когда фокус пойман
-      var ev = Math.sin(Math.PI * 1.5 * clamp01((p - .12) / .38)) * 48 * (1 - clamp01((p - .44) / .08));
-      v.push({ transform: 'translate3d(' + ev.toFixed(1) + 'px,0,0)' });
-      return v;
-    };
-    if (viewTl) onRebuild(scrollKeys(st, 'vf', els, at, 180));
-    var lastCnt = '';
-    st.fns.push(function (p) {
-      if (!viewTl) applyAt(els, at(p));
-      // Счётчик оставшихся кадров уменьшается, когда кадр снят
-      var c = p >= .56 ? '247' : '248';
-      if (c !== lastCnt) { lastCnt = c; cnt.textContent = c; }
-    });
-  })();
-
-  // ---------- «Затвор между блоками» ----------
-  // Блок-переход наезжает на последний экран предыдущего блока и на первый экран следующего.
-  // Пока он прилип к экрану, прокрутка закрывает лепестки поверх уходящего блока, на полпути — щелчок со вспышкой,
-  // и лепестки раскрываются уже на следующем блоке
-  (function () {
-    var box = $('.tshut');
-    if (!box) return;
-    if (!fx) return drop(box);
-    box.classList.add('is-on');
-    var st = stage(box);
-    var iris = $('.tshut__iris', box), blades = $$('.tshut__iris i', box), mark = $('.tshut__mark', box), flash = $('.tshut__flash', box);
-    var els = blades.concat([iris, mark]);
-    var at = function (p) {
-      // open: 1 — лепестки ушли за край экрана, 0 — закрыты
-      var open = p < .42 ? 1 - ease2(p / .42) : p > .58 ? ease2((p - .58) / .42) : 0;
-      // Лепестки свёрстаны маленькими (40vmax) и растянуты в 4 раза: сплошной цвет от этого не мылится,
-      // а браузеру рисовать в 16 раз меньше, чем лепесток в полный размер
-      var d = 'calc(' + (open * 120).toFixed(3) + 'vmax - ' + (3 * (1 - open)).toFixed(2) + 'px)';
-      var v = blades.map(function (b, i) { return { transform: 'rotate(' + (i * 60) + 'deg) translate3d(' + d + ',0,0) scale(4)' }; });
-      v.push({ transform: 'rotate(' + (-40 * (1 - open)).toFixed(2) + 'deg)' });
-      v.push({ opacity: Math.max(0, 1 - open * 6).toFixed(3) });
-      return v;
-    };
-    if (viewTl) onRebuild(scrollKeys(st, 'tshut', els, at, 120));
-    var shot = false;
-    st.fns.push(function (p) {
-      if (!viewTl) applyAt(els, at(p));
-      // Щелчок со вспышкой — один раз за проход через закрытый затвор
-      var closed = p > .46 && p < .54;
-      if (closed && !shot) { shot = true; flash.classList.remove('is-go'); void flash.offsetWidth; flash.classList.add('is-go'); }
-      if (!closed && (p < .3 || p > .7)) shot = false;
-    });
   })();
 
   // ---------- «Приближение» ----------
@@ -1630,7 +1506,8 @@
     // Первые 62% прокрутки — влёт в букву; к концу бордовый закрывает экран, по нему выезжают контакты
     var FULL = .62;
     var at = function (p) {
-      var q = Math.min(1, p / FULL), e = q * q * q, z = 1 + e * 90;
+      // Приближение с постоянной скоростью для глаза (во сколько раз за сантиметр прокрутки), до 91 раза
+      var q = Math.min(1, p / FULL), z = Math.pow(91, q);
       // Копия с верхним левым углом в (L, T) и уменьшенная вдвое совпадает со словом; приближение в z раз
       // вокруг точки (x, y) экрана — это сдвиг (точка − угол) · (1 − z) и масштаб z / 2
       var dx = (g.x - g.L) * (1 - z), dy = (g.y - g.T) * (1 - z);

@@ -92,7 +92,12 @@ function createApp(cfg) {
   const store = new Store(cfg.dbFile || path.join(cfg.dataDir, 'rigs.db'));
   const auth = new Auth(store);
   if (!auth.hasPassword() && cfg.adminPassword) auth.setPassword(cfg.adminPassword);
-  const voteLimit = new Limiter(300, 10 * 60 * 1000);
+  // Ограничение на голоса. Считаем по каждому ученику (его cookie), а не по IP: целый класс в школьном Wi‑Fi
+  // или у одного мобильного оператора выходит в интернет с одного адреса, и общий лимит на IP их бы отсекал.
+  // По IP остаётся только большой запас — от явного флуда
+  const voteLimit = new Limiter(60, 10 * 60 * 1000);
+  const ipLimit = new Limiter(5000, 10 * 60 * 1000);
+  const tooMany = (ctx, voter) => !voteLimit.hit(voter) || !ipLimit.hit(ctx.ip);
   const publicDir = path.join(__dirname, 'public');
   const siteRoot = path.resolve(cfg.siteRoot);
   const media = new Media(store, cfg.mediaDir || path.join(cfg.dataDir, 'media'));
@@ -251,7 +256,7 @@ function createApp(cfg) {
     if (!cls) return H.json(ctx.res, 404, { error: 'not_found' });
     const voter = voterOf(ctx);
     if (!voter) return H.json(ctx.res, 400, { error: 'cookies' });
-    if (!voteLimit.hit(ctx.ip)) return H.json(ctx.res, 429, { error: 'busy' });
+    if (tooMany(ctx, voter)) return H.json(ctx.res, 429, { error: 'busy' });
     const cat = catalog();
     const opts = V.visibleOptions(cat, cls);
     const b = ctx.body || {};
@@ -273,7 +278,7 @@ function createApp(cfg) {
     if (!cls) return H.json(ctx.res, 404, { error: 'not_found' });
     const voter = voterOf(ctx);
     if (!voter) return H.json(ctx.res, 400, { error: 'cookies' });
-    if (!voteLimit.hit(ctx.ip)) return H.json(ctx.res, 429, { error: 'busy' });
+    if (tooMany(ctx, voter)) return H.json(ctx.res, 429, { error: 'busy' });
     const cat = catalog();
     const step = String((ctx.body || {}).step || '');
     if (V.activeSteps(V.visibleOptions(cat, cls)).indexOf(step) === -1) return H.json(ctx.res, 400, { error: 'bad_step' });

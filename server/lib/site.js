@@ -138,6 +138,15 @@ function freshPool(items, skip) {
   (skip || []).forEach(it => { used.add(it.sm); used.add(it.lg); });
   return items.filter(it => !used.has(it.sm) && !used.has(it.lg));
 }
+// Кадрик плёнки — 125×90: берём маленькую копию фото (360 px), если она есть. Иначе телефон, когда плёнка
+// подъезжает, разом уменьшает три десятка фото 720×1080, и прокрутка подвисает
+const XS = new Map();
+function filmSrc(sm) {
+  const m = /^(assets\/gallery\/[A-Za-z0-9_-]+)-sm\.jpg$/.exec(sm || '');
+  if (!m) return sm;
+  if (!XS.has(m[1])) XS.set(m[1], fs.existsSync(path.join(__dirname, '..', '..', m[1] + '-xs.jpg')));
+  return XS.get(m[1]) ? m[1] + '-xs.jpg' : sm;
+}
 function filmHtml(items, skip) {
   let pool = freshPool(items, skip);
   // Если почти всё уже есть внизу — лучше повтор, чем пустая плёнка
@@ -145,7 +154,7 @@ function filmHtml(items, skip) {
   pool = pool.slice(0, FILM_MAX);
   if (pool.length < 2) return null;
   const half = Math.ceil(pool.length / 2);
-  const frame = it => '<span class="film__f' + (isWide(it) ? ' film__f--w' : '') + '"><img src="' + esc(it.sm) + '" alt="" loading="lazy" decoding="async"></span>';
+  const frame = it => '<span class="film__f' + (isWide(it) ? ' film__f--w' : '') + '"><img src="' + esc(filmSrc(it.sm)) + '" alt="" loading="lazy" decoding="async"></span>';
   const strip = (cls, list) => {
     const f = list.map(frame).join('');
     return '<div class="film__strip ' + cls + '"><div class="film__track">' + f + f + '</div></div>';

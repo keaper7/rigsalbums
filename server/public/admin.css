@@ -145,7 +145,7 @@ code { font-size: .9em; background: var(--paper-2); padding: 2px 6px; border-rad
 .checks legend { padding: 0; margin-bottom: 4px; font: 700 13px/1.2 var(--disp); letter-spacing: .04em; text-transform: uppercase; color: var(--wine); }
 .checks .check { border-bottom: 1px solid var(--line); }
 .checks .check:last-child { border-bottom: 0; }
-.colors { display: flex; gap: 10px; }
+.colors { display: flex; flex-wrap: wrap; gap: 10px; }
 .colors input { width: 56px; height: 48px; padding: 3px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; }
 
 /* список классов */

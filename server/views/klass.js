@@ -78,8 +78,10 @@ function placeCard(base, o, v) {
 
 function colorCard(base, o, v) {
   const sw = (o.colors || []).map(c => html`<i style="background:${c}"></i>`);
+  // Чёрный и белый, которые можно к любому цвету, тоже видны в палитре, но узкими полосками
+  if (o.plus) sw.push(html`<i class="sw__bw"></i><i class="sw__bw"></i>`);
   return html`
-    <article class="opt color"${v.ids ? html` id="c-${o.key}"` : ''} data-id="${o.key}" data-name="${o.name}">
+    <article class="opt color${v.wide && v.wide.indexOf(o.key) !== -1 ? ' color--wide' : ''}"${v.ids ? html` id="c-${o.key}"` : ''} data-id="${o.key}" data-name="${o.name}">
       <div class="sw">${sw}</div>
       <h3>${o.name}</h3>
       ${o.plus ? html`<p class="color__plus"><i></i><i></i>+ чёрный и белый</p>` : ''}
@@ -101,6 +103,12 @@ function stepSection(base, step, n, total, list, v) {
     ? html`
   <nav class="jump" aria-label="Все тематики">${list.map(o => html`<a href="#t-${o.key}">${o.name}</a>`)}</nav>`
     : '';
+  // 5–7 оттенков идут на всю ширину. Если узких карточек нечётное число, последняя узкая
+  // тоже растягивается, чтобы рядом не оставалось пустого места
+  if (step === 'color') {
+    const narrow = list.filter(o => (o.colors || []).length < 5);
+    v = Object.assign({}, v, { wide: list.filter(o => (o.colors || []).length >= 5 || (narrow.length % 2 && o === narrow[narrow.length - 1])).map(o => o.key) });
+  }
   const cards = list.map(o => CARD[step](base, o, v));
   const body = step === 'color' ? html`
   <div class="colors">${cards}</div>` : cards;

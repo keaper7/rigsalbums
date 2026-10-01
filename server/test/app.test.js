@@ -257,6 +257,9 @@ test('каталог: правка и порядок', async t => {
   const c = app.store.getOption(bw.id);
   assert.deepStrictEqual(c.colors, ['#000000', '#FFFFFF']);
   assert.strictEqual(c.hidden, true);
+  r = await admin.post('/admin/o/' + bw.id, { name: 'Семь', count: '7', c0: '#000001', c1: '#000002', c2: '#000003', c3: '#000004', c4: '#000005', c5: '#000006', c6: '#000007', plus: '1', hidden: '1' });
+  assert.strictEqual(r.status, 303);
+  assert.strictEqual(app.store.getOption(bw.id).colors.length, 7);
   r = await admin.post('/admin/o/' + bw.id, { name: 'Ч/Б', count: '1', c0: 'red' });
   assert.strictEqual(r.status, 400);
 });

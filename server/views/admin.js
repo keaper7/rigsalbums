@@ -671,9 +671,10 @@ function optionPage(o) {
   <label class="field"><span>Ссылка на Pinterest</span><input name="pin" type="url" value="${x.pin || ''}" maxlength="300" placeholder="https://pin.it/..."></label>`;
   } else {
     fields = html`<label class="field"><span>Название</span><input name="name" value="${x.name}" required maxlength="80"></label>
-  <label class="field"><span>Цвета</span><span class="colors">${[0, 1, 2, 3].map(i => html`<input type="color" name="c${i}" value="${(x.colors || [])[i] || '#ffffff'}" aria-label="Цвет ${i + 1}">`)}</span></label>
-  <label class="field"><span>Сколько цветов показывать</span><select name="count">${[1, 2, 3, 4].map(n => html`<option value="${n}"${n === (x.colors || []).length ? raw(' selected') : ''}>${n}</option>`)}</select></label>
-  <label class="check"><input type="checkbox" name="plus" value="1"${x.plus ? raw(' checked') : ''}><span>Подпись «+ чёрный и белый»</span></label>`;
+  <label class="field"><span>Цвета</span><span class="colors">${[0, 1, 2, 3, 4, 5, 6].map(i => html`<input type="color" name="c${i}" value="${(x.colors || [])[i] || '#ffffff'}" list="sw-bw" aria-label="Цвет ${i + 1}">`)}</span></label>
+  <datalist id="sw-bw"><option value="#000000"></option><option value="#ffffff"></option></datalist>
+  <label class="field"><span>Сколько цветов показывать</span><select name="count">${[1, 2, 3, 4, 5, 6, 7].map(n => html`<option value="${n}"${n === (x.colors || []).length ? raw(' selected') : ''}>${n}</option>`)}</select></label>
+  <label class="check"><input type="checkbox" name="plus" value="1"${x.plus ? raw(' checked') : ''}><span>«+ чёрный и белый»: подпись и полоски в палитре</span></label>`;
   }
   const theme = x.step === 'theme';
   const photoCard = x.step === 'color' ? '' : html`

@@ -17,6 +17,7 @@ const A = require('./views/admin');
 const RESERVED = ['admin', 'assets', 'state', 'vote', 'react', 'new', 'media'];
 const VOTER_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const COLORS_MAX = 7;
 const YEAR = 365 * 24 * 60 * 60 * 1000;
 const ONLINE = 40 * 1000;
 const DRAIN_MAX = 64 * 1024 * 1024;
@@ -797,7 +798,7 @@ function createApp(cfg) {
       if (pin && !/^https?:\/\/\S+$/.test(pin)) return fail('Ссылка на Pinterest должна начинаться с https://');
       data.pin = pin;
     } else {
-      const n = int(f.count, 1, 4, (o.colors || []).length || 1);
+      const n = int(f.count, 1, COLORS_MAX, (o.colors || []).length || 1);
       const colors = [];
       for (let i = 0; i < n; i++) {
         const c = str(f['c' + i], 7);

@@ -1088,7 +1088,9 @@ p, li { text-wrap: pretty; }
 
 /* одно видео */
 .live__grid { display: -ms-grid; display: grid; gap: 34px; }
-.clip--one { width: 78%; max-width: 340px; margin: 0 auto; }
+.clip--one { width: 100%; max-width: 440px; margin: 0 auto; }
+/* Видео «вживую» квадратное: так развороты крупнее */
+.clip--one .clip__frame { padding-top: 100%; }
 
 /* цены */
 .offer__card {
@@ -1161,7 +1163,7 @@ p, li { text-wrap: pretty; }
 @media (min-width: 960px) {
   .hd__menu { display: none; }
   .quick { padding-bottom: 50px; }
-  .live__grid { grid-template-columns: minmax(0, 1fr) 360px; gap: 70px; align-items: center; }
+  .live__grid { grid-template-columns: minmax(0, 1fr) 440px; gap: 70px; align-items: center; }
   .clip--one { width: 100%; margin: 0; }
   .stats dt.word { font-size: 44px; }
   .perk { display: flex; min-height: 340px; padding: 30px 32px 32px; }
@@ -1540,18 +1542,26 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 /* --- «Вот так я снимаю выпускников»: фото наводятся на резкость, как объектив,
    а при прокрутке чуть сдвигаются внутри рамки — появляется глубина --- */
 .fx .gallery .pics[data-stagger].in > * { -webkit-animation-name: pic-in; animation-name: pic-in; -webkit-animation-duration: .9s; animation-duration: .9s; -webkit-animation-delay: calc(var(--i, 0) * 90ms); animation-delay: calc(var(--i, 0) * 90ms); }
-.fx .gallery .pics[data-stagger].in > * img { -webkit-animation: pic-focus 1.6s cubic-bezier(.2, .7, .2, 1) backwards; animation: pic-focus 1.6s cubic-bezier(.2, .7, .2, 1) backwards; -webkit-animation-delay: calc(var(--i, 0) * 90ms); animation-delay: calc(var(--i, 0) * 90ms); }
+/* Наводка — фото внутри скруглённой рамки чуть крупнее и садится на место. На телефоне не делаем: каждая такая
+   рамка — лишняя работа видеочипу как раз тогда, когда в галерею садится снимок из камеры. Там плитки просто проявляются */
+@media (hover: hover) and (pointer: fine) {
+  .fx .gallery .pics[data-stagger].in > * img { -webkit-animation: pic-focus 1.6s cubic-bezier(.2, .7, .2, 1) backwards; animation: pic-focus 1.6s cubic-bezier(.2, .7, .2, 1) backwards; -webkit-animation-delay: calc(var(--i, 0) * 90ms); animation-delay: calc(var(--i, 0) * 90ms); }
+}
 @-webkit-keyframes pic-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pic-in { from { opacity: 0; } to { opacity: 1; } }
-@-webkit-keyframes pic-focus { from { -webkit-filter: blur(14px); filter: blur(14px); -webkit-transform: scale(1.16); transform: scale(1.16); } 60% { -webkit-filter: blur(0); filter: blur(0); } to { -webkit-filter: blur(0); filter: blur(0); -webkit-transform: none; transform: none; } }
-@keyframes pic-focus { from { -webkit-filter: blur(14px); filter: blur(14px); -webkit-transform: scale(1.16); transform: scale(1.16); } 60% { -webkit-filter: blur(0); filter: blur(0); } to { -webkit-filter: blur(0); filter: blur(0); -webkit-transform: none; transform: none; } }
-@supports (animation-timeline: view()) {
+/* Без размытия (blur): на телефоне размытие десяти фото сразу перегружает видеочип, и вся страница дёргается.
+   «Наводка» — фото чуть крупнее и мягко садится в рамку */
+@-webkit-keyframes pic-focus { from { -webkit-transform: scale(1.12); transform: scale(1.12); } to { -webkit-transform: none; transform: none; } }
+@keyframes pic-focus { from { transform: scale(1.12); } to { transform: none; } }
+/* Глубина при прокрутке — только на компьютере с мышью: на телефоне каждое фото галереи от неё становится
+   отдельным слоем со скруглённой обрезкой, и под переходами (принтер, фото на стол) видеочип не успевает */
+@supports (animation-timeline: view()) { @media (hover: hover) and (pointer: fine) {
   .fx .gallery .pic img { animation: pic-depth linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
   .fx .gallery .pics[data-stagger].in > * img {
     animation: pic-depth linear both, pic-focus 1.6s cubic-bezier(.2, .7, .2, 1) backwards;
     animation-timeline: view(), auto; animation-range: cover 0% cover 100%, normal; animation-delay: 0s, calc(var(--i, 0) * 90ms);
   }
-}
+} }
 @keyframes pic-depth { from { translate: 0 -3.5%; scale: 1.08; } to { translate: 0 3.5%; scale: 1.08; } }
 
 /* --- «Как всё проходит» на телефоне: номер шага загорается, когда до него дошла линия.
@@ -1731,7 +1741,7 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) { .film__track { -webkit-animation: none; animation: none; } }
 .film__f { flex: 0 0 auto; width: 118px; height: 80px; border-radius: 3px; overflow: hidden; background: #3A2A28; }
 /* Кадр горизонтальный, а фото вертикальные: показываем верхнюю часть, где лицо, а не середину с телом */
-.film__f img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 14%; -webkit-filter: sepia(.15); filter: sepia(.15); }
+.film__f img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 14%; }
 .film__f--w img { object-position: 50% 40%; }
 @media (min-width: 960px) {
   .film { height: 330px; }
@@ -1822,7 +1832,10 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .print__osd { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; padding: 5px 7px; background: linear-gradient(rgba(0, 0, 0, .6), rgba(0, 0, 0, 0)); }
 .print__osd b { font: 700 8px/1 ui-monospace, Menlo, monospace; color: #fff; letter-spacing: .04em; }
 .print__ui { position: absolute; left: 0; right: 0; bottom: 0; display: grid; gap: 5px; padding: 12px 8px 7px; background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, .75)); }
-.print__lcd { font: 700 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .05em; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.print__lcd { position: relative; display: block; height: 10px; font: 700 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .05em; color: #fff; white-space: nowrap; }
+/* «ПЕЧАТЬ…» сменяется на «ГОТОВО ✓» прозрачностью, которую ведёт прокрутка */
+.print__lcd span { position: absolute; top: 0; left: 0; will-change: opacity; }
+.print__lcd span + span { opacity: 0; }
 .print__bar { display: block; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .25); overflow: hidden; }
 .print__fill { display: block; height: 100%; background: #fff; -webkit-transform-origin: 0 50%; transform-origin: 0 50%; -webkit-transform: scaleX(0); transform: scaleX(0); will-change: transform; }
 /* Кнопки справа на прорезиненной накладке под большой палец */
@@ -1844,9 +1857,13 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .print__row { display: flex; gap: 8px; }
 .print__lamp { display: grid; place-items: center; }
 /* Индикатор записи на карту: красный, мигает, пока идёт печать */
-.print__led { width: 7px; height: 4px; border-radius: 2px; background: #3E1412; }
-.print__led.is-on { background: #FF3B30; box-shadow: 0 0 8px #FF3B30; will-change: opacity; -webkit-animation: print-led .8s linear infinite; animation: print-led .8s linear infinite; }
-@media (min-width: 960px) { .print__face { grid-template-columns: 1fr 64px; } .print__osd b { font-size: 9px; } .print__lcd { font-size: 11px; } }
+/* Тусклый индикатор, а над ним красный: его показывает прокрутка (пока идёт печать), а мигает он сам по себе.
+   Скрипт во время прокрутки ничего не трогает */
+.print__led { position: relative; display: block; width: 7px; height: 4px; border-radius: 2px; background: #3E1412; }
+.print__led i { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; opacity: 0; will-change: opacity; }
+.print__led i:after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; background: #FF3B30; box-shadow: 0 0 8px #FF3B30; will-change: opacity; -webkit-animation: print-led .8s linear infinite; animation: print-led .8s linear infinite; }
+@media (min-width: 960px) { .print__face { grid-template-columns: 1fr 64px; } .print__osd b { font-size: 9px; } .print__lcd { font-size: 11px; height: 11px; } }
+.print:not(.is-live) .print__led i:after { -webkit-animation-play-state: paused; animation-play-state: paused; }
 @-webkit-keyframes print-led { 0%, 49% { opacity: 1; } 51%, 100% { opacity: .2; } }
 @keyframes print-led { 0%, 49% { opacity: 1; } 51%, 100% { opacity: .2; } }
 /* Снимок лежит под корпусом принтера и выходит из-за его верхнего края. Без обрезки по щели:

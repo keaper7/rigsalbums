@@ -705,12 +705,22 @@
     // Если телефон не смог открыть видео, возвращаем заставку вместо чёрного экрана
     v.addEventListener('error', function () { frame.classList.remove('has-video'); });
   });
+  var vidLoad = function (v) {
+    if (v.src) return;
+    v.preload = 'auto';
+    v.src = v.getAttribute('data-src');
+  };
+  // Видео стоит сразу после первого экрана: начинаем качать, как только загрузилась страница,
+  // чтобы к моменту прокрутки оно уже успело подгрузиться
+  var vidEarly = function () { vids.forEach(vidLoad); };
+  if (document.readyState === 'complete') setTimeout(vidEarly, 300);
+  else window.addEventListener('load', function () { setTimeout(vidEarly, 300); });
   watch(vids, function (v, vis) {
     if (vis) {
-      if (!v.src) v.src = v.getAttribute('data-src');
+      vidLoad(v);
       var p = v.play(); if (p && p.catch) p.catch(function () {});
     } else if (v.src) v.pause();
-  }, { rootMargin: '200px 0px' });
+  }, { rootMargin: '100% 0px' });
 
   // ---------- Заставка «затвор камеры» (класс intro ставит скрипт в <head> главной) ----------
   // Убираем, как только лепестки раскрылись; нажатие или клавиша — сразу. Запасной таймер — на случай,
@@ -1169,7 +1179,6 @@
   //    от высоты самого перехода (диапазон exit-crossing: от «верх перехода у верха экрана»).
   // 3. Ничто не догоняет прокрутку расчётом. Снимок, который садится в плитку галереи, в конце полёта живёт
   //    в той же прокрутке, что и плитка, — поэтому садится пиксель в пиксель, как бы быстро ни листали.
-  // Мигание индикатора и проценты печати — от порогов, а не каждый кадр
   (function () {
     // Плёнка едет сама (CSS-анимация), на паузе, пока её нет на экране
     var film = $('.film');
@@ -1205,23 +1214,26 @@
     supports('animation-range', 'exit-crossing 0% exit-crossing 50%');
   var ease2 = function (t) { return t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
   var clamp01 = function (v) { return v < 0 ? 0 : v > 1 ? 1 : v; };
-  // svh — высота экрана с показанной панелью браузера: постоянная, в отличие от innerHeight
+  // Размеры экрана в пикселях: vh — высота без панели браузера (lvh), svh — с панелью, vw — ширина.
+  // На телефоне они не меняются, когда Safari прячет и показывает панель, поэтому переходы считаем сразу
+  // в пикселях: формулы с vh/vw внутри шагов анимации Safari пересчитывает на каждом кадре прокрутки
   var SVH = supports('height', '1svh') ? 'svh' : 'vh';
-  var svhPx = function () {
+  var U = {};
+  function units() {
     var d = document.createElement('div');
-    d.style.cssText = 'position:absolute;top:0;left:0;width:1px;visibility:hidden;pointer-events:none;height:100' + SVH;
+    d.style.cssText = 'position:absolute;top:0;left:0;width:100vw;height:100vh;visibility:hidden;pointer-events:none';
     body.appendChild(d);
-    var v = d.offsetHeight;
+    var vw = d.offsetWidth, vh = d.offsetHeight;
+    d.style.height = '100' + SVH;
+    var svh = d.offsetHeight;
     body.removeChild(d);
-    return v || window.innerHeight;
-  };
-  // px пикселей + h высот экрана (vh) + w ширин экрана
-  function len(px, h, w) {
-    var out = (px || 0).toFixed(1) + 'px';
-    if (h) out += ' + ' + (h * 100).toFixed(3) + 'vh';
-    if (w) out += ' + ' + (w * 100).toFixed(3) + 'vw';
-    return h || w ? 'calc(' + out + ')' : out;
+    var old = U;
+    U = { vw: (vw || window.innerWidth) / 100, vh: (vh || window.innerHeight) / 100, svh: (svh || vh || window.innerHeight) / 100 };
+    return old.vw !== U.vw || old.vh !== U.vh || old.svh !== U.svh;
   }
+  units();
+  // px пикселей + h высот экрана (vh) + w ширин экрана — в пикселях
+  function len(px, h, w) { return ((px || 0) + (h || 0) * 100 * U.vh + (w || 0) * 100 * U.vw).toFixed(1) + 'px'; }
 
   // Где переходы лежат на странице — в пикселях документа. Прогресс считаем из прокрутки без замеров
   // раскладки каждый кадр; перемеряем, только когда страница поменяла размер
@@ -1272,53 +1284,98 @@
   };
   var keyStart = function () { clearTimeout(keyTimer); keyTimer = setTimeout(function () { idle(keyNext); }, 400); };
   if (document.readyState === 'complete') keyStart(); else window.addEventListener('load', keyStart);
+  // Переход работает, только пока до него не больше экрана: Safari на каждом кадре прокрутки обрабатывает
+  // все подключённые анимации, даже далёкие, — отключённые не стоят ничего
   var keyIO = viewTl && hasIO ? new IntersectionObserver(function (ents) {
-    ents.forEach(function (en) { var it = en.target.__keys; if (en.isIntersecting && it && it.dirty) it.build(); });
-  }, { rootMargin: '50% 0px' }) : null;
-  // at(p) для p от 0 до 1 возвращает для каждого элемента { transform, opacity }
+    ents.forEach(function (en) { (en.target.__keys || []).forEach(function (it) { it.near(en.isIntersecting); }); });
+  }, { rootMargin: '100% 0px' }) : null;
+  // Шаги анимации: считаем часто, а оставляем только те, без которых движение заметно меняется —
+  // между ними браузер ведёт прямую. Допуск: треть пикселя, десятая градуса, тысячные масштаба и прозрачности.
+  // Safari на каждом кадре перебирает шаги всех анимаций, поэтому их должно быть как можно меньше
+  var NUM = /-?\d*\.?\d+/g;
+  function thin(list) {
+    var n = list.length;
+    var shape = list.map(function (c) { return c.replace(NUM, '#'); });
+    var nums = list.map(function (c) { return (c.match(NUM) || []).map(Number); });
+    var tols = list.map(function (c) {
+      var t = [];
+      c.replace(NUM, function (m, off) { var u = c.charAt(off + m.length); t.push(u === 'p' ? .3 : u === 'd' ? .1 : .002); return m; });
+      return t;
+    });
+    var fits = function (a, b) {
+      if (shape[a] !== shape[b]) return false;
+      for (var i = a + 1; i < b; i++) {
+        if (shape[i] !== shape[a]) return false;
+        var t = (i - a) / (b - a), A = nums[a], B = nums[b], I = nums[i], T = tols[a];
+        for (var k = 0; k < I.length; k++) if (Math.abs(A[k] + (B[k] - A[k]) * t - I[k]) > T[k]) return false;
+      }
+      return true;
+    };
+    var keep = [0], a = 0;
+    while (a < n - 1) {
+      var b = a + 1;
+      while (b + 1 < n && fits(a, b + 1)) b++;
+      keep.push(b);
+      a = b;
+    }
+    return keep.map(function (i) { return (i * 100 / (n - 1)).toFixed(3) + '%{' + list[i] + '}'; }).join('');
+  }
+  // at(p) для p от 0 до 1 возвращает для каждого элемента { transform, opacity }; длины — только в пикселях
   function scrollKeys(st, name, els, at, steps) {
-    var box = st.box, sheet = null, range = '';
-    box.style.setProperty('view-timeline', '--' + name + ' block');
+    var box = st.box, sheet = null, range = '', near = false, bound = false;
+    // Шкала прокрутки у перехода одна, даже если наборов анимаций несколько
+    var tl = st.tl || (st.tl = name);
+    box.style.setProperty('view-timeline', '--' + tl + ' block');
     // Иначе браузер отсчитывает прокрутку с учётом отступа под шапку (scroll-padding)
     box.style.setProperty('view-timeline-inset', '0px');
     // Элементы вне перехода (плитка галереи) видят его шкалу через общего родителя
-    if (els.some(function (el) { return !box.contains(el); })) box.parentNode.style.setProperty('timeline-scope', '--' + name);
+    if (els.some(function (el) { return !box.contains(el); })) box.parentNode.style.setProperty('timeline-scope', '--' + tl);
     var it = { dirty: true };
+    var bind = function () {
+      var on = near && !!range;
+      els.forEach(function (el, j) {
+        if (on) {
+          if (!bound) {
+            el.style.animation = name + '-' + j + ' linear both';
+            el.style.setProperty('animation-duration', 'auto');
+            el.style.setProperty('animation-timeline', '--' + tl);
+          }
+          el.style.setProperty('animation-range', range);
+        } else if (bound) {
+          el.style.animation = '';
+          ['animation-duration', 'animation-timeline', 'animation-range'].forEach(function (k) { el.style.removeProperty(k); });
+        }
+      });
+      bound = on;
+    };
     it.build = function () {
       it.dirty = false;
-      var frames = els.map(function () { return []; });
-      for (var i = 0; i <= steps; i++) {
-        var v = at(i / steps), pct = (i * 100 / steps).toFixed(3) + '%';
-        for (var j = 0; j < els.length; j++) {
-          var s = v[j], css = '';
-          if (s.transform != null) css += 'transform:' + s.transform + ';';
-          if (s.opacity != null) css += 'opacity:' + s.opacity + ';';
-          frames[j].push(pct + '{' + css + '}');
-        }
-      }
+      var samples = [];
+      for (var i = 0; i <= steps; i++) samples.push(at(i / steps));
       if (!sheet) { sheet = document.createElement('style'); document.head.appendChild(sheet); }
-      sheet.textContent = frames.map(function (f, j) { return '@keyframes ' + name + '-' + j + '{' + f.join('') + '}'; }).join('\n');
+      sheet.textContent = els.map(function (el, j) {
+        var list = samples.map(function (v) {
+          var x = v[j], c = '';
+          if (x.transform != null) c += 'transform:' + x.transform + ';';
+          if (x.opacity != null) c += 'opacity:' + x.opacity + ';';
+          return c;
+        });
+        return '@keyframes ' + name + '-' + j + '{' + thin(list) + '}';
+      }).join('\n');
       // Прилипание — первые (высота перехода − экран) пикселей его пересечения с верхом экрана
-      var r = 'exit-crossing 0% exit-crossing ' + (st.span / st.h * 100).toFixed(4) + '%';
-      if (r === range) return;
-      var first = !range;
-      range = r;
-      els.forEach(function (el, j) {
-        if (first) {
-          el.style.animation = name + '-' + j + ' linear both';
-          el.style.setProperty('animation-duration', 'auto');
-          el.style.setProperty('animation-timeline', '--' + name);
-        }
-        el.style.setProperty('animation-range', r);
-      });
+      range = 'exit-crossing 0% exit-crossing ' + (st.span / st.h * 100).toFixed(4) + '%';
+      bind();
     };
-    box.__keys = it;
-    if (keyIO) { keyIO.observe(box); keyQueue.push(it); } else it.build();
+    it.near = function (v) {
+      near = v;
+      if (v && it.dirty) it.build(); else bind();
+    };
+    (box.__keys = box.__keys || []).push(it);
+    if (keyIO) { keyIO.unobserve(box); keyIO.observe(box); keyQueue.push(it); } else { near = true; it.build(); }
     // Пересчёт (сменилась ширина экрана или раскладка): сразу — если переход рядом, иначе — когда до него дойдут
     return function () {
       it.dirty = true;
-      var y = window.pageYOffset, V = window.innerHeight;
-      if (!keyIO || (st.top + st.h > y - 1.5 * V && st.top < y + 2.5 * V)) it.build();
+      if (!keyIO || near) it.build();
       else if (keyQueue.indexOf(it) < 0) { keyQueue.push(it); keyStart(); }
     };
   }
@@ -1331,15 +1388,14 @@
   }
   // Пересчитать переходы, когда сменилась ширина экрана (поворот, окно компьютера) или высота — сильнее,
   // чем прячется панель браузера на телефоне
-  var rebuilds = [], rebuildW = window.innerWidth, rebuildH = window.innerHeight;
+  // Шаги в пикселях: пересчитываем, когда поменялся сам экран (поворот, окно компьютера). На телефоне панель
+  // Safari ни vh, ни svh не меняет — от неё ничего не пересчитывается
+  var rebuilds = [];
   function onRebuild(fn) { rebuilds.push(fn); }
   window.addEventListener('resize', function () {
     raf(function () {
       stagesNow();
-      var w = window.innerWidth, h = window.innerHeight;
-      if (w === rebuildW && Math.abs(h - rebuildH) < 160) return;
-      rebuildW = w; rebuildH = h;
-      rebuilds.forEach(function (fn) { fn(); });
+      if (units()) rebuilds.forEach(function (fn) { fn(); });
     });
   });
   // Переход без анимаций (облегчённый режим, «меньше движения») убираем целиком
@@ -1360,26 +1416,27 @@
     var st = stage(box);
     var photo = $('.print__photo', box), dev = $('.print__dev', photo);
     var fly = $('.print__fly', box), flyPaper = $('.print__paper', fly);
-    var pbox = $('.print__box', box), lcd = $('.print__lcd', box), fill = $('.print__fill', box), led = $('.print__led', box);
+    var pbox = $('.print__box', box), lcd = $$('.print__lcd span', box), fill = $('.print__fill', box), led = $('.print__led i', box);
     $$('img', box).forEach(function (im) { im.src = src.currentSrc || src.src; });
     warm($$('img', box));
-    var els = [pbox, photo, dev, fly, flyPaper, fill, tile];
+    var els = [pbox, photo, dev, fly, flyPaper, fill, tile, led, lcd[0], lcd[1]];
     var g = null;
     // Размер снимка (тех же пропорций, что плитка), верх камеры (--slot) и где плитка относительно перехода
     var measure = function () {
       var W = box.clientWidth, br = box.getBoundingClientRect(), tr = tile.getBoundingClientRect();
       var ratio = tr.width ? tr.height / tr.width : 1.5;
-      var w = Math.min(Math.max(180, W * .6), 300, svhPx() * .46 / ratio), h = w * ratio;
+      var w = Math.min(Math.max(180, W * .6), 300, U.svh * 46 / ratio), h = w * ratio;
       var old = g;
       g = {
-        w: w, h: h, span: st.span, slot: 'max(58' + SVH + ', ' + (60 + h + 90).toFixed(1) + 'px)',
+        // верх камеры: 58% экрана с панелью браузера, но не ниже, чем нужно снимку над ней
+        w: w, h: h, span: st.span, slot: Math.max(58 * U.svh, 60 + h + 90),
         // куда встаёт центр снимка: сдвиг от середины перехода по x и от его верха по y
         x: tr.left + tr.width / 2 - (br.left + W / 2), y: tr.top - br.top + tr.height / 2 - h / 2, k: tr.width / w
       };
       box.style.setProperty('--pw', w.toFixed(1) + 'px');
       box.style.setProperty('--ph', h.toFixed(1) + 'px');
-      box.style.setProperty('--slot', g.slot);
-      return !old || ['w', 'x', 'y', 'span'].some(function (k) { return Math.abs(old[k] - g[k]) > .5; });
+      box.style.setProperty('--slot', g.slot.toFixed(1) + 'px');
+      return !old || ['w', 'x', 'y', 'span', 'slot'].some(function (k) { return Math.abs(old[k] - g[k]) > .5; });
     };
     var at = function (p) {
       // Камера стоит на нижнем краю экрана; когда снимок готов — уезжает вниз за край
@@ -1390,11 +1447,11 @@
       var yA = 12 - (g.h + 66) * fed - pop * 18, rotA = 3 * pop;
       // Второй снимок: верх над щелью в координатах перехода = сдвиг прилипшего экрана (p · span) + щель + 11px + yA.
       // Доля этого пути (1 − q) к концу полёта уходит в ноль, остаётся только место плитки
-      var ty = 'calc(' + (a * (p * g.span + 11 + yA) + q * g.y).toFixed(2) + 'px + ' + g.slot + ' * ' + a.toFixed(4) + ')';
+      var ty = (a * (p * g.span + g.slot + 11 + yA) + q * g.y).toFixed(2) + 'px';
       var tx = g.x * q + Math.sin(Math.PI * q) * 24;
       var sc = 1 + (g.k - 1) * q, rot = rotA * a - Math.sin(Math.PI * q) * 2;
       return [
-        { transform: 'translate3d(0,calc((100vh - ' + g.slot + ' + 60px) * ' + out.toFixed(4) + '),0)' },
+        { transform: 'translate3d(0,' + ((100 * U.vh - g.slot + 60) * out).toFixed(2) + 'px,0)' },
         // Передача снимка: второй появляется чуть раньше, чем исчезает первый, — оба стоят в одном месте
         { transform: 'translate3d(0,' + yA.toFixed(2) + 'px,0) rotate(' + rotA.toFixed(2) + 'deg)', opacity: p < .48 ? 1 : 0 },
         { opacity: (1 - clamp01((p - .1) / .32)).toFixed(3) },
@@ -1403,21 +1460,24 @@
         { opacity: (1 - clamp01((p - .66) / .2)).toFixed(3) },
         { transform: 'scaleX(' + fed.toFixed(4) + ')' },
         // Плитка под снимком появляется, когда он уже сел; потом снимок растворяется, и остаются только её скруглённые углы
-        { opacity: p < .9 ? 0 : 1 }
+        { opacity: p < .9 ? 0 : 1 },
+        // Красный индикатор горит (и мигает), пока идёт печать; на экране камеры «ПЕЧАТЬ…», потом «ГОТОВО ✓»
+        { opacity: p > .03 && p < .44 ? 1 : 0 },
+        { opacity: fed < 1 ? 1 : 0 },
+        { opacity: fed < 1 ? 0 : 1 }
       ];
     };
     measure();
-    var rebuild = viewTl ? scrollKeys(st, 'print', els, at, 200) : null;
-    var busy = null, lastLcd = '';
+    var rebuild = viewTl ? scrollKeys(st, 'print', els, at, 400) : null;
+    // Проценты печати пишет скрипт, но редко — шагами по 5%: двадцать маленьких правок за всю печать
+    var pct = lcd[0], lastPct = -1;
     st.fns.push(function (p) {
-      if (!viewTl) applyAt(els, at(p));
-      var fed = ease2(clamp01((p - .04) / .4));
-      // Красный индикатор мигает, пока идёт печать; проценты — на экране камеры
-      var b = p > .03 && p < .44;
-      if (b !== busy) { busy = b; led.classList.toggle('is-on', b); }
-      var text = fed >= 1 ? 'ГОТОВО ✓' : 'ПЕЧАТЬ ' + Math.round(fed * 100) + '%';
-      if (text !== lastLcd) { lastLcd = text; lcd.textContent = text; }
+      var v = Math.min(95, Math.floor(ease2(clamp01((p - .04) / .4)) * 20) * 5);
+      if (v !== lastPct) { lastPct = v; pct.textContent = 'ПЕЧАТЬ ' + v + '%'; }
     });
+    if (!viewTl) st.fns.push(function (p) { applyAt(els, at(p)); });
+    // Лампочка мигает, только пока камера рядом с экраном
+    watch([box], function (el, vis) { box.classList.toggle('is-live', vis); }, { rootMargin: '100px 0px' });
     // Раскладка могла сдвинуться (шрифты, картинки) — пересчитываем, если плитка уехала
     var recheck = function () {
       st.measure();
@@ -1468,7 +1528,7 @@
       });
       return v;
     };
-    if (viewTl) onRebuild(scrollKeys(st, 'desk', els, at, 160));
+    if (viewTl) onRebuild(scrollKeys(st, 'desk', els, at, 400));
     else st.fns.push(function (p) { applyAt(els, at(p)); });
   })();
 
@@ -1520,7 +1580,7 @@
       ];
     };
     measure();
-    var rebuild = viewTl ? scrollKeys(st, 'zoom', els, at, 200) : null;
+    var rebuild = viewTl ? scrollKeys(st, 'zoom', els, at, 400) : null;
     if (!viewTl) st.fns.push(function (p) { applyAt(els, at(p)); });
     var recheck = function () { if (measure()) { if (rebuild) rebuild(); st.p = -1; if (st.on) stageTick(st, window.pageYOffset); } };
     onRebuild(recheck);

@@ -464,7 +464,7 @@
             frag.appendChild(w);
           });
           c.parentNode.replaceChild(frag, c);
-        } else if (c.nodeType === 1 && !/^(BR|SMALL|SVG)$/i.test(c.tagName)) walk(c);
+        } else if (c.nodeType === 1 && !/^(BR|SMALL|SVG)$/i.test(c.tagName) && !c.classList.contains('fig')) walk(c);
       });
     };
     walk(el);
@@ -475,6 +475,67 @@
     heads.forEach(splitWords);
     reveal(heads, { threshold: .25, rootMargin: '0px 0px -6% 0px' });
   }
+
+  // ---------- Рисованные человечки на заголовках ----------
+  // Ставим человечка на последнее слово первой строки: над ним пусто, и он не задевает подпись раздела.
+  // Переносы строк зависят от ширины экрана, поэтому место считаем по факту и пересчитываем при повороте
+  (function () {
+    var hs = $$('.has-fig');
+    if (!hs.length || !document.createRange) return;
+    // Слова заголовка с их местом на экране. После разбивки на слова берём обёртки .w: их не сдвигает
+    // анимация появления. Без разбивки (лёгкий режим) меряем каждое слово через Range
+    var words = function (h) {
+      var ws = h.querySelectorAll('.w');
+      if (ws.length) return Array.prototype.map.call(ws, function (w) { return w.getBoundingClientRect(); });
+      var out = [], tw = document.createTreeWalker(h, NodeFilter.SHOW_TEXT, null, false), n, m, re = /\S+/g;
+      while ((n = tw.nextNode())) {
+        if (n.parentNode.closest && n.parentNode.closest('.fig')) continue;
+        re.lastIndex = 0;
+        while ((m = re.exec(n.nodeValue))) {
+          var r = document.createRange();
+          r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
+          var b = r.getBoundingClientRect();
+          if (b.width) out.push(b);
+        }
+      }
+      return out;
+    };
+    // Человечку нужно свободное место над словом. Берём строку, у которой правый край торчит дальше
+    // строк над ней (у первой строки мешает только подпись раздела), и ставим его на её последнее слово,
+    // ближе к правому краю. Первая строка подходит, если места с запасом; иначе берём строку, где места больше всего
+    var place = function () {
+      hs.forEach(function (h) {
+        var f = h.querySelector('.fig'), ws = words(h);
+        if (!f || !ws.length) return;
+        var hb = h.getBoundingClientRect(), fw = f.offsetWidth, lines = [];
+        ws.forEach(function (b) {
+          var l = lines[lines.length - 1];
+          if (!l || Math.abs(b.top - l.top) > 4) lines.push(l = { top: b.top, right: 0, last: b });
+          if (b.right >= l.right) { l.right = b.right; l.last = b; }
+        });
+        var eb = h.previousElementSibling, floor = 0;
+        if (eb && eb.classList.contains('eyebrow')) floor = eb.getBoundingClientRect().right + 8;
+        var best = null;
+        lines.forEach(function (l, i) {
+          // Над строкой: правые края двух строк выше (рисунок выше одной строки)
+          var above = i ? Math.max(lines[i - 1].right, i > 1 ? lines[i - 2].right : 0) + 6 : floor;
+          var room = l.right - above;
+          if (!best || (best.room < fw * 2 && room > best.room)) best = { l: l, room: room, above: above };
+        });
+        var l = best.l, x = Math.min(l.last.left + l.last.width * .62 - fw / 2, l.right - fw * .8);
+        x = Math.max(x, best.above, l.last.left);
+        f.style.left = (x - hb.left) + 'px';
+        f.style.setProperty('--line', (l.top - lines[0].top) + 'px');
+      });
+    };
+    place();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+    var rq = 0;
+    window.addEventListener('resize', function () {
+      if (rq) return;
+      rq = requestAnimationFrame(function () { rq = 0; place(); });
+    });
+  })();
 
   // ---------- Появление блоков ----------
   // Внутри [data-stagger] элементы выезжают по очереди
@@ -491,7 +552,7 @@
   reveal($$('.perk'), { threshold: .3 });
 
   // ---------- Бесконечные анимации идут, только пока их видно ----------
-  var LIVE = '.ticker, .me, .offer__card, .phone, .next';
+  var LIVE = '.ticker, .me, .offer__card, .phone, .next, .has-fig';
   var lives = $$(LIVE);
   if (!hasIO) lives.forEach(function (el) { el.classList.add('is-live'); });
   else watch(lives, function (el, vis) { el.classList.toggle('is-live', vis); });

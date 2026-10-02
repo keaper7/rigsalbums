@@ -2033,3 +2033,80 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 @keyframes fig-knob { 0%, 100% { transform: none; } 50% { transform: translateX(10px); } }
 .has-fig:not(.is-live) .fig, .has-fig:not(.is-live) .fig * { -webkit-animation-play-state: paused !important; animation-play-state: paused !important; }
 @media (prefers-reduced-motion: reduce) { .fig, .fig * { -webkit-animation: none !important; animation: none !important; } .fig .flash, .fig .smile { opacity: 0; } }
+
+/* ---------- Рисованные мелочи: геймер на карточке PS5 и бумажный самолётик ---------- */
+/* Двигаются сами, без привязки к прокрутке; вне экрана стоят (is-live ставит скрипт) */
+.gamer { --fig-bg: var(--card); position: absolute; right: 14px; bottom: calc(100% - 2px); width: 40px; height: 56px; pointer-events: none; }
+.gamer svg { display: block; width: 100%; height: 100%; overflow: visible; -webkit-animation: gm-jump 4.2s infinite; animation: gm-jump 4.2s infinite; }
+.gamer .ink { fill: none; stroke: #3A2321; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gamer .thin { stroke-width: 1.2; }
+.gamer .fil { fill: #3A2321; stroke: #3A2321; stroke-width: 1.3; stroke-linejoin: round; }
+.gamer .wht { fill: var(--card); stroke: #3A2321; stroke-width: 1.8; stroke-linejoin: round; }
+.gamer .hat { fill: none; stroke: #3A2321; stroke-width: 1; stroke-linecap: round; }
+.gamer .g-yay { opacity: 0; -webkit-animation: gm-yay 4.2s steps(1) infinite; animation: gm-yay 4.2s steps(1) infinite; }
+.gamer .g-sit { -webkit-animation: gm-sit 4.2s steps(1) infinite; animation: gm-sit 4.2s steps(1) infinite; }
+.gamer .blink { -webkit-animation: gm-blink .5s steps(1) infinite; animation: gm-blink .5s steps(1) infinite; }
+@keyframes gm-jump { 0%, 78%, 100% { transform: none; } 82% { transform: translateY(-6px); } 86% { transform: translateY(-1px); } 89% { transform: translateY(-5px); } 93% { transform: none; } }
+@keyframes gm-yay { 0%, 79% { opacity: 0; } 80%, 94% { opacity: 1; } 95% { opacity: 0; } }
+@keyframes gm-sit { 0%, 79% { opacity: 1; } 80%, 94% { opacity: 0; } 95% { opacity: 1; } }
+@keyframes gm-blink { 50% { opacity: .2; } }
+/* Над карточками место под геймера */
+.has-gamer .sec__split > .kit { margin-top: 70px; }
+@media (min-width: 720px) { .has-gamer .sec__split > .kit { margin-top: 56px; } }
+
+/* Бумажный самолётик из фотографии: летит по кривой с мёртвой петлёй и наклоняется по ходу полёта (offset-path).
+   Кривую под ширину экрана строит скрипт. Пунктирный след остаётся в воздухе: прорисовывается за самолётиком
+   (маска открывает его с той же скоростью) и тает, когда тот улетел. Круг 14 с: полёт 5,5 с, потом пауза */
+.has-plane { position: relative; padding-top: 112px; }
+.plane { position: absolute; left: 0; right: 0; top: 0; height: 100px; pointer-events: none; z-index: 0; }
+.plane__trail { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; -webkit-animation: pl-fade 14s linear infinite; animation: pl-fade 14s linear infinite; }
+.plane__dots { fill: none; stroke: #3A2321; stroke-width: 1.3; stroke-linecap: round; stroke-dasharray: .5 7; opacity: .5; }
+.plane__rev { fill: none; stroke: #fff; stroke-width: 10; stroke-dasharray: 1 1; stroke-dashoffset: 1; -webkit-animation: pl-rev 14s linear infinite; animation: pl-rev 14s linear infinite; }
+.plane__p {
+  position: absolute; left: 0; top: 0; width: 44px; height: 22px; opacity: 0;
+  offset-rotate: auto; offset-anchor: 60% 50%; offset-distance: 0%;
+  -webkit-animation: pl-go 14s linear infinite; animation: pl-go 14s linear infinite;
+}
+.plane__wob { width: 100%; height: 100%; -webkit-animation: pl-wob .9s ease-in-out infinite alternate; animation: pl-wob .9s ease-in-out infinite alternate; }
+.plane svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.plane__wing { transform-box: fill-box; transform-origin: 100% 0; -webkit-animation: pl-flap .32s ease-in-out infinite alternate; animation: pl-flap .32s ease-in-out infinite alternate; }
+.plane .ink { fill: none; stroke: #3A2321; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.plane .thin { stroke-width: 1; }
+.plane .fil { fill: #3A2321; }
+.plane .wht { fill: var(--paper); stroke: #3A2321; stroke-width: 1.3; stroke-linejoin: round; }
+@keyframes pl-go { 0% { offset-distance: 0%; opacity: 1; } 39.3% { offset-distance: 100%; opacity: 1; } 39.4%, 100% { offset-distance: 100%; opacity: 0; } }
+@keyframes pl-rev { 0% { stroke-dashoffset: 1; } 39.3%, 100% { stroke-dashoffset: 0; } }
+@keyframes pl-fade { 0%, 39% { opacity: 1; } 52%, 100% { opacity: 0; } }
+@keyframes pl-wob { from { transform: rotate(-5deg) translateY(-1px); } to { transform: rotate(4deg) translateY(1.5px); } }
+@keyframes pl-flap { from { transform: scaleY(1); } to { transform: scaleY(.78); } }
+@supports not (offset-rotate: auto) { .plane { display: none; } .has-plane { padding-top: 64px; } }
+
+.has-gamer:not(.is-live) .gamer *, .has-plane:not(.is-live) .plane * { -webkit-animation-play-state: paused !important; animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .gamer *, .plane, .plane * { -webkit-animation: none !important; animation: none !important; } .plane { display: none; } .gamer .g-yay { opacity: 0; } }
+
+/* ---------- Выпускник в подвале ---------- */
+.toss svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.toss .ink { fill: none; stroke: #3A2321; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.toss .thin { stroke-width: 1.2; }
+.toss .fil { fill: #3A2321; stroke: #3A2321; stroke-width: 1.3; stroke-linejoin: round; }
+.toss .wht { fill: var(--fig-bg); stroke: #3A2321; stroke-width: 1.8; stroke-linejoin: round; }
+.toss .hat { fill: none; stroke: #3A2321; stroke-width: 1; stroke-linecap: round; }
+/* Выпускник сидит на большой надписи RIGSARTHUR и подбрасывает шапочку */
+.ft__word { position: relative; display: inline-block; font-style: normal; --fig-bg: var(--paper); }
+.toss { position: absolute; right: 9%; top: calc(.1em - var(--th)); --th: clamp(52px, .62em, 96px); width: calc(var(--th) * .625); height: var(--th); pointer-events: none; }
+.toss__cap { -webkit-transform-origin: 70px 29px; transform-origin: 70px 29px; -webkit-animation: toss-cap 3.4s cubic-bezier(.3, .6, .4, 1) infinite; animation: toss-cap 3.4s cubic-bezier(.3, .6, .4, 1) infinite; }
+@keyframes toss-cap {
+  0%, 20% { transform: none; }
+  45% { transform: translate(-4px, -30px) rotate(-200deg); }
+  70%, 100% { transform: rotate(-360deg); }
+}
+.toss__arm { -webkit-transform-origin: 61px 57px; transform-origin: 61px 57px; -webkit-animation: toss-arm 3.4s ease-in-out infinite; animation: toss-arm 3.4s ease-in-out infinite; }
+@keyframes toss-arm { 0%, 12% { transform: rotate(14deg); } 22% { transform: rotate(-6deg); } 34%, 62% { transform: none; } 72% { transform: rotate(-4deg); } 100% { transform: rotate(14deg); } }
+
+.ft:not(.is-live) .toss * { -webkit-animation-play-state: paused !important; animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .toss * { -webkit-animation: none !important; animation: none !important; } }
+
+/* Если ткнуть в человечка, он подпрыгивает (отдельное свойство translate не мешает его собственным движениям) */
+.fig, .gamer, .toss { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.is-poke { -webkit-animation: poke .55s cubic-bezier(.3, .7, .4, 1); animation: poke .55s cubic-bezier(.3, .7, .4, 1); }
+@keyframes poke { 0% { translate: 0 0; } 35% { translate: 0 -10px; } 60% { translate: 0 0; } 78% { translate: 0 -3px; } 100% { translate: 0 0; } }

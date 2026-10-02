@@ -351,22 +351,33 @@
   // ---------- Картинки проявляются по мере загрузки ----------
   // Блик бежит только по плиткам, которые видно на экране, и только пока фото грузится
   var LD_BOX = /(^|\s)(pic|book__cover|deck__card|clip__frame)(\s|$)/;
-  var ldBoxes = [];
+  var ldBoxes = [], ldIO = null;
+  var ldDone = function (img) {
+    img.classList.remove('ld');
+    var box = img.parentNode;
+    if (box && box.classList) box.classList.remove('is-ld');
+    if (ldIO && box) ldIO.unobserve(box);
+  };
+  // Один общий слушатель на всю страницу, а не на каждое фото: так проявляются и копии фото, которые скрипт
+  // добавляет позже (лента-плёнка). Раньше копия наследовала невидимость, но не слушатель, и лента оставалась пустой.
+  // Проявляем, когда фото уже раскодировано: иначе телефон раскодирует его в момент показа и прокрутка замирает
+  document.addEventListener('load', function (e) {
+    var img = e.target;
+    if (img.tagName !== 'IMG' || !img.classList.contains('ld')) return;
+    if (img.decode) img.decode().then(function () { ldDone(img); }, function () { ldDone(img); }); else ldDone(img);
+  }, true);
+  document.addEventListener('error', function (e) { if (e.target.tagName === 'IMG') ldDone(e.target); }, true);
   $$('img').forEach(function (img) {
     if (img.complete && img.naturalWidth) return;
     img.classList.add('ld');
     var box = img.parentNode;
-    var done = function () {
-      img.classList.remove('ld');
-      if (box && box.classList) box.classList.remove('is-ld');
-      if (ldIO && box) ldIO.unobserve(box);
-    };
-    // Проявляем, когда фото уже раскодировано: иначе телефон раскодирует его в момент показа и прокрутка замирает
-    img.addEventListener('load', function () { if (img.decode) img.decode().then(done, done); else done(); });
-    img.addEventListener('error', done);
     if (box && LD_BOX.test(box.className)) ldBoxes.push(box);
   });
-  var ldIO = !reduce && ldBoxes.length ? watch(ldBoxes, function (box, vis) {
+  // Страховка: фото, которое уже загрузилось, не должно остаться невидимым ни при каком раскладе
+  window.addEventListener('load', function () {
+    setTimeout(function () { $$('img.ld').forEach(function (img) { if (img.complete && img.naturalWidth) ldDone(img); }); }, 600);
+  });
+  ldIO = !reduce && ldBoxes.length ? watch(ldBoxes, function (box, vis) {
     var img = $('img', box);
     box.classList.toggle('is-ld', vis && !!img && img.classList.contains('ld'));
   }, { rootMargin: '60px 0px' }) : null;
@@ -537,6 +548,41 @@
     });
   })();
 
+  // ---------- Человечки откликаются на касание: подпрыгивают ----------
+  document.addEventListener('click', function (e) {
+    var f = e.target.closest && e.target.closest('.fig, .gamer, .toss');
+    if (!f) return;
+    f.classList.remove('is-poke');
+    void f.offsetWidth;
+    f.classList.add('is-poke');
+  });
+  document.addEventListener('animationend', function (e) { if (e.animationName === 'poke') e.target.classList.remove('is-poke'); });
+
+  // ---------- Самолётик: кривая полёта под ширину экрана ----------
+  // Петля — фиксированного размера в пикселях по центру, подлёт и отлёт тянутся на всю ширину
+  (function () {
+    var pl = $('.plane'), p = pl && $('.plane__p', pl);
+    if (!p || !window.CSS || !CSS.supports || !CSS.supports('offset-rotate', 'auto')) return;
+    var tr = $('.plane__trail', pl), dots = $('.plane__dots', pl), rev = $('.plane__rev', pl), w0 = 0;
+    var build = function () {
+      var W = pl.offsetWidth, H = pl.offsetHeight;
+      if (!W || W === w0) return;
+      w0 = W;
+      var c = Math.round(W * .5), f = function (v) { return Math.round(v); };
+      var d = 'M -60 72 C ' + f(c * .3) + ' 74, ' + f(c * .62) + ' 40, ' + (c - 40) + ' 50 ' +
+        'C ' + (c - 10) + ' 56, ' + (c + 34) + ' 40, ' + (c + 24) + ' 16 ' +
+        'C ' + (c + 16) + ' 0, ' + (c - 22) + ' 4, ' + (c - 18) + ' 26 ' +
+        'C ' + (c - 14) + ' 46, ' + (c + 10) + ' 58, ' + (c + 40) + ' 52 ' +
+        'C ' + (c + 120) + ' 44, ' + f(W * .86) + ' 22, ' + (W + 60) + ' 34';
+      tr.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      dots.setAttribute('d', d);
+      rev.setAttribute('d', d);
+      p.style.offsetPath = "path('" + d + "')";
+    };
+    build();
+    window.addEventListener('resize', function () { raf(build); });
+  })();
+
   // ---------- Появление блоков ----------
   // Внутри [data-stagger] элементы выезжают по очереди
   $$('.receipt li').forEach(function (li, i) { li.style.setProperty('--ri', i); });
@@ -552,7 +598,7 @@
   reveal($$('.perk'), { threshold: .3 });
 
   // ---------- Бесконечные анимации идут, только пока их видно ----------
-  var LIVE = '.ticker, .me, .offer__card, .phone, .next, .has-fig';
+  var LIVE = '.ticker, .me, .offer__card, .phone, .next, .has-fig, .has-gamer, .has-plane, .ft';
   var lives = $$(LIVE);
   if (!hasIO) lives.forEach(function (el) { el.classList.add('is-live'); });
   else watch(lives, function (el, vis) { el.classList.toggle('is-live', vis); });
@@ -776,12 +822,29 @@
   var vidEarly = function () { vids.forEach(vidLoad); };
   if (document.readyState === 'complete') setTimeout(vidEarly, 300);
   else window.addEventListener('load', function () { setTimeout(vidEarly, 300); });
+  // Видео без звука должно играть всегда, когда оно на экране. Браузер иногда отказывает в первом play():
+  // видео ещё не успело загрузиться, вкладка была в фоне, на iPhone включён режим энергосбережения.
+  // Поэтому пробуем снова, когда видео подгрузилось, когда вкладка вернулась и при первом касании экрана
+  var tryPlay = function (v) {
+    if (!v.__want || !v.src || !v.paused) return;
+    v.muted = true;
+    var p = v.play(); if (p && p.catch) p.catch(function () {});
+  };
+  vids.forEach(function (v) {
+    v.muted = true; v.defaultMuted = true; v.playsInline = true;
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+    ['loadeddata', 'canplay', 'canplaythrough'].forEach(function (ev) { v.addEventListener(ev, function () { tryPlay(v); }); });
+    // Если браузер сам поставил видео на паузу, пока его видно, запускаем снова
+    v.addEventListener('pause', function () { if (v.__want && !document.hidden) setTimeout(function () { tryPlay(v); }, 400); });
+  });
+  var kick = function () { vids.forEach(tryPlay); };
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) kick(); });
+  ['touchend', 'click', 'keydown'].forEach(function (ev) { document.addEventListener(ev, kick, { passive: true, capture: true }); });
   watch(vids, function (v, vis) {
-    if (vis) {
-      vidLoad(v);
-      var p = v.play(); if (p && p.catch) p.catch(function () {});
-    } else if (v.src) v.pause();
-  }, { rootMargin: '100% 0px' });
+    v.__want = vis;
+    if (vis) { vidLoad(v); tryPlay(v); }
+    else if (v.src && !v.paused) v.pause();
+  }, { rootMargin: '0px' });
 
   // ---------- Заставка «затвор камеры» (класс intro ставит скрипт в <head> главной) ----------
   // Убираем, как только лепестки раскрылись; нажатие или клавиша — сразу. Запасной таймер — на случай,
@@ -1247,9 +1310,16 @@
       watch([film], function (el, vis) { film.classList.toggle('is-live', vis); }, { rootMargin: '100px 0px' });
       // В ленте набор кадров повторён дважды, сдвиг на половину зацикливает её. На широком экране половины
       // может не хватить на всю ленту — тогда повторяем набор чаще, а время круга растёт так же, чтобы скорость не менялась
+      // Кадры плёнки маленькие: грузим их сразу. Отложенная загрузка ждёт, пока кадр въедет в экран сбоку,
+      // и тогда в ленте мелькают пустые кадры
+      $$('img', film).forEach(function (im) { im.loading = 'eager'; });
       var tracks = $$('.film__track', film).map(function (tr) {
         var n = tr.children.length / 2, one = '';
-        for (var i = 0; i < n; i++) one += tr.children[i].outerHTML;
+        for (var i = 0; i < n; i++) {
+          var c = tr.children[i].cloneNode(true);
+          $$('img', c).forEach(function (im) { im.classList.remove('ld'); im.removeAttribute('loading'); });
+          one += c.outerHTML;
+        }
         return { el: tr, one: one, k: 1, dur: parseFloat(getComputedStyle(tr).animationDuration) || 22 };
       });
       var fillFilm = function () {

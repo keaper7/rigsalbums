@@ -1995,7 +1995,7 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
   --fig-bg: var(--paper); --fh: 1.2em; --ar: 1; --cap: .12em;
   position: absolute; left: 1.2em; top: calc(var(--line, 0px) + var(--cap) - var(--fh));
   width: calc(var(--fh) * var(--ar)); height: var(--fh);
-  pointer-events: none; opacity: .92;
+  pointer-events: none; opacity: 1;
 }
 .fig--grad { --fh: 1.6em; --ar: .642; }
 .fig--cam { --fh: 1.5em; --ar: .885; }
@@ -2005,11 +2005,11 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 @media (min-width: 960px) { .fig { -webkit-transform: scale(.8); transform: scale(.8); -webkit-transform-origin: 50% 100%; transform-origin: 50% 100%; } .h2.has-fig { margin-top: calc(14px + .6em); } }
 /* Появляется, когда заголовок уже выехал */
 .fx .has-fig .fig { opacity: 0; -webkit-transition: opacity .6s .55s; transition: opacity .6s .55s; }
-.fx .has-fig.in .fig { opacity: .92; }
-.fig svg { display: block; width: 100%; height: 100%; overflow: visible; -webkit-animation: fig-boil .42s steps(1) infinite; animation: fig-boil .42s steps(1) infinite; }
+.fx .has-fig.in .fig { opacity: 1; }
+/* Рисунок не двигаем целиком (поворот на доли градуса превращал его в размытую картинку): двигаются только части */
+.fig svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .fig .type { animation: fig-type .5s steps(1) infinite; }
 @keyframes fig-type { 50% { transform: translateY(-1px); } }
-@keyframes fig-boil { 0% { transform: rotate(.35deg) translate(.2px, 0); } 33% { transform: rotate(-.3deg) translate(-.2px, .2px); } 66% { transform: rotate(.1deg) translate(0, -.2px); } }
 .fig .ink { fill: none; stroke: #3A2321; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
 .fig .thin { stroke-width: 1.3; }
 .fig .fil { fill: #3A2321; stroke: #3A2321; stroke-width: 1.4; stroke-linejoin: round; }
@@ -2037,7 +2037,9 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 /* ---------- Рисованные мелочи: геймер на карточке PS5 и бумажный самолётик ---------- */
 /* Двигаются сами, без привязки к прокрутке; вне экрана стоят (is-live ставит скрипт) */
 .gamer { --fig-bg: var(--card); position: absolute; right: 14px; bottom: calc(100% - 2px); width: 40px; height: 56px; pointer-events: none; }
-.gamer svg { display: block; width: 100%; height: 100%; overflow: visible; -webkit-animation: gm-jump 4.2s infinite; animation: gm-jump 4.2s infinite; }
+.gamer svg { display: block; width: 100%; height: 100%; overflow: visible; }
+/* Прыгает рисунок внутри, а не элемент целиком: так браузер перерисовывает линии, и они остаются чёткими */
+.gamer .gm-body { -webkit-animation: gm-jump 4.2s infinite; animation: gm-jump 4.2s infinite; }
 .gamer .ink { fill: none; stroke: #3A2321; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .gamer .thin { stroke-width: 1.2; }
 .gamer .fil { fill: #3A2321; stroke: #3A2321; stroke-width: 1.3; stroke-linejoin: round; }
@@ -2067,7 +2069,8 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
   offset-rotate: auto; offset-anchor: 60% 50%; offset-distance: 0%;
   -webkit-animation: pl-go 14s linear infinite; animation: pl-go 14s linear infinite;
 }
-.plane__wob { width: 100%; height: 100%; -webkit-animation: pl-wob .9s ease-in-out infinite alternate; animation: pl-wob .9s ease-in-out infinite alternate; }
+.plane__wob { width: 100%; height: 100%; }
+.plane .pl-body { transform-box: fill-box; transform-origin: 50% 50%; -webkit-animation: pl-wob .9s ease-in-out infinite alternate; animation: pl-wob .9s ease-in-out infinite alternate; }
 .plane svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .plane__wing { transform-box: fill-box; transform-origin: 100% 0; -webkit-animation: pl-flap .32s ease-in-out infinite alternate; animation: pl-flap .32s ease-in-out infinite alternate; }
 .plane .ink { fill: none; stroke: #3A2321; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -2110,3 +2113,16 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .fig, .gamer, .toss { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .is-poke { -webkit-animation: poke .55s cubic-bezier(.3, .7, .4, 1); animation: poke .55s cubic-bezier(.3, .7, .4, 1); }
 @keyframes poke { 0% { translate: 0 0; } 35% { translate: 0 -10px; } 60% { translate: 0 0; } 78% { translate: 0 -3px; } 100% { translate: 0 0; } }
+
+/* Фотограф стоит на верхней грани карточки с ценой, у правого края, и снимает цену */
+.offer__card { position: relative; }
+.fig.fig--card {
+  --fh: 64px; top: auto; left: auto; right: 22px; bottom: calc(100% - 2px); opacity: 1;
+  -webkit-transform: none; transform: none;
+}
+.offer__card:not(.is-live) .fig * { -webkit-animation-play-state: paused !important; animation-play-state: paused !important; }
+@media (min-width: 960px) { .fig.fig--card { --fh: 74px; right: 34px; -webkit-transform: none; transform: none; } }
+
+/* «Каждый год новый уникальный дизайн»: в Unbounded слова длинные, и на телефоне заголовок рассыпался
+   на четыре коротких строки. Чуть меньший кегль укладывает его в две ровные строки */
+.designs .h2 { font-size: clamp(25px, 7.05vw, 66px); }

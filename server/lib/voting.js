@@ -64,6 +64,12 @@ function coverNote(o) {
   return o.covers === 2 ? '. Какую из двух обложек, утверждаем в чате' : '';
 }
 
+// Артур убрал этап «Место» у класса (место решили заранее) — тогда строку «Групповые» не пишем,
+// место при желании указывают в поле «Ещё»
+function placeRemoved(cls) {
+  return (cls.hidden || []).some(k => k.indexOf('place:') === 0);
+}
+
 // Строки шпаргалки после закрытия голосования
 function cheat(cls, res) {
   const rows = [];
@@ -82,7 +88,7 @@ function cheat(cls, res) {
   if (res.place) {
     const pl = res.place.option;
     rows.push({ label: 'Групповые', value: pl ? pl.name + '. Точное место обсудим в чате' : 'Скоро выберу место и напишу в чате' });
-  } else if (res.theme) rows.push({ label: 'Групповые', value: (th && th.loc ? 'Рекомендуемая локация: ' + th.loc + '. ' : '') + 'Место выбираем в чате' });
+  } else if (res.theme && !placeRemoved(cls)) rows.push({ label: 'Групповые', value: (th && th.loc ? 'Рекомендуемая локация: ' + th.loc + '. ' : '') + 'Место выбираем в чате' });
   rows.push({ label: 'Дата и время съёмки', value: cls.shoot || LATER, muted: !cls.shoot });
   rows.push({ label: 'Адрес студии', value: cls.address || LATER, muted: !cls.address });
   rows.push({ label: 'Что взять с собой', value: cls.bring || LATER, muted: !cls.bring });

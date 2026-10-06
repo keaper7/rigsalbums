@@ -189,6 +189,12 @@ test('полный сценарий голосования', async t => {
   const somePlace = cat.place[0].key;
   r = await kid3.req('POST', '/k/' + copy.slug + '/vote', { json: { step: 'place', option: somePlace } });
   assert.strictEqual(r.status, 400);
+  // В шпаргалке нет строки «Групповые», если этап убран
+  const V = require('../lib/voting');
+  const noPlaceCls = app.store.getClass(+copyId);
+  const rowsNoPlace = V.cheat(noPlaceCls, { theme: { option: { name: 'CLASSIC', loc: '' } } });
+  assert.ok(!rowsNoPlace.some(x => x.label === 'Групповые'));
+  assert.ok(V.cheat(Object.assign({}, noPlaceCls, { hidden: [] }), { theme: { option: { name: 'CLASSIC', loc: '' } } }).some(x => x.label === 'Групповые'));
   r = await admin.req('POST', '/admin/c/' + copyId + '/options', { form: new URLSearchParams({ _csrf: admin.csrf }) });
   assert.strictEqual(r.status, 400);
   assert.match(r.text, /хотя бы один этап/);

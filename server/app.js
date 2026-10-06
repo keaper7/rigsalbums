@@ -521,17 +521,18 @@ function createApp(cfg) {
     const on = [].concat(ctx.form.on || []);
     const cat = catalog();
     const hidden = [];
-    let empty = false;
+    // Этап без единого варианта убирается у класса целиком (например, место уже выбрали заранее).
+    // Но хотя бы один этап для голосования должен остаться
+    let steps = 0;
     STEPS.forEach(step => {
-      const visible = cat[step].filter(o => !o.hidden);
       let kept = 0;
-      visible.forEach(o => {
+      cat[step].filter(o => !o.hidden).forEach(o => {
         const k = step + ':' + o.key;
         if (on.indexOf(k) === -1) hidden.push(k); else kept++;
       });
-      if (visible.length && !kept) empty = true;
+      if (kept) steps++;
     });
-    if (empty) return page(ctx, 400, classView(ctx, cls, { err: 'В каждом этапе должен остаться хотя бы один вариант' }));
+    if (!steps) return page(ctx, 400, classView(ctx, cls, { err: 'Оставьте хотя бы один этап для голосования' }));
     store.updateClass(cls.id, { hidden: hidden });
     back(ctx, '/admin/c/' + cls.id + '#options', 'saved');
   });

@@ -384,6 +384,11 @@ function classPage(o) {
   const share = 'Привет! Это страница вашего класса, тут выбираем альбом: ' + url;
   const all = o.catalog;
   const hiddenCount = STEPS.reduce((n, step) => n + all[step].filter(x => !x.hidden && c.hidden.indexOf(step + ':' + x.key) !== -1).length, 0);
+  // Этапы, где класс не видит ни одного варианта, — убраны из голосования
+  const offSteps = STEPS.filter(step => {
+    const vis = all[step].filter(x => !x.hidden);
+    return vis.length && vis.every(x => c.hidden.indexOf(step + ':' + x.key) !== -1);
+  });
   return layout({
     title: c.title + ' · ' + c.school, nav: 'classes', sess: o.sess, msg: o.msg, err: o.err,
     body: html`<a class="back" href="/admin">← Классы</a>
@@ -415,12 +420,12 @@ ${resultsBlock(o)}
 </form>
 
 <details class="card fold" id="options"${o.open === 'options' ? raw(' open') : ''}>
-  <summary class="fold__h"><span><b>Варианты для этого класса</b><small>${hiddenCount ? 'Скрыто для класса: ' + hiddenCount : 'Класс видит все варианты'}</small></span></summary>
+  <summary class="fold__h"><span><b>Варианты для этого класса</b><small>${offSteps.length ? 'Убрано из голосования: ' + offSteps.map(st => STEP_NAMES[st].toLowerCase()).join(', ') + (hiddenCount > offSteps.reduce((n, st) => n + all[st].filter(x => !x.hidden).length, 0) ? '; есть скрытые варианты' : '') : hiddenCount ? 'Скрыто для класса: ' + hiddenCount : 'Класс видит все варианты'}</small></span></summary>
   <form class="form" method="post" action="/admin/c/${c.id}/options">
   ${csrf(o.sess)}
-  <p class="muted small">Снимите галочку, чтобы вариант не показывался этому классу.</p>
+  <p class="muted small">Снимите галочку, чтобы вариант не показывался этому классу. Снимите все галочки в этапе — и этап уберётся из голосования целиком (например, место уже выбрали заранее; его можно написать в шпаргалке в поле «Ещё»).</p>
   ${STEPS.map(step => html`<fieldset class="checks">
-    <legend>${STEP_NAMES[step]}</legend>
+    <legend>${STEP_NAMES[step]}${offSteps.indexOf(step) !== -1 ? html` <small class="muted">убран из голосования</small>` : ''}</legend>
     ${all[step].map(x => {
       const on = c.hidden.indexOf(step + ':' + x.key) === -1;
       return html`<label class="check${x.hidden ? ' is-off' : ''}"><input type="checkbox" name="on" value="${step}:${x.key}"${on ? raw(' checked') : ''}${x.hidden ? raw(' disabled') : ''}><span>${x.name}${x.hidden ? html` <small>скрыт в разделе «Варианты»</small>` : ''}</span></label>`;

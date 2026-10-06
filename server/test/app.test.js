@@ -178,6 +178,23 @@ test('полный сценарий голосования', async t => {
   r = await kid3.req('POST', '/k/' + copy.slug + '/vote', { json: { step: 'theme', option: 'neon' } });
   assert.strictEqual(r.status, 400);
 
+  // Этап можно убрать у класса целиком, но не все этапы сразу
+  const noPlace = new URLSearchParams({ _csrf: admin.csrf });
+  on.filter(v => v.indexOf('place:') !== 0).forEach(v => noPlace.append('on', v));
+  r = await admin.req('POST', '/admin/c/' + copyId + '/options', { form: noPlace });
+  assert.strictEqual(r.status, 303);
+  r = await kid3.req('GET', '/k/' + copy.slug);
+  assert.doesNotMatch(r.text, /id="s-place"/);
+  assert.match(r.text, /id="s-theme"/);
+  const somePlace = cat.place[0].key;
+  r = await kid3.req('POST', '/k/' + copy.slug + '/vote', { json: { step: 'place', option: somePlace } });
+  assert.strictEqual(r.status, 400);
+  r = await admin.req('POST', '/admin/c/' + copyId + '/options', { form: new URLSearchParams({ _csrf: admin.csrf }) });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.text, /хотя бы один этап/);
+  r = await admin.req('POST', '/admin/c/' + copyId + '/options', { form: form });
+  assert.strictEqual(r.status, 303);
+
   // Заново открыть закрытое голосование: ручной выбор сбрасывается
   await admin.post('/admin/c/' + id + '/open', { duration_min: '15' });
   const again = app.store.getClass(+id);

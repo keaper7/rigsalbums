@@ -15,6 +15,8 @@ const MSG = {
   unscheduled: 'Запланированный старт отменён',
   closed: 'Голосование закрыто',
   extended: 'Время продлено',
+  until: 'Время окончания изменено',
+  stepreset: 'Голоса этапа обнулены. Ребята могут проголосовать в нём заново',
   reopened: 'Голосование открыто заново',
   picked: 'Выбор класса сохранён',
   unpicked: 'Ручной выбор сброшен, итог снова по голосам',
@@ -68,6 +70,8 @@ function photosN(n) { return n + ' фото'; }
 
 function left(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400);
+  if (d) return d + ' д ' + Math.floor(s / 3600) % 24 + ' ч';
   const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
   const two = n => (n < 10 ? '0' : '') + n;
   return h ? h + ':' + two(m) + ':' + two(sec) : m + ':' + two(sec);
@@ -120,7 +124,8 @@ ${o.msg && MSG[o.msg] ? html`<p class="flash" role="status">${MSG[o.msg]}</p>
 </main>
 <p class="toast" role="status" aria-live="polite" hidden></p>
 <script src="/admin/static/admin.js"></script>
-</body>
+${(o.scripts || []).map(src => html`<script src="${src}"></script>
+`)}</body>
 </html>
 `.s;
 }
@@ -214,6 +219,11 @@ ${o.classes.length > 5 ? html`<label class="search"><span class="sr">Поиск<
   });
 }
 
+// «Или до» — точная дата окончания вместо длительности
+function untilField(now, label) {
+  return html`<label class="field field--inline until"><span>${label || 'или до'}</span><input type="datetime-local" name="until" min="${toLocalInput(now)}"></label>`;
+}
+
 // ---------- новый класс ----------
 
 function durationSelect(name, value, base) {
@@ -299,6 +309,7 @@ function resultsBlock(o) {
     ${note}
     <ul class="bars">${shown.map(row)}</ul>
     ${rest.length ? html`<details class="more more--rest"><summary>Показать ещё ${rest.length} без голосов</summary><ul class="bars">${rest.map(row)}</ul></details>` : ''}
+    ${total ? html`<form method="post" action="/admin/c/${c.id}/resetstep" class="res__reset" data-confirm="Обнулить все голоса этапа «${STEP_NAMES[step]}» (${votes(total)})? Ребята смогут проголосовать в нём заново, остальные этапы не изменятся.">${csrf(o.sess)}<input type="hidden" name="step" value="${step}"><button class="link" type="submit">Обнулить голоса этапа</button></form>` : ''}
   </div>`;
   });
   return html`<div class="card" id="results"${st === 'open' ? html` data-refresh="/admin/c/${c.id}/results"` : ''}>
@@ -325,7 +336,7 @@ function controlBlock(o) {
     if (at) {
       return html`<div class="card ctl ctl--plan">
   <div class="card__h"><h2 class="h">Старт запланирован</h2><span class="chip chip--plan">${fmtWhen(at, now)}</span></div>
-  <p class="muted">Голосование начнётся ${fmtWhen(at, now)} и продлится ${minutes(c.duration_min)}. До этого ребята видят варианты, но голосовать не могут. Страница откроется у всех сама.</p>
+  <p class="muted">Голосование начнётся ${fmtWhen(at, now)} и ${c.ends_at === at + c.duration_min * 60000 ? html`продлится ${minutes(c.duration_min)}` : html`закончится ${fmtWhen(c.ends_at, now)}`}. До этого ребята видят варианты, но голосовать не могут. Страница откроется у всех сама.</p>
   <p class="count count--sm" data-ends="${at}" data-now="${now}">${left(at - now)}</p>
   <div class="ctl__btns ctl__btns--two">
     <form method="post" action="/admin/c/${c.id}/open">${csrf(o.sess)}<input type="hidden" name="duration_min" value="${c.duration_min}"><button class="b b--main" type="submit">Начать сейчас</button></form>
@@ -340,14 +351,17 @@ function controlBlock(o) {
   <form method="post" action="/admin/c/${c.id}/open" class="ctl__row">
     ${csrf(o.sess)}
     <label class="field field--inline"><span>Длится</span>${durationSelect('duration_min', c.duration_min)}</label>
+    ${untilField(now)}
     <button class="b b--main" type="submit">Начать сейчас</button>
   </form>
+  <p class="muted small until__hint">Можно указать точную дату окончания, например 12 октября 23:59 — тогда длительность не учитывается.</p>
   <details class="more">
     <summary>Запланировать старт на время</summary>
     <form method="post" action="/admin/c/${c.id}/schedule" class="form plan">
       ${csrf(o.sess)}
       <label class="field"><span>Когда начать</span><input type="datetime-local" name="at" value="${toLocalInput(soon)}" min="${toLocalInput(now)}" required></label>
       <label class="field field--inline"><span>Длится</span>${durationSelect('duration_min', c.duration_min)}</label>
+      ${untilField(now)}
       <button class="b b--main" type="submit">Запланировать</button>
     </form>
   </details>
@@ -355,13 +369,21 @@ function controlBlock(o) {
   }
   if (st === 'open') {
     return html`<div class="card ctl ctl--live">
-  <div class="card__h"><h2 class="h">Идёт голосование</h2><span class="chip chip--live">до ${fmtTime(c.ends_at)}</span></div>
+  <div class="card__h"><h2 class="h">Идёт голосование</h2><span class="chip chip--live">до ${c.ends_at - now < 20 * 60 * 60 * 1000 ? fmtTime(c.ends_at) : fmtWhen(c.ends_at, now)}</span></div>
   <p class="count" data-ends="${c.ends_at}" data-now="${now}">${left(c.ends_at - now)}</p>
   <div class="ctl__btns">
     <form method="post" action="/admin/c/${c.id}/extend">${csrf(o.sess)}<input type="hidden" name="min" value="15"><button class="b" type="submit">+15 мин</button></form>
     <form method="post" action="/admin/c/${c.id}/extend">${csrf(o.sess)}<input type="hidden" name="min" value="60"><button class="b" type="submit">+1 час</button></form>
     <form method="post" action="/admin/c/${c.id}/close" data-confirm="Закрыть голосование сейчас? Класс сразу увидит итог.">${csrf(o.sess)}<button class="b b--danger" type="submit">Закрыть сейчас</button></form>
   </div>
+  <details class="more">
+    <summary>Изменить время окончания</summary>
+    <form method="post" action="/admin/c/${c.id}/until" class="ctl__row">
+      ${csrf(o.sess)}
+      <label class="field field--inline"><span>До</span><input type="datetime-local" name="until" value="${toLocalInput(c.ends_at)}" min="${toLocalInput(now)}" required></label>
+      <button class="b b--main" type="submit">Сохранить</button>
+    </form>
+  </details>
 </div>`;
   }
   return html`<div class="card ctl">
@@ -372,6 +394,7 @@ function controlBlock(o) {
     <form method="post" action="/admin/c/${c.id}/open" class="ctl__row" data-confirm="Открыть голосование заново?">
       ${csrf(o.sess)}
       <label class="field field--inline"><span>Ещё</span>${durationSelect('duration_min', 30, REOPEN)}</label>
+      ${untilField(now)}
       <button class="b" type="submit">Открыть</button>
     </form>
   </details>
@@ -435,6 +458,8 @@ ${resultsBlock(o)}
   </form>
 </details>
 
+<a class="card fold__link" href="/admin/c/${c.id}/photos"><b>Отбор фото</b><small>${o.pk && (o.pk.photos || o.pk.students) ? (o.pk.closed ? 'Отбор закрыт · ' : '') + o.pk.photos + ' фото · начали выбирать ' + o.pk.started + ' из ' + o.pk.students : 'Личные фото, общие групповые, цитаты и раскладка по папкам'}</small></a>
+
 <details class="card fold" id="info"${o.open === 'info' ? raw(' open') : ''}>
   <summary class="fold__h"><span><b>Название, год, адрес ссылки</b><small>${c.school} · ${c.title} · ${c.year}</small></span></summary>
   <form class="form" method="post" action="/admin/c/${c.id}/info">
@@ -458,7 +483,7 @@ ${resultsBlock(o)}
   <div class="danger">
   <form method="post" action="/admin/c/${c.id}/archive">${csrf(o.sess)}<input type="hidden" name="on" value="${c.archived ? 0 : 1}"><button class="b" type="submit">${c.archived ? 'Вернуть из архива' : 'Убрать в архив'}</button></form>
   <form method="post" action="/admin/c/${c.id}/reset" data-confirm="Удалить все голоса этого класса? Это нельзя отменить.">${csrf(o.sess)}<button class="b b--danger" type="submit">Сбросить голоса</button></form>
-  <form method="post" action="/admin/c/${c.id}/delete" data-confirm="Удалить страницу класса вместе с голосами? Ссылка перестанет работать. Это нельзя отменить.">${csrf(o.sess)}<button class="b b--danger" type="submit">Удалить класс</button></form>
+  <form method="post" action="/admin/c/${c.id}/delete" data-confirm="Удалить страницу класса вместе с голосами${o.pk && (o.pk.photos || o.pk.students) ? ' и отбором фото (выбор учеников и цитаты)' : ''}? Ссылки перестанут работать. Это нельзя отменить.">${csrf(o.sess)}<button class="b b--danger" type="submit">Удалить класс</button></form>
   </div>
 </div>`
   });

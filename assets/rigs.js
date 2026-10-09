@@ -1634,33 +1634,41 @@
     var st = stage(box);
     // Где снимок ложится: сдвиг от центра в долях ширины и высоты экрана и наклон
     var SPOT = [[-.2, -.2, -9], [.2, -.24, 7], [-.03, -.02, 3], [-.24, .17, -6], [.23, .12, 10], [.02, .26, -7], [.1, -.08, -3]];
-    var backOut = function (t) { var c = 1.3; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
-    var els = [bg].concat(cards);
-    // Снимки «бросают» на стол: каждый появляется крупным, как будто ещё в воздухе над столом, и садится на своё место
-    // с лёгким шлепком. Движение в основном — масштаб, на экране снимок почти не едет: при медленной прокрутке
-    // пальцем ничего не дёргается (снимок, пролетающий весь экран за пару сантиметров прокрутки, усиливает любую
-    // неровность движения пальца). Потом снимки плавно разъезжаются в стороны, не быстрее чем вдвое быстрее пальца
-    var at = function (p) {
-      var v = [{ opacity: (clamp01((p - .08) / .17) * (1 - clamp01((p - .72) / .16))).toFixed(3) }];
+    // Снимки «бросают» на стол. Раньше каждый кадр движения считался от прокрутки, и на iPhone закреплённый
+    // экран и пересчёт по пальцу расходились на долю кадра — снимки мелко дрожали. Теперь прокрутка только
+    // говорит «пора»: снимки ложатся и разъезжаются сами, по времени, плавными переходами на видеочипе,
+    // как бы неровно ни двигался палец
+    var setSpots = function () {
+      var W = window.innerWidth, H = U.vh * 100 || window.innerHeight;
       cards.forEach(function (c, i) {
         var sp = SPOT[i % SPOT.length], dir = sp[0] < 0 ? -1 : 1;
-        var t = clamp01((p - (.03 + i * .05)) / .2), f = backOut(t);
-        var txW = sp[0] + (1 - f) * dir * .06, tyH = sp[1] - (1 - f) * .05;
-        var rot = sp[2] + (1 - f) * (i % 2 ? 16 : -16), sc = 1 + (1 - f) * .5;
-        var go = clamp01((p - (.6 + i * .02)) / .24);
-        go = 1 - Math.cos(go * Math.PI / 2);
-        txW += go * dir * .9;
-        tyH -= go * .08;
-        rot += go * dir * 22;
-        v.push({
-          transform: 'translate3d(' + len(0, 0, txW) + ',' + len(0, tyH) + ',0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(3) + ')',
-          opacity: clamp01(t / .3).toFixed(3)
-        });
+        var x = sp[0] * W, y = sp[1] * H;
+        c.style.setProperty('--i', i);
+        // в воздухе: крупнее, чуть в стороне и с бо́льшим наклоном
+        c.style.setProperty('--from', 'translate3d(' + (x + dir * .06 * W).toFixed(1) + 'px,' + (y - .05 * H).toFixed(1) + 'px,0) rotate(' + (sp[2] + (i % 2 ? 16 : -16)) + 'deg) scale(1.5)');
+        c.style.setProperty('--at', 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0) rotate(' + sp[2] + 'deg)');
+        // уезжает за край экрана в свою сторону
+        c.style.setProperty('--away', 'translate3d(' + (x + dir * .9 * W).toFixed(1) + 'px,' + (y - .08 * H).toFixed(1) + 'px,0) rotate(' + (sp[2] + dir * 22) + 'deg)');
       });
-      return v;
     };
-    if (viewTl) onRebuild(scrollKeys(st, 'desk', els, at, 400));
-    else st.fns.push(function (p) { applyAt(els, at(p)); });
+    setSpots();
+    box.classList.add('is-time');
+    var phase = '';
+    var show = function (ph) {
+      if (ph === phase) return;
+      if (ph === 'land') setSpots();
+      phase = ph;
+      box.classList.toggle('is-land', ph === 'land');
+      box.classList.toggle('is-gone', ph === 'gone');
+    };
+    // Небольшой запас у границ, чтобы на самой границе не мигало туда-сюда
+    st.fns.push(function (p) {
+      if (p < .04) show('');
+      else if (p < .06 && phase !== 'land') show(phase === 'gone' ? 'land' : '');
+      else if (p > .64) show('gone');
+      else if (p > .06 && p < .6) show('land');
+    });
+    onRebuild(function () { if (!phase) setSpots(); });
   })();
 
   // ---------- «Приближение» ----------

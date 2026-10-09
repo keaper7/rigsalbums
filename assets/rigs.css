@@ -482,6 +482,25 @@ ol, ul { padding: 0; list-style: none; }
 .ft__small { margin-top: 30px; font-size: 12px; color: var(--ink-2); }
 .ft__mark { margin-top: 44px; padding-bottom: 34px; padding-bottom: calc(34px + env(safe-area-inset-bottom, 0px)); }
 .ft__mark span { margin-top: 14px; }
+/* Строка под знаком: слева «SCHOOL ALBUMS · NALCHIK», справа подпись разработчика тем же шрифтом
+   и разрядкой — тихо, в ритме строки; на узком экране переносится под неё */
+/* знак по ширине слова, чтобы строка под ним кончалась ровно под последней буквой */
+.ft__mark { width: -webkit-max-content; width: max-content; max-width: 100%; }
+.ft__mark .ft__line { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: baseline; gap: 12px; white-space: nowrap; }
+/* Всегда одной строкой: на телефоне строка короче, поэтому разрядка и размер подстраиваются под ширину экрана */
+@media (max-width: 959px) {
+  .ft__mark .ft__line { font-size: 10px; letter-spacing: 1.2px; letter-spacing: clamp(1.2px, calc((100vw - 320px) / 40 + 1.2px), 4.5px); }
+}
+.ft__mark .ft__line span { display: inline; margin: 0; font: inherit; letter-spacing: inherit; color: inherit; }
+.ft__by { position: relative; text-decoration: none; color: var(--ink-2); white-space: nowrap; -webkit-transition: color .25s ease; transition: color .25s ease; }
+/* у стрелки своей разрядки нет — подпись кончается ровно по краю последней буквы знака */
+.ft__by i { display: inline-block; margin-left: .05em; font-style: normal; letter-spacing: 0; -webkit-transition: -webkit-transform .25s ease; transition: transform .25s ease; }
+.ft__by b { font-weight: 800; color: var(--ink); -webkit-transition: color .25s ease; transition: color .25s ease; }
+.ft__by:after { content: ''; position: absolute; left: 0; right: .5em; bottom: -5px; height: 1px; background: currentColor; opacity: 0; -webkit-transform: scaleX(.4); transform: scaleX(.4); -webkit-transform-origin: 0 50%; transform-origin: 0 50%; -webkit-transition: opacity .25s ease, -webkit-transform .35s ease; transition: opacity .25s ease, transform .35s ease; }
+.ft__by:hover, .ft__by:focus-visible { color: var(--wine); }
+.ft__by:hover b, .ft__by:focus-visible b { color: var(--wine); }
+.ft__by:hover i { -webkit-transform: translate(2px, -2px); transform: translate(2px, -2px); }
+.ft__by:hover:after, .ft__by:focus-visible:after { opacity: .5; -webkit-transform: none; transform: none; }
 
 /* ---------- sticky cta ---------- */
 .dock {
@@ -1395,7 +1414,7 @@ p, li { text-wrap: pretty; }
 /* --- «Почему так дорого»: римские цифры поворачиваются на место --- */
 .js .why__list li.rv .why__n {
   opacity: 0; -webkit-transform: translate3d(0, 30%, 0) rotate(-14deg); transform: translate3d(0, 30%, 0) rotate(-14deg);
-  -webkit-transition: -webkit-transform .8s cubic-bezier(.34, 1.4, .64, 1) .2s, opacity .4s ease .2s; transition: transform .8s cubic-bezier(.34, 1.4, .64, 1) .2s, opacity .4s ease .2s;
+  -webkit-transition: -webkit-transform .8s cubic-bezier(.2, .8, .25, 1) .2s, opacity .4s ease .2s; transition: transform .8s cubic-bezier(.2, .8, .25, 1) .2s, opacity .4s ease .2s;
 }
 .js .why__list li.rv.in .why__n { opacity: 1; -webkit-transform: none; transform: none; }
 
@@ -1631,18 +1650,17 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .fx .why__quote.is-ink .ink.on { opacity: 1; }
 /* …а римские цифры ставятся, как оттиск штампа: падают крупно и с наклоном, прижимаются и чуть отскакивают */
 .why__n { display: inline-block; -webkit-transform-origin: 50% 60%; transform-origin: 50% 60%; }
-.fx .why__list li.rv .why__n { opacity: 0; }
-.fx .why__list li.rv.in .why__n { -webkit-animation: stamp .62s cubic-bezier(.55, 0, .7, .2) .28s both; animation: stamp .62s cubic-bezier(.55, 0, .7, .2) .28s both; }
+.fx .why__list li.rv .why__n { opacity: 0; -webkit-transition: none; transition: none; }
+/* Одно плавное движение без отскока: отскок (сжаться — разжаться) выглядел как лишние рывки */
+.fx .why__list li.rv.in .why__n { -webkit-animation: stamp .7s cubic-bezier(.2, .8, .25, 1) .25s both; animation: stamp .7s cubic-bezier(.2, .8, .25, 1) .25s both; }
 @-webkit-keyframes stamp {
-  0% { opacity: 0; -webkit-transform: scale(2.4) rotate(-14deg); transform: scale(2.4) rotate(-14deg); }
-  62% { opacity: 1; -webkit-transform: scale(.9) rotate(-3deg); transform: scale(.9) rotate(-3deg); }
-  80% { -webkit-transform: scale(1.05) rotate(-5deg); transform: scale(1.05) rotate(-5deg); }
+  0% { opacity: 0; -webkit-transform: scale(1.8) rotate(-12deg); transform: scale(1.8) rotate(-12deg); }
+  45% { opacity: 1; }
   100% { opacity: 1; -webkit-transform: rotate(-4deg); transform: rotate(-4deg); }
 }
 @keyframes stamp {
-  0% { opacity: 0; -webkit-transform: scale(2.4) rotate(-14deg); transform: scale(2.4) rotate(-14deg); }
-  62% { opacity: 1; -webkit-transform: scale(.9) rotate(-3deg); transform: scale(.9) rotate(-3deg); }
-  80% { -webkit-transform: scale(1.05) rotate(-5deg); transform: scale(1.05) rotate(-5deg); }
+  0% { opacity: 0; -webkit-transform: scale(1.8) rotate(-12deg); transform: scale(1.8) rotate(-12deg); }
+  45% { opacity: 1; }
   100% { opacity: 1; -webkit-transform: rotate(-4deg); transform: rotate(-4deg); }
 }
 
@@ -1918,6 +1936,24 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 }
 .desk__ph img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; border-radius: 1px; }
 @media (min-width: 960px) { .desk__ph { width: 17vw; max-width: 260px; left: calc(50% - min(8.5vw, 130px)); top: calc(50% - min(11.6vw, 177px)); } }
+/* Снимки ложатся и разъезжаются по времени (см. rigs.js «Фото на стол»): прокрутка только переключает
+   «лежат» / «уехали», движение идёт плавными переходами на видеочипе и не зависит от неровностей пальца */
+.desk.is-time .desk__ph {
+  -webkit-transform: var(--from); transform: var(--from); opacity: 0;
+  -webkit-transition: -webkit-transform .5s cubic-bezier(.4, 0, .9, .6), opacity .3s ease; transition: transform .5s cubic-bezier(.4, 0, .9, .6), opacity .3s ease;
+}
+.desk.is-time.is-land .desk__ph {
+  -webkit-transform: var(--at); transform: var(--at); opacity: 1;
+  -webkit-transition: -webkit-transform .75s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .11s), opacity .35s ease calc(var(--i) * .11s);
+  transition: transform .75s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .11s), opacity .35s ease calc(var(--i) * .11s);
+}
+.desk.is-time.is-gone .desk__ph {
+  -webkit-transform: var(--away); transform: var(--away); opacity: 0;
+  -webkit-transition: -webkit-transform .8s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .04s), opacity .5s ease calc(.25s + var(--i) * .04s);
+  transition: transform .8s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .04s), opacity .5s ease calc(.25s + var(--i) * .04s);
+}
+.desk.is-time .desk__bg { -webkit-transition: opacity .45s ease; transition: opacity .45s ease; }
+.desk.is-time.is-land .desk__bg { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .desk.is-on { display: none; }

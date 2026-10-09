@@ -329,6 +329,11 @@ class Store {
     this.db.prepare('DELETE FROM votes WHERE class_id = ?').run(classId);
   }
 
+  // Голоса одного этапа: например, ребята в шутку накидали голосов, и этап переголосовывают
+  resetStepVotes(classId, step) {
+    return this.db.prepare('DELETE FROM votes WHERE class_id = ? AND step = ?').run(classId, step).changes;
+  }
+
   // ---------- сессии админки ----------
   createSession(id, ttl) {
     const now = Date.now();

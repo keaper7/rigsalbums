@@ -389,6 +389,8 @@
   function two(n) { return (n < 10 ? '0' : '') + n; }
   function fmtLeft(ms) {
     var s = Math.max(0, Math.floor(ms / 1000));
+    // Больше суток — дни и часы: «3 д 4 ч»
+    if (s >= 86400) return Math.floor(s / 86400) + ' д ' + Math.floor(s / 3600) % 24 + ' ч';
     var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
     return h ? h + ':' + two(m) + ':' + two(s % 60) : m + ':' + two(s % 60);
   }

@@ -13,6 +13,8 @@ const { Media, FILE_RE, ID_RE } = require('./lib/media');
 const { Site, SLOTS, COVER, coverKey, coverSrc, GALLERIES, TEXTS, TOGGLES, PAGES, DATE_RE } = require('./lib/site');
 const klassView = require('./views/klass');
 const A = require('./views/admin');
+const PV = require('./views/photos');
+const { Photos, PHOTO_ID } = require('./lib/photos');
 
 const RESERVED = ['admin', 'assets', 'state', 'vote', 'react', 'new', 'media'];
 const VOTER_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -103,6 +105,7 @@ function createApp(cfg) {
   const siteRoot = path.resolve(cfg.siteRoot);
   const media = new Media(store, cfg.mediaDir || path.join(cfg.dataDir, 'media'));
   const site = new Site(siteRoot, store);
+  const photos = new Photos(store, cfg.photosDir || path.join(cfg.dataDir, 'photos'));
 
   // «Работы» разделились на пять разделов. Если галерею уже меняли в админке,
   // групповые фото из неё переезжают в свои разделы, в «Индивидуальной» остаются остальные
@@ -431,7 +434,8 @@ function createApp(cfg) {
       msg: ctx.q('m'),
       url: baseUrl(ctx) + '/k/' + cls.slug,
       nextTitle: nextTitle(cls.title),
-      defaults: defaultsFor(store)
+      defaults: defaultsFor(store),
+      pk: { photos: photos.photos(cls.id).length, students: photos.students(cls.id).length, started: photos.startedIds(cls.id).size, closed: !!(photos.album(cls.id) || {}).closed_at }
     }, extra || {}));
   }
 
@@ -457,13 +461,29 @@ function createApp(cfg) {
     });
   }
 
+  // Конец голосования: либо «длится N», либо «до такого-то дня и времени» (поле until)
+  const UNTIL_MAX = 60 * 24 * 60 * 60 * 1000;
+  function endFrom(ctx, start, def) {
+    const raw = str(ctx.form.until, 30);
+    if (raw) {
+      const until = fromLocalInput(raw);
+      if (!until) return { err: 'Не получилось прочитать дату окончания' };
+      if (until < start + 60 * 1000) return { err: 'Время окончания должно быть позже начала' };
+      if (until > start + UNTIL_MAX) return { err: 'Голосование может длиться не больше двух месяцев' };
+      return { ends: until };
+    }
+    const min = int(ctx.form.duration_min, 1, 600, def);
+    return { ends: start + min * 60000, min: min };
+  }
+
   act('open', (ctx, cls) => {
     const now = Date.now();
     const st = V.status(cls, now);
     if (st === 'open') return back(ctx, '/admin/c/' + cls.id);
-    const min = int(ctx.form.duration_min, 1, 600, cls.duration_min);
-    const f = { opened_at: st === 'draft' ? now : cls.opened_at, ends_at: now + min * 60000, closed_at: null };
-    if (st === 'draft') f.duration_min = min;
+    const e = endFrom(ctx, now, cls.duration_min);
+    if (e.err) return page(ctx, 400, classView(ctx, cls, { err: e.err }));
+    const f = { opened_at: st === 'draft' ? now : cls.opened_at, ends_at: e.ends, closed_at: null };
+    if (st === 'draft' && e.min) f.duration_min = e.min;
     else f.picks = {};
     store.updateClass(cls.id, f);
     back(ctx, '/admin/c/' + cls.id, st === 'draft' ? 'opened' : 'reopened');
@@ -478,16 +498,42 @@ function createApp(cfg) {
       return back(ctx, '/admin/c/' + cls.id, 'unscheduled');
     }
     const at = fromLocalInput(str(ctx.form.at, 30));
-    const min = int(ctx.form.duration_min, 1, 600, cls.duration_min);
     if (!at || at < now + 30 * 1000) return page(ctx, 400, classView(ctx, cls, { err: 'Время старта должно быть в будущем' }));
     if (at > now + 60 * 24 * 60 * 60 * 1000) return page(ctx, 400, classView(ctx, cls, { err: 'Запланировать можно не дальше чем на два месяца вперёд' }));
-    store.updateClass(cls.id, { opened_at: at, ends_at: at + min * 60000, closed_at: null, duration_min: min });
+    const e = endFrom(ctx, at, cls.duration_min);
+    if (e.err) return page(ctx, 400, classView(ctx, cls, { err: e.err }));
+    const f = { opened_at: at, ends_at: e.ends, closed_at: null };
+    if (e.min) f.duration_min = e.min;
+    store.updateClass(cls.id, f);
     back(ctx, '/admin/c/' + cls.id, 'scheduled');
   });
 
   act('close', (ctx, cls) => {
     if (V.status(cls) === 'open') store.updateClass(cls.id, { closed_at: Date.now() });
     back(ctx, '/admin/c/' + cls.id, 'closed');
+  });
+
+  // Идущее голосование: поставить точное время окончания
+  act('until', (ctx, cls) => {
+    const now = Date.now();
+    if (V.status(cls, now) !== 'open') return back(ctx, '/admin/c/' + cls.id);
+    const until = fromLocalInput(str(ctx.form.until, 30));
+    if (!until) return page(ctx, 400, classView(ctx, cls, { err: 'Не получилось прочитать дату окончания' }));
+    if (until < now + 60 * 1000) return page(ctx, 400, classView(ctx, cls, { err: 'Время окончания должно быть в будущем. Чтобы закончить сейчас, нажмите «Закрыть сейчас»' }));
+    if (until > now + UNTIL_MAX) return page(ctx, 400, classView(ctx, cls, { err: 'Голосование может длиться не больше двух месяцев' }));
+    store.updateClass(cls.id, { ends_at: until });
+    back(ctx, '/admin/c/' + cls.id, 'until');
+  });
+
+  // Обнулить голоса одного этапа: ребята смогут проголосовать в нём заново
+  act('resetstep', (ctx, cls) => {
+    const step = str(ctx.form.step, 20);
+    if (STEPS.indexOf(step) === -1) return back(ctx, '/admin/c/' + cls.id);
+    store.resetStepVotes(cls.id, step);
+    const picks = Object.assign({}, cls.picks);
+    delete picks[step];
+    store.updateClass(cls.id, { picks: picks });
+    back(ctx, '/admin/c/' + cls.id + '#results', 'stepreset');
   });
 
   act('extend', (ctx, cls) => {
@@ -551,8 +597,8 @@ function createApp(cfg) {
       school: school, title: title, slug: slug,
       year: int(f.year, 2020, 2100, cls.year), duration_min: int(f.duration_min, 1, 600, cls.duration_min)
     };
-    // Если старт запланирован, конец двигаем вместе с новой длительностью
-    if (V.opensAt(cls)) f2.ends_at = cls.opened_at + f2.duration_min * 60000;
+    // Если старт запланирован и конец считался по длительности, двигаем его вместе с ней (точную дату окончания не трогаем)
+    if (V.opensAt(cls) && cls.ends_at === cls.opened_at + cls.duration_min * 60000) f2.ends_at = cls.opened_at + f2.duration_min * 60000;
     store.updateClass(cls.id, f2);
     back(ctx, '/admin/c/' + cls.id + '#info', 'saved');
   });
@@ -579,6 +625,7 @@ function createApp(cfg) {
 
   act('delete', (ctx, cls) => {
     store.deleteClass(cls.id);
+    photos.removeFiles(cls.id);
     presence.delete(cls.id);
     back(ctx, '/admin', 'deleted');
   });
@@ -944,6 +991,231 @@ function createApp(cfg) {
     return true;
   }
 
+  // ---------- отбор фото ----------
+  // Админка: /admin/c/:id/photos. Ученики: /f/:slug — отдельная ссылка, голосование /k/ не трогаем
+
+  const pickLimit = new Limiter(600, 10 * 60 * 1000);
+
+  function albumFor(cls) {
+    return photos.ensureAlbum(cls.id, slugify(cls.title + '-' + cls.school).slice(0, 30) + '-' + randomCode(6));
+  }
+
+  function photosView(ctx, cls, extra) {
+    const album = albumFor(cls);
+    const list = photos.photos(cls.id);
+    const students = photos.students(cls.id);
+    const picks = new Map(students.map(s => [s.id, photos.personal(s.id, album)]));
+    const counts = new Map(students.map(s => [s.id, picks.get(s.id).length]));
+    const group = photos.group(cls.id, album);
+    const inGroup = new Set(group.map(g => g.photo_id));
+    const byId = new Map(list.map(p => [p.id, p]));
+    const log = photos.log(cls.id, 60).map(l => Object.assign({}, l, { path: byId.has(l.photo_id) ? byId.get(l.photo_id).path : '', inGroup: inGroup.has(l.photo_id) }));
+    return PV.adminPage(Object.assign({
+      cls: cls, album: album, photos: list, students: students, counts: counts, groupCount: group.length, log: log,
+      disk: photos.disk(), usage: photos.usage(cls.id), picks: picks, byId: byId,
+      isGroup: s => photos.isGroupSection(album, s), sess: ctx.sess, base: baseUrl(ctx), msg: ctx.q('m')
+    }, extra || {}));
+  }
+
+  r.get('/admin/c/:id/photos', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return notFound(ctx);
+    page(ctx, 200, photosView(ctx, cls));
+  });
+
+  function pact(name, fn) {
+    r.post('/admin/c/:id/photos/' + name, ctx => {
+      const cls = loadClass(ctx);
+      if (!cls) return notFound(ctx);
+      fn(ctx, cls, albumFor(cls));
+    });
+  }
+  const pback = (ctx, cls, msg) => back(ctx, '/admin/c/' + cls.id + '/photos', msg);
+
+  pact('students', (ctx, cls) => {
+    const res = photos.setStudents(cls.id, String(ctx.form.names || '').slice(0, 20000));
+    if (res.dups.length) return page(ctx, 400, photosView(ctx, cls, { err: 'Повторяются имена: ' + res.dups.join(', ') + '. Если это разные ученики, добавьте фамилию или первую букву. Список не сохранён', names: ctx.form.names }));
+    if (res.kept.length) return page(ctx, 400, photosView(ctx, cls, { err: 'Остались в списке, потому что уже выбрали фото или написали цитату: ' + res.kept.join(', ') + '. Остальное сохранено' }));
+    pback(ctx, cls, 'students');
+  });
+
+  pact('rename', (ctx, cls) => {
+    const res = photos.renameStudent(cls.id, +ctx.form.student, ctx.form.name);
+    if (res.error) return page(ctx, 400, photosView(ctx, cls, { err: res.error }));
+    pback(ctx, cls, 'saved');
+  });
+
+  pact('settings', (ctx, cls, album) => {
+    photos.updateAlbum(cls.id, { personal_max: int(ctx.form.personal_max, 1, 20, album.personal_max), group_max: int(ctx.form.group_max, 1, 300, album.group_max) });
+    pback(ctx, cls, 'saved');
+  });
+
+  pact('sections', (ctx, cls) => {
+    const names = new Set(photos.photos(cls.id).map(p => p.section));
+    const on = [].concat(ctx.form.group || []).filter(s => names.has(s));
+    // Пустой список значит «по названию папки», поэтому «ни одного группового» храним явной меткой
+    photos.updateAlbum(cls.id, { group_sections: on.length ? on : ['\u0000'] });
+    pback(ctx, cls, 'saved');
+  });
+
+  pact('close', (ctx, cls) => { photos.updateAlbum(cls.id, { closed_at: Date.now() }); pback(ctx, cls, 'closed'); });
+  pact('open', (ctx, cls) => { photos.updateAlbum(cls.id, { closed_at: null }); pback(ctx, cls, 'opened'); });
+
+  pact('restore', (ctx, cls, album) => {
+    const ph = photos.photo(cls.id, ctx.form.photo);
+    if (!ph) return pback(ctx, cls);
+    const res = photos.setGroup(album, ph.id, true, null, 'Артур');
+    if (!res.ok) return page(ctx, 400, photosView(ctx, cls, { err: 'Групповых уже максимум. Уберите какое-то фото или увеличьте лимит' }));
+    pback(ctx, cls, 'saved');
+  });
+
+  pact('delsection', (ctx, cls) => {
+    photos.deleteSection(cls.id, str(ctx.form.section, 120));
+    pback(ctx, cls, 'removed');
+  });
+
+  r.get('/admin/api/c/:id/photos/have', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return H.json(ctx.res, 404, { error: 'Класс не найден' });
+    H.json(ctx.res, 200, { paths: photos.paths(cls.id) });
+  });
+
+  // Загрузка — под /admin/api/media/…: для этого пути nginx на сервере уже разрешает большие файлы
+  // (у остальных путей предел 1 МБ, а копия 1600 px с камеры бывает больше)
+  r.post('/admin/api/media/pk/:id', async ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) { ctx.req.resume(); return H.json(ctx.res, 404, { error: 'Класс не найден' }); }
+    albumFor(cls);
+    H.json(ctx.res, 200, await photos.savePhoto(cls.id, ctx.q('path'), ctx.req));
+  }, { raw: true });
+
+  r.post('/admin/api/media/pk/:id/:pid/sm', async ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) { ctx.req.resume(); return H.json(ctx.res, 404, { error: 'Класс не найден' }); }
+    H.json(ctx.res, 200, await photos.saveSmall(cls.id, ctx.params.pid, ctx.req));
+  }, { raw: true });
+
+  r.get('/admin/api/c/:id/photos/export', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return H.json(ctx.res, 404, { error: 'Класс не найден' });
+    H.json(ctx.res, 200, photos.exportPlan(cls.id));
+  });
+
+  // ----- страница учеников -----
+  const PK_COOKIE = id => 'rp' + id;
+
+  function pickCtx(ctx) {
+    const album = photos.albumBySlug(ctx.params.slug);
+    if (!album) return null;
+    const cls = store.getClass(album.class_id);
+    if (!cls) return null;
+    const admin = !!auth.session(ctx.cookies.rs);
+    const sid = +ctx.cookies[PK_COOKIE(cls.id)] || 0;
+    const me = sid ? photos.student(cls.id, sid) : null;
+    return { album: album, cls: cls, admin: admin, me: me };
+  }
+
+  function pickState(p) {
+    const students = photos.students(p.cls.id);
+    const names = {};
+    students.forEach(s => { names[s.id] = s.name; });
+    return {
+      closed: !!p.album.closed_at,
+      personalMax: p.album.personal_max,
+      groupMax: p.album.group_max,
+      group: photos.group(p.cls.id, p.album).map(g => [g.photo_id, g.student_id ? names[g.student_id] || 'ученик' : 'Артур']),
+      mine: p.me ? photos.personal(p.me.id, p.album) : [],
+      quote: p.me ? p.me.quote : '',
+      me: p.me ? { id: p.me.id, name: p.me.name } : null,
+      admin: p.admin && !p.me
+    };
+  }
+
+  r.get('/f/:slug', ctx => {
+    const p = pickCtx(ctx);
+    if (!p) return notFound(ctx);
+    // «Открыть как Артур» из админки: даже если в этом браузере раньше выбирали ученика, заходим как Артур
+    if (ctx.q('admin') && p.admin && p.me) {
+      H.setCookie(ctx.res, PK_COOKIE(p.cls.id), '', cookieOpts(ctx, 0));
+      p.me = null;
+    }
+    const list = photos.ready(p.cls.id);
+    const data = Object.assign(pickState(p), {
+      slug: p.album.slug,
+      students: (started => photos.students(p.cls.id).map(s => ({ id: s.id, name: s.name, started: started.has(s.id) })))(photos.startedIds(p.cls.id)),
+      photos: list.map(ph => [ph.id, ph.section, ph.w, ph.h, photos.isGroupSection(p.album, ph.section) ? 1 : 0, ph.ver])
+    });
+    H.send(ctx.res, 200, PV.pickPage({ cls: p.cls, data: data }), 'text/html; charset=utf-8', {
+      'Cache-Control': 'no-store',
+      'X-Robots-Tag': 'noindex, nofollow',
+      'Content-Security-Policy': "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    });
+  });
+
+  r.get('/f/:slug/state', ctx => {
+    const p = pickCtx(ctx);
+    if (!p) return H.json(ctx.res, 404, { error: 'not_found' });
+    H.json(ctx.res, 200, pickState(p));
+  });
+
+  r.get('/f/:slug/p/:file', ctx => {
+    const album = photos.albumBySlug(ctx.params.slug);
+    const m = /^([a-z0-9]{16})(-sm)?\.jpg$/.exec(ctx.params.file);
+    if (!album || !m || !photos.photo(album.class_id, m[1])) return notFound(ctx);
+    if (!H.serveStatic(photos.classDir(album.class_id), ctx.req, ctx.res, '/' + ctx.params.file, [], { cache: 'private, max-age=604800' })) notFound(ctx);
+  });
+
+  r.post('/f/:slug/me', ctx => {
+    const p = pickCtx(ctx);
+    if (!p) return H.json(ctx.res, 404, { error: 'not_found' });
+    const s = photos.student(p.cls.id, +(ctx.body && ctx.body.student));
+    if (!s) return H.json(ctx.res, 400, { error: 'Такого ученика нет в списке' });
+    H.setCookie(ctx.res, PK_COOKIE(p.cls.id), String(s.id), cookieOpts(ctx, YEAR));
+    p.me = s;
+    H.json(ctx.res, 200, pickState(p));
+  });
+
+  r.post('/f/:slug/leave', ctx => {
+    const p = pickCtx(ctx);
+    if (!p) return H.json(ctx.res, 404, { error: 'not_found' });
+    H.setCookie(ctx.res, PK_COOKIE(p.cls.id), '', cookieOpts(ctx, 0));
+    p.me = null;
+    H.json(ctx.res, 200, pickState(p));
+  });
+
+  function pickWrite(name, fn) {
+    r.post('/f/:slug/' + name, ctx => {
+      const p = pickCtx(ctx);
+      if (!p) return H.json(ctx.res, 404, { error: 'not_found' });
+      if (!pickLimit.hit((p.me ? 's' + p.me.id : 'a') + ':' + ctx.ip)) return H.json(ctx.res, 429, { error: 'Слишком часто. Подождите минуту' });
+      if (p.album.closed_at && !p.admin) return H.json(ctx.res, 409, { error: 'Отбор уже закрыт', state: pickState(p) });
+      const res = fn(ctx, p, ctx.body || {});
+      if (res && res.error) return H.json(ctx.res, res.status || 400, { error: res.error, state: pickState(p) });
+      H.json(ctx.res, 200, pickState(p));
+    });
+  }
+
+  pickWrite('pick', (ctx, p, b) => {
+    if (!p.me) return { error: 'Сначала выберите себя в списке', status: 403 };
+    const ph = photos.photo(p.cls.id, b.photo);
+    if (!ph || photos.isGroupSection(p.album, ph.section)) return { error: 'Фото не найдено' };
+    const res = photos.setPersonal(p.album, p.me.id, ph.id, !!b.on);
+    if (!res.ok) return { error: 'Уже выбрано ' + p.album.personal_max + ' фото. Чтобы выбрать это, уберите какое-то из выбранных', status: 409 };
+  });
+
+  pickWrite('group', (ctx, p, b) => {
+    if (!p.me && !p.admin) return { error: 'Сначала выберите себя в списке', status: 403 };
+    const ph = photos.photo(p.cls.id, b.photo);
+    if (!ph || !photos.isGroupSection(p.album, ph.section)) return { error: 'Фото не найдено' };
+    const res = photos.setGroup(p.album, ph.id, !!b.on, p.me ? p.me.id : null, p.me ? p.me.name : 'Артур');
+    if (!res.ok) return { error: 'Уже выбрано ' + p.album.group_max + ' групповых — это максимум. Чтобы добавить это фото, сначала уберите другое', status: 409 };
+  });
+
+  pickWrite('quote', (ctx, p, b) => {
+    if (!p.me) return { error: 'Сначала выберите себя в списке', status: 403 };
+    p.me.quote = photos.setQuote(p.cls.id, p.me.id, b.text);
+  });
+
   // ---------- обработчик запросов ----------
 
   const OPEN_ADMIN = ['/admin/login', '/admin/static/'];
@@ -1037,7 +1309,7 @@ function createApp(cfg) {
     }
   }
 
-  return { handle: handle, store: store, auth: auth, media: media, site: site };
+  return { handle: handle, store: store, auth: auth, media: media, site: site, photos: photos };
 }
 
 module.exports = { createApp, nextTitle, resultText };

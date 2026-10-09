@@ -188,6 +188,10 @@ function timerText(p) {
     return h ? h + ':' + two(m) + ':' + two(sec) : m + ':' + two(sec);
   }
   const left = Math.max(0, (p.state && p.state.endsAt ? p.state.endsAt : Date.now() + 45 * 60000) - Date.now());
+  if (left >= 86400000) return Math.floor(left / 86400000) + ' д ' + Math.floor(left / 3600000) % 24 + ' ч';
+  const h = Math.floor(left / 3600000);
+  const pad = n => (n < 10 ? '0' : '') + n;
+  if (h) return h + ':' + pad(Math.floor(left / 60000) % 60) + ':' + pad(Math.floor(left / 1000) % 60);
   const m = Math.floor(left / 60000), s = Math.floor(left / 1000) % 60;
   return m + ':' + (s < 10 ? '0' : '') + s;
 }

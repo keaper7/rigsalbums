@@ -4,7 +4,9 @@
   'use strict';
 
   var csrf = (document.querySelector('meta[name=csrf]') || {}).content || '';
-  var LG = 1600, SM = 520;
+  // Копии только для выбора: на экране телефона и ноутбука 1400 px не отличить от оригинала,
+  // а места на сервере уходит заметно меньше
+  var LG = 1400, SM = 480;
   var busy = false;
 
   function $(s, root) { return (root || document).querySelector(s); }
@@ -90,7 +92,7 @@
       var lgC = scaled(img, LG);
       if (img.close) img.close();
       var smC = scaled(lgC, SM);
-      return Promise.all([jpeg(lgC, 0.82), jpeg(smC, 0.76)]).then(function (b) {
+      return Promise.all([jpeg(lgC, 0.8), jpeg(smC, 0.75)]).then(function (b) {
         lgC.width = lgC.height = smC.width = smC.height = 0;
         return post('/admin/api/media/pk/' + classId + '?path=' + encodeURIComponent(rel), b[0]).then(function (res) {
           return post('/admin/api/media/pk/' + classId + '/' + res.id + '/sm', b[1]);
@@ -278,20 +280,22 @@
           // два ученика с похожими именами не должны попасть в одну папку
           var folder = safe(s.name), base = folder, k = 2;
           while (jobs.some(function (j) { return j.folder.toLowerCase() === folder.toLowerCase(); }) || folder.toLowerCase() === 'групповые') folder = base + ' (' + k++ + ')';
-          jobs.push({ folder: folder, files: s.photos, quote: s.quote });
+          jobs.push({ folder: folder, files: s.photos, names: s.roles || [], quote: s.quote });
         });
         if (plan.group.length) jobs.push({ folder: 'Групповые', files: plan.group });
         var total = jobs.reduce(function (n, j) { return n + j.files.length; }, 0) || 1;
         var done = 0;
 
-        function copyAll(dir, files) {
+        function copyAll(dir, files, names) {
           var used = {};
-          return files.reduce(function (p, rel) {
+          return files.reduce(function (p, rel, i) {
             return p.then(function () {
               var name = rel.split('/').pop();
+              // фото с местом в альбоме называем по месту: «Обложка.jpg»
+              if (names && names[i]) name = names[i] + (/\.jpeg$/i.test(name) ? '.jpeg' : '.jpg');
               // одинаковые имена из разных папок не затираем
-              if (used[name]) name = rel.split('/').slice(0, -1).join('-') + '-' + name;
-              used[name] = true;
+              if (used[name.toLowerCase()]) name = rel.split('/').slice(0, -1).join('-') + '-' + rel.split('/').pop();
+              used[name.toLowerCase()] = true;
               return fileAt(src, rel).then(function (f) { return writeFile(dir, safe(name), f); })
                 .catch(function () { missing.push(rel); })
                 .then(function () { done++; state(box, 'Копируем ' + done + ' из ' + total, done / total); });
@@ -303,7 +307,7 @@
           return p.then(function () {
             return out.getDirectoryHandle(j.folder, { create: true }).then(function (dir) {
               var q = j.quote ? writeFile(dir, 'Цитата.txt', j.quote + '\n') : Promise.resolve();
-              return q.then(function () { return copyAll(dir, j.files); });
+              return q.then(function () { return copyAll(dir, j.files, j.names); });
             });
           });
         }, Promise.resolve()).then(function () {

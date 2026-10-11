@@ -2162,3 +2162,7 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 /* «Каждый год новый уникальный дизайн»: в Unbounded слова длинные, и на телефоне заголовок рассыпался
    на четыре коротких строки. Чуть меньший кегль укладывает его в две ровные строки */
 .designs .h2 { font-size: clamp(25px, 7.05vw, 66px); }
+
+/* стрелка «откроется в новой вкладке»: короткая и плотная, цвет как у текста */
+.arr { display: inline-block; width: .8em; height: .8em; margin-left: .3em; vertical-align: -.02em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.ft__by .arr { width: 1em; height: 1em; margin-left: .15em; vertical-align: -.1em; }

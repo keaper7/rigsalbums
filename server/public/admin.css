@@ -471,7 +471,7 @@ form.inline { display: inline-block; margin: 4px 4px 0 0; }
 .pk-picks > summary { cursor: pointer; list-style: none; display: flex; flex-direction: column; gap: 2px; }
 .pk-picks > summary::-webkit-details-marker { display: none; }
 .pk-picks > summary small { font-size: 13px; }
-.pk-pick { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.pk-pick { padding: 12px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 84px; }
 .pk-pick:last-child { border-bottom: 0; }
 .pk-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .pk-thumbs img { display: block; width: 64px; height: 64px; object-fit: cover; border-radius: 8px; background: var(--paper-2); }
@@ -481,3 +481,31 @@ form.inline { display: inline-block; margin: 4px 4px 0 0; }
 .until__hint { margin-top: 6px; }
 .res__reset { margin-top: 8px; text-align: right; }
 .res__reset .link { font-size: 13px; color: var(--ink-2); }
+
+/* отбор фото, вторая версия: места в альбоме, ретушь, коды, освободить место */
+.pk-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.pk-table td small { display: block; font-size: 12px; font-weight: 700; }
+.pk-warn { color: var(--warn); }
+.pk-pin { font: 700 15px/1 var(--sans); font-variant-numeric: tabular-nums; letter-spacing: .08em; }
+.pk-x { border: 0; background: none; padding: 0 4px; margin-left: 2px; font-size: 18px; line-height: 1; color: var(--ink-2); cursor: pointer; }
+.pk-x:hover { color: var(--wine); }
+.pk-table form.inline { margin: 0; vertical-align: middle; }
+.pk-wf { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.pk-slim { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+p.pk-slim { display: block; }
+.pk-pick__h { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.pk-pick__h form.inline { margin: 0; }
+.pk-pick.is-wait { box-shadow: inset 3px 0 0 var(--warn); padding-left: 12px; }
+.b.is-done { background: var(--ok-bg); border-color: var(--ok-bg); color: var(--ok); }
+.pk-thumbs .pk-ph { margin: 0; width: 112px; }
+.pk-thumbs .pk-ph img { width: 112px; height: 112px; }
+.pk-ph figcaption { margin-top: 4px; font-size: 12.5px; line-height: 1.3; }
+.pk-ph figcaption b { display: block; }
+.pk-ret { display: block; margin-top: 3px; padding: 4px 6px; border-radius: 6px; background: var(--warn-bg); color: #5a3a10; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pk-lab { margin: 10px 0 0; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+.pk-lab .muted { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.pk-pick .pk-lab + blockquote { margin-top: 4px; }
+.pk-pick blockquote.pk-wish { border-left-color: var(--ink-2); }
+
+/* стрелка «откроется в новой вкладке»: короткая и плотная, цвет как у текста */
+.arr { display: inline-block; width: .8em; height: .8em; margin-left: .3em; vertical-align: -.02em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }

@@ -3,6 +3,7 @@
 // Отбор фото: страница в админке и страница для учеников
 const { html, raw, plural, fmtWhen } = require('../lib/util');
 const { layout } = require('./admin');
+const { ROLES, ROLE_NAMES } = require('../lib/photos');
 
 function photosN(n) { return n + ' фото'; }
 const GB = 1024 * 1024 * 1024;
@@ -18,7 +19,9 @@ const MSG = {
   students: 'Список учеников сохранён',
   closed: 'Отбор закрыт. Ученики видят свой выбор, но поменять уже не могут',
   opened: 'Отбор снова открыт',
-  removed: 'Раздел удалён'
+  removed: 'Раздел удалён',
+  pinreset: 'Код сброшен. Ученик при следующем входе придумает новый',
+  slim: 'Место освобождено: остались только выбранные фото в маленьком размере'
 };
 
 // ---------- админка: /admin/c/:id/photos ----------
@@ -34,17 +37,23 @@ function adminPage(o) {
   });
   const sections = Array.from(bySection.keys()).sort((x, y) => x.localeCompare(y, 'ru'));
   const counts = o.counts;
-  // «Всё выбрал» — свои фото до лимита и цитата
-  const finished = s => (counts.get(s.id) || 0) >= a.personal_max && !!s.quote;
+  // Сколько мест в альбоме нужно отметить: по одному фото на место, но не больше, чем фото
+  const rolesNeed = Math.min(ROLES.length, a.personal_max);
+  const rolesOf = s => (o.picks.get(s.id) || []).filter(x => x.role).length;
+  // «Всё выбрал» — свои фото до лимита, места отмечены, цитата и пожелание написаны
+  const finished = s => (counts.get(s.id) || 0) >= a.personal_max && rolesOf(s) >= rolesNeed && !!s.quote && !!s.wish;
+  const retouchWait = o.students.filter(s => (o.picks.get(s.id) || []).some(x => x.retouch) && !s.retouch_done_at).length;
   const done = o.students.filter(finished).length;
   const left = o.students.filter(s => !finished(s));
   const hasGroup = sections.some(s => o.isGroup(s));
+  const places = ROLES.map(r => r[1].toLowerCase()).join(', ');
   const chat = 'Ребята, выбираем фото для выпускного альбома! 📸\n\n' + link + '\n\n' +
-    '1. Найдите себя в списке — выбирайте только себя.\n' +
-    '2. «Мои фото» — отметьте ' + a.personal_max + ' своих фото.\n' +
-    (hasGroup ? '3. «Групповые» — это ОБЩИЙ выбор всего класса: все видят одно и то же. Не убирайте чужие фото без причины — заменяйте, если очень хочется другое.\n4. «Цитата» — напишите фразу для альбома.\n'
-      : '3. «Цитата» — напишите фразу для альбома.\n') +
-    '\nПоменять выбор можно, пока я не закрою отбор.';
+    '1. Найдите себя в списке и придумайте код из 4 цифр. Запомните его — без кода в ваш выбор никто не зайдёт.\n' +
+    '2. «Мои фото» — выберите ' + a.personal_max + ' своих фото и отметьте, какое куда в альбоме' + (rolesNeed === ROLES.length ? ': ' + places : '') + '. Если нужна доп. ретушь — напишите под фото.\n' +
+    (hasGroup ? '3. «Групповые» — это ОБЩИЙ выбор всего класса: все видят одно и то же. Не убирайте чужие фото без причины — заменяйте, если очень хочется другое.\n4. «Тексты» — цитата для альбома и пожелание себе в будущее (его никто из класса не увидит).\n'
+      : '3. «Тексты» — цитата для альбома и пожелание себе в будущее (его никто из класса не увидит).\n') +
+    '\nФото на сайте сжатые — только для выбора, не скриньте их.' + (a.wfolio ? ' Оригиналы: ' + a.wfolio : '') +
+    '\n\nПоменять выбор можно, пока я не закрою отбор.';
   const remind = left.length ? 'Напоминаю про выбор фото для альбома. Ещё не закончили: ' + left.map(s => s.name).join(', ') + '.\n\n' + link : '';
   const body = html`
 <a class="back" href="/admin/c/${c.id}">← ${c.title} · ${c.school}</a>
@@ -69,6 +78,12 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
       <a class="b b--sm" href="https://wa.me/?text=${encodeURIComponent(chat)}" target="_blank" rel="noopener" data-share data-share-text="${chat}">Отправить</a>
     </div>
   </details>
+  <form class="form pk-wf" method="post" action="/admin/c/${c.id}/photos/wfolio">
+    ${csrf(o.sess)}
+    <label class="field"><span>Ссылка на оригиналы в wfolio</span><input name="wfolio" type="url" inputmode="url" maxlength="500" placeholder="https://…" value="${a.wfolio || ''}"></label>
+    <p class="muted small">У учеников на странице будет заметная кнопка «Оригиналы» — чтобы не скринили сжатые фото.</p>
+    <button class="b b--sm" type="submit">Сохранить ссылку</button>
+  </form>
   <form method="post" action="/admin/c/${c.id}/photos/${a.closed_at ? 'open' : 'close'}" style="margin-top:14px"${a.closed_at ? '' : raw(' data-confirm="Закрыть отбор? Ученики больше не смогут менять выбор"')}>
     ${csrf(o.sess)}
     <button class="b b--wide${a.closed_at ? '' : ' b--main'}" type="submit">${a.closed_at ? 'Открыть отбор снова' : 'Закрыть отбор'}</button>
@@ -83,10 +98,17 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
     <span>Выбрать папку с фото</span>
   </label>
   <div class="upl__state" data-pk-state hidden><div class="upl__bar"><i></i></div><p></p></div>
-  ${o.disk ? html`<p class="muted small pk-disk${o.disk.free < 3 * GB ? ' is-low' : ''}">Копии фото этого класса: ${size(o.usage)}. Свободно на сервере: ${size(o.disk.free)} из ${size(o.disk.total)}${o.disk.free < 3 * GB ? ' — места мало, скоро понадобится тариф побольше' : ''}.</p>` : ''}
+  ${o.disk ? html`<p class="muted small pk-disk${o.disk.free < 3 * GB ? ' is-low' : ''}">Копии фото этого класса: ${size(o.usage)}. Свободно на сервере: ${size(o.disk.free)} из ${size(o.disk.total)}${o.disk.free < 3 * GB ? ' — места мало: освободите место у классов, где отбор закончен' : ''}.</p>` : ''}
+  ${a.slim_at ? html`<p class="flash pk-slim">Место освобождено ${fmtWhen(a.slim_at)}: остались только выбранные фото в маленьком размере. Если загрузить папку снова, вернутся все фото.</p>`
+    : o.photos.length ? html`<form method="post" action="/admin/c/${c.id}/photos/slim" class="pk-slim"${a.closed_at ? raw(' data-confirm="Удалить с сервера все фото, которые никто не выбрал? У выбранных останется маленькая копия, выбор, места, ретушь и тексты сохранятся. Оригиналы на компьютере не трогаются"') : ''}>
+    ${csrf(o.sess)}
+    <button class="b b--sm" type="submit"${a.closed_at ? '' : raw(' disabled')}>Освободить место</button>
+    <span class="muted small">${a.closed_at ? 'Удалит невыбранные фото, выбор сохранится. Лучше после раскладки по папкам' : 'Станет доступно, когда закроете отбор'}</span>
+  </form>` : ''}
   ${sections.length ? html`<form method="post" action="/admin/c/${c.id}/photos/sections" class="secs">
     ${csrf(o.sess)}
     <p class="muted small" style="margin:16px 0 8px">Галочка — общие групповые (один выбор на весь класс). Без галочки — личные фото, каждый выбирает себе.</p>
+    ${sections.every(x => o.isGroup(x)) ? html`<p class="flash flash--err">Все разделы отмечены как групповые — во вкладке «Мои фото» у учеников пусто. Снимите галочку с портретов («Парни», «Девочки») и нажмите «Сохранить разделы».</p>` : ''}
     ${sections.map(s => {
       const st = bySection.get(s);
       const grp = o.isGroup(s);
@@ -112,28 +134,38 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
     <p class="muted small">Новые имена добавятся, убранные — удалятся (если ученик ещё ничего не выбрал). Чтобы исправить опечатку у того, кто уже выбирал, нажмите на имя в таблице ниже.</p>
     <button class="b b--main" type="submit">Сохранить список</button>
   </form>
-  ${o.students.length ? html`<table class="pk-table">
-    <thead><tr><th>Ученик</th><th>Личные</th><th>Цитата</th></tr></thead>
+  ${o.students.length ? html`<div class="pk-scroll"><table class="pk-table">
+    <thead><tr><th>Ученик</th><th>Фото</th><th>Цитата</th><th>Пожел.</th><th>Код</th></tr></thead>
     <tbody>${o.students.map(s => {
       const n = counts.get(s.id) || 0;
-      return html`<tr><td><details class="pk-ren"><summary>${s.name}</summary><form method="post" action="/admin/c/${c.id}/photos/rename">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><input name="name" value="${s.name}" maxlength="60" required aria-label="Новое имя"><button class="b b--sm" type="submit">Сохранить</button></form></details></td><td class="${n >= a.personal_max ? 'ok' : n ? '' : 'muted'}">${n} из ${a.personal_max}</td><td class="${s.quote ? 'ok' : 'muted'}">${s.quote ? '✓' : '—'}</td></tr>`;
+      const r = rolesOf(s);
+      const full = n >= a.personal_max && r >= rolesNeed;
+      return html`<tr><td><details class="pk-ren"><summary>${s.name}</summary><form method="post" action="/admin/c/${c.id}/photos/rename">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><input name="name" value="${s.name}" maxlength="60" required aria-label="Новое имя"><button class="b b--sm" type="submit">Сохранить</button></form></details></td><td class="${full ? 'ok' : n ? '' : 'muted'}">${n} из ${a.personal_max}${n && r < Math.min(n, rolesNeed) ? html`<small class="pk-warn">мест ${r} из ${rolesNeed}</small>` : ''}</td><td class="${s.quote ? 'ok' : 'muted'}">${s.quote ? '✓' : '—'}</td><td class="${s.wish ? 'ok' : 'muted'}">${s.wish ? '✓' : '—'}</td><td>${s.pin ? html`<span class="pk-pin">${s.pin}</span><form method="post" action="/admin/c/${c.id}/photos/resetpin" class="inline" data-confirm="Сбросить код ученика «${s.name}»? При следующем входе он придумает новый. Выбор сохранится">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><button class="pk-x" type="submit" title="Сбросить код" aria-label="Сбросить код">×</button></form>` : html`<span class="muted">—</span>`}</td></tr>`;
     })}</tbody>
-  </table>` : ''}
+  </table></div>
+  <p class="muted small" style="margin-top:8px">Код ученик придумывает сам при первом входе. Забыл — подскажите ему код. Если под чужим именем вошёл кто-то другой — сбросьте код (×), выбор сохранится.</p>` : ''}
 </section>
 
-${o.students.some(st => (counts.get(st.id) || 0) || st.quote) ? html`<section class="card">
-  <details class="pk-picks">
-    <summary><b class="h">Что выбрали ученики</b><small class="muted">фото и цитаты каждого</small></summary>
+${o.students.some(st => (counts.get(st.id) || 0) || st.quote || st.wish) ? html`<section class="card">
+  <details class="pk-picks" open>
+    <summary><b class="h">Что выбрали ученики</b><small class="muted">фото с местом в альбоме, доп. ретушь, цитата и пожелание${retouchWait ? html` · <b class="pk-warn">ждут ретуши: ${retouchWait}</b>` : ''}</small></summary>
     ${o.students.map(st => {
-      const ids = o.picks.get(st.id) || [];
-      if (!ids.length && !st.quote) return '';
-      return html`<div class="pk-pick">
-      <p><b>${st.name}</b> <small class="muted">${ids.length} из ${a.personal_max}</small></p>
-      ${ids.length ? html`<div class="pk-thumbs">${ids.map(id => {
-        const ph = o.byId.get(id);
-        return ph ? html`<a href="/f/${a.slug}/p/${ph.id}.jpg?v=${ph.ver}" target="_blank" rel="noopener" title="${ph.path}"><img src="/f/${a.slug}/p/${ph.id}-sm.jpg?v=${ph.ver}" alt="${ph.path}" loading="lazy"></a>` : '';
+      const list = (o.picks.get(st.id) || []).filter(x => o.byId.has(x.id));
+      if (!list.length && !st.quote && !st.wish) return '';
+      const wants = list.some(x => x.retouch);
+      const doneR = !!st.retouch_done_at;
+      // Порядок как в альбоме: обложка, личная, список, потом без места
+      const order = x => { const i = ROLES.findIndex(r => r[0] === x.role); return i === -1 ? 99 : i; };
+      list.sort((x, y) => order(x) - order(y));
+      return html`<div class="pk-pick${wants && !doneR ? ' is-wait' : ''}" id="st-${st.id}">
+      <div class="pk-pick__h"><p><b>${st.name}</b> <small class="muted">${list.length} из ${a.personal_max}</small></p>
+      ${list.length ? html`<form method="post" action="/admin/c/${c.id}/photos/retouched" class="inline">${csrf(o.sess)}<input type="hidden" name="student" value="${st.id}"><input type="hidden" name="on" value="${doneR ? '0' : '1'}"><button class="b b--sm${doneR ? ' is-done' : ''}" type="submit">${doneR ? '✓ Обработан' : 'Отметить: обработан'}</button></form>` : ''}</div>
+      ${list.length ? html`<div class="pk-thumbs">${list.map(x => {
+        const ph = o.byId.get(x.id);
+        return html`<figure class="pk-ph"><a href="/f/${a.slug}/p/${ph.id}.jpg?v=${ph.ver}" target="_blank" rel="noopener" title="${ph.path}"><img src="/f/${a.slug}/p/${ph.id}-sm.jpg?v=${ph.ver}" alt="${ph.path}" loading="lazy"></a><figcaption><b class="${x.role ? '' : 'muted'}">${x.role ? ROLE_NAMES[x.role] : 'без места'}</b>${x.retouch ? html`<span class="pk-ret">✎ ${x.retouch}</span>` : ''}</figcaption></figure>`;
       })}</div>` : ''}
-      ${st.quote ? html`<blockquote>${st.quote}</blockquote>` : ''}
+      ${st.quote ? html`<p class="pk-lab">Цитата</p><blockquote>${st.quote}</blockquote>` : ''}
+      ${st.wish ? html`<p class="pk-lab">🔒 Пожелание себе в будущее <span class="muted">— видите только вы</span></p><blockquote class="pk-wish">${st.wish}</blockquote>` : ''}
     </div>`;
     })}
   </details>
@@ -154,7 +186,7 @@ ${o.students.some(st => (counts.get(st.id) || 0) || st.quote) ? html`<section cl
 
 <section class="card">
   <div class="card__h"><h2 class="h">Разложить по папкам</h2></div>
-  <p class="muted small">Работает в Chrome на компьютере. Сначала выберите ту же папку с оригиналами, потом — куда сложить. Появится папка класса, в ней папка каждого ученика с его фото и цитатой, и папка «Групповые».</p>
+  <p class="muted small">Работает в Chrome на компьютере. Сначала выберите ту же папку с оригиналами, потом — куда сложить. Появится папка класса, в ней папка каждого ученика с фото и цитатой, и папка «Групповые». Фото с отмеченным местом называются по нему: «${ROLES.map(r => r[1]).join('.jpg», «')}.jpg».</p>
   <button class="b b--main b--wide" type="button" data-pk-export="${c.id}" data-pk-title="${c.title} ${c.school}" style="margin-top:12px">Разложить по папкам</button>
   <div class="upl__state" data-pk-export-state hidden><div class="upl__bar"><i></i></div><p></p></div>
 </section>

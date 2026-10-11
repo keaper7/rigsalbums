@@ -108,7 +108,7 @@ test('отбор фото: загрузка, выбор учеников, гру
   assert.match(r.headers.get('x-robots-tag'), /noindex/);
   r = await kid.req('POST', '/f/' + slug + '/pick', { json: { photo: p1, on: true } });
   assert.strictEqual(r.status, 403);
-  r = await kid.req('POST', '/f/' + slug + '/me', { json: { student: students[0].id } });
+  r = await kid.req('POST', '/f/' + slug + '/me', { json: { student: students[0].id, newPin: '1111' } });
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.data.me.name, 'Анна');
 
@@ -137,7 +137,7 @@ test('отбор фото: загрузка, выбор учеников, гру
 
   // Второй ученик видит общий выбор
   const kid2 = client(s.base);
-  await kid2.req('POST', '/f/' + slug + '/me', { json: { student: students[1].id } });
+  await kid2.req('POST', '/f/' + slug + '/me', { json: { student: students[1].id, newPin: '2222' } });
   r = await kid2.req('GET', '/f/' + slug + '/state');
   assert.strictEqual(r.data.group.length, 2);
   assert.deepStrictEqual(r.data.mine, []);
@@ -148,16 +148,16 @@ test('отбор фото: загрузка, выбор учеников, гру
   r = await kid2.req('GET', '/f/wrong-slug/p/' + p1 + '-sm.jpg');
   assert.strictEqual(r.status, 404);
 
-  // На странице видно, кто уже начал выбирать (для предупреждения «под этим именем уже выбирали»)
+  // На странице видно, кто уже вошёл (с кодом) — у таких имён замок
   r = await client(s.base).req('GET', '/f/' + slug);
   const pageData = JSON.parse(/<script type="application\/json" id="pk-data">([\s\S]*?)<\/script>/.exec(r.text)[1]);
-  assert.deepStrictEqual(pageData.students.map(x => [x.name, x.started]), [['Анна', true], ['Тимур', false]]);
+  assert.deepStrictEqual(pageData.students.map(x => [x.name, x.started]), [['Анна', true], ['Тимур', true]]);
 
   // В админке: сообщение для чата со ссылкой, напоминание и выбор каждого
   r = await admin.req('GET', '/admin/c/' + id + '/photos');
   assert.match(r.text, /Сообщение для чата класса/);
   assert.ok(r.text.indexOf('/f/' + slug) !== -1);
-  assert.match(r.text, /Ещё не закончили: Тимур/);
+  assert.match(r.text, /Ещё не закончили: Анна, Тимур/);
   assert.match(r.text, /Что выбрали ученики/);
   assert.match(r.text, /Вместе навсегда/);
 
@@ -222,7 +222,7 @@ test('отбор фото: загрузка, выбор учеников, гру
 
   // План раскладки — относительные пути оригиналов
   r = await admin.req('GET', '/admin/api/c/' + id + '/photos/export');
-  assert.deepStrictEqual(r.data.students[0], { name: 'Анна', quote: 'Вместе навсегда', photos: ['Парни/IMG_1.jpg', 'Девочки/IMG_1.jpg'] });
+  assert.deepStrictEqual(r.data.students[0], { name: 'Анна', quote: 'Вместе навсегда', photos: ['Парни/IMG_1.jpg', 'Девочки/IMG_1.jpg'], roles: ['', ''] });
   assert.deepStrictEqual(r.data.group.sort(), ['Групповые/G_2.jpg', 'Групповые/G_3.jpg']);
 
   // Голосование класса не изменилось
@@ -294,7 +294,7 @@ test('отбор фото: одновременные нажатия не пре
   const st = s.app.store.db.prepare('SELECT id FROM pk_students ORDER BY sort').all();
   const kids = await Promise.all(st.map(async row => {
     const k = client(s.base);
-    await k.req('POST', '/f/' + slug + '/me', { json: { student: row.id } });
+    await k.req('POST', '/f/' + slug + '/me', { json: { student: row.id, newPin: '1234' } });
     return k;
   }));
 

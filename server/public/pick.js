@@ -1,5 +1,6 @@
-// Страница отбора фото для учеников: найти себя, выбрать личные фото,
-// вместе с классом собрать групповые и написать цитату
+// Страница отбора фото для учеников: найти себя (с кодом из 4 цифр), выбрать личные фото
+// и отметить, какое куда в альбоме, написать про доп. ретушь, вместе с классом собрать
+// групповые, написать цитату и пожелание себе в будущее
 (function () {
   'use strict';
 
@@ -12,6 +13,12 @@
   var tiles = {};       // id фото → плитка на экране
   var pending = {};     // фото, по которому ждём ответа сервера
   var photos = D.photos.map(function (p) { return { id: p[0], section: p[1], w: p[2], h: p[3], group: !!p[4], v: p[5] || 0 }; });
+  var byId = {};
+  photos.forEach(function (p) { byId[p.id] = p; });
+  // Места в альбоме: [ключ, название]; на кнопках — коротко
+  var PLACES = D.placeList || [];
+  var SHORT = { cover: 'Обложка', page: 'Личная', list: 'Список' };
+  var hint = false;     // все фото выбраны — подсвечиваем места и ретушь
 
   function el(tag, attrs, kids) {
     var e = document.createElement(tag);
@@ -24,13 +31,24 @@
     return e;
   }
 
+  // Стрелка «откроется в новой вкладке» — та же, что на сайте и в админке
+  function arrow() {
+    var s = el('span', { class: 'arr-w', 'aria-hidden': 'true' });
+    s.innerHTML = '<svg class="arr" viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 11.5l7-7M6 4.5h5.5V10"/></svg>';
+    return s;
+  }
+
   var toastEl = document.querySelector('.toast');
-  function toast(text, bad) {
+  // action: [текст кнопки, что сделать] — например «Наверх ↑»
+  function toast(text, bad, action) {
     toastEl.textContent = text;
     toastEl.classList.toggle('is-bad', !!bad);
+    if (action) {
+      toastEl.appendChild(el('button', { type: 'button', class: 'toast__go', text: action[0], onclick: function () { toastEl.hidden = true; action[1](); } }));
+    }
     toastEl.hidden = false;
     clearTimeout(toastEl.tm);
-    toastEl.tm = setTimeout(function () { toastEl.hidden = true; }, bad ? 5000 : 2200);
+    toastEl.tm = setTimeout(function () { toastEl.hidden = true; }, bad ? 5000 : action ? 7000 : 2200);
   }
 
   function setState(j) {
@@ -39,23 +57,59 @@
     return (S.me ? S.me.id : 0) !== who;
   }
 
-  function api(path, body) {
+  function api(path, body, keep) {
     return fetch(base + path, {
-      method: 'POST', credentials: 'same-origin',
+      method: 'POST', credentials: 'same-origin', keepalive: !!keep,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {})
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         var changed = false;
         if (j.state) changed = setState(j.state);
-        else if (r.ok) changed = setState(j);
-        if (!r.ok) throw new Error(j.error || 'Не получилось. Попробуйте ещё раз');
+        else if (r.ok && !j.error) changed = setState(j);
+        if (!r.ok) throw Object.assign(new Error(j.error || 'Не получилось. Попробуйте ещё раз'), { pin: j.pin, status: r.status });
         return changed;
       });
     }, function () {
       throw new Error('Нет связи. Проверьте интернет и попробуйте ещё раз');
     });
   }
+
+  // Текст сохраняется сам: через секунду после того, как перестали печатать, и при уходе со страницы
+  function autosave(ta, send, status) {
+    var timer = null, sent = ta.value, busy = null;
+    function flush(keep) {
+      clearTimeout(timer);
+      timer = null;
+      var v = ta.value;
+      if (v === sent) return busy || Promise.resolve();
+      status.textContent = 'Сохраняем…';
+      status.className = 'save';
+      var p = send(v, keep).then(function () {
+        sent = v;
+        if (ta.value === v) { status.textContent = 'Сохранено ✓'; status.className = 'save is-ok'; }
+        paint();
+      }, function (e) {
+        status.textContent = e.message;
+        status.className = 'save is-bad';
+      });
+      busy = p.then(function () { busy = null; });
+      return p;
+    }
+    ta.addEventListener('input', function () {
+      ta.dataset.dirty = '1';
+      status.textContent = '';
+      clearTimeout(timer);
+      timer = setTimeout(flush, 1200);
+    });
+    ta.addEventListener('blur', function () { flush(); });
+    flushers.push(function () { flush(true); });
+    return { flush: flush, reset: function (v) { sent = v; } };
+  }
+  var flushers = [];
+  function flushAll() { flushers.forEach(function (f) { f(); }); }
+  window.addEventListener('pagehide', flushAll);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) flushAll(); });
 
   function groupMap() {
     var m = {};
@@ -87,6 +141,7 @@
     if (pending[p.id]) return Promise.resolve();
     if (!canEdit()) { toast('Отбор уже закрыт', true); return Promise.resolve(); }
     var on = isOn(p);
+    if (!p.group && on && (S.retouch || {})[p.id] && !confirm('Убрать это фото? Пожелание по ретуши к нему тоже удалится')) return Promise.resolve();
     if (p.group && on) {
       var by = groupMap()[p.id];
       if (by !== myName() && !confirm('Это фото выбрал(а) ' + by + '. Убрать его из общего выбора класса?')) return Promise.resolve();
@@ -97,9 +152,11 @@
     return api(p.group ? '/group' : '/pick', { photo: p.id, on: !on })
       .then(function (changed) {
         if (changed) return render();
-        // подсказываем, что дальше, когда свои фото набраны
+        // подсказываем, что дальше, когда свои фото набраны: отметить места и написать про ретушь
         if (!p.group && !on && before < S.personalMax && (S.mine || []).length >= S.personalMax) {
-          toast(S.quote ? 'Готово: все ' + S.personalMax + ' фото выбраны' : 'Все ' + S.personalMax + ' фото выбраны. Осталось написать цитату');
+          hint = true;
+          if (!lb.hidden) closeLb();
+          toast('Все ' + S.personalMax + ' фото выбраны! Теперь отметьте, какое куда в альбоме, и напишите, если нужна доп. ретушь', false, ['Наверх ↑', toMine]);
         }
       })
       .catch(function (e) { toast(e.message, true); })
@@ -114,24 +171,71 @@
       var q = input.value.trim().toLowerCase();
       list.textContent = '';
       D.students.filter(function (s) { return !q || s.name.toLowerCase().indexOf(q) !== -1; }).forEach(function (s) {
-        list.appendChild(el('li', {}, [el('button', { type: 'button', text: s.name, onclick: function () {
-          var q = s.started
-            ? 'Под именем «' + s.name + '» уже выбирали фото. Это точно вы?\n\nЕсли это не вы — нажмите «Отмена» и найдите своё имя.'
-            : 'Вы — ' + s.name + '?';
-          if (!confirm(q)) return;
-          api('/me', { student: s.id }).then(render).catch(function (e) { toast(e.message, true); });
-        } })]));
+        list.appendChild(el('li', {}, [el('button', { type: 'button', onclick: function () { askPin(s); } }, [
+          s.name, s.locked ? el('span', { class: 'who__lock', title: 'Уже вошли, нужен код', text: '🔒' }) : null
+        ])]));
       });
       if (!list.children.length) list.appendChild(el('li', { class: 'muted', text: D.students.length ? 'Никого не нашли. Проверьте, как написано имя' : 'Артур ещё не добавил список класса' }));
     }
     input.addEventListener('input', fill);
     fill();
     app.textContent = '';
+    app.appendChild(compressNote());
     app.appendChild(el('section', { class: 'who' }, [
       el('h2', { text: 'Найдите себя в списке' }),
-      el('p', { class: 'muted', text: 'Так мы поймём, чьи это фото и цитата. Выбирайте только себя.' }),
+      el('p', { class: 'muted', text: 'Выбирайте только себя. При первом входе придумаете код из 4 цифр — без него в ваш выбор никто не зайдёт.' }),
       input, list
     ]));
+  }
+
+  // Окно с кодом: придумать при первом входе или ввести, если уже входили
+  function askPin(s) {
+    var fresh = !s.locked;
+    var input = el('input', { type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '4', autocomplete: 'off', class: 'pin', 'aria-label': 'Код из 4 цифр', placeholder: '••••' });
+    var err = el('p', { class: 'dlg__err', hidden: true });
+    var ok = el('button', { type: 'submit', class: 'btn btn--main', text: 'Войти' });
+    var form = el('form', { class: 'dlg__box', novalidate: '' }, [
+      el('h2', { text: s.name }),
+      el('p', { class: 'muted', text: fresh
+        ? 'Придумайте код из 4 цифр и запомните его (лучше сделайте скрин или запишите). С ним вы сможете зайти снова, а без него в ваш выбор никто не зайдёт.'
+        : 'Под этим именем уже вошли. Введите свой код. Забыли — спросите у Артура. Если вы здесь впервые и код не придумывали — напишите Артуру, он сбросит.' }),
+      input, err,
+      el('div', { class: 'dlg__btns' }, [el('button', { type: 'button', class: 'btn', text: 'Это не я', onclick: close }), ok])
+    ]);
+    var dlg = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true' }, [form]);
+    function close() { dlg.remove(); }
+    input.addEventListener('input', function () { input.value = input.value.replace(/\D/g, '').slice(0, 4); err.hidden = true; });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!/^\d{4}$/.test(input.value)) { err.textContent = 'Нужно 4 цифры'; err.hidden = false; return; }
+      ok.disabled = true;
+      api('/me', fresh ? { student: s.id, newPin: input.value } : { student: s.id, pin: input.value })
+        .then(function () {
+          close();
+          if (fresh) toast('Ваш код: ' + input.value + '. Запомните его!', false, ['Понятно', function () {}]);
+          render();
+        })
+        .catch(function (e2) {
+          // код успели придумать раньше — дальше только ввод кода
+          if (e2.pin === 'ask' && fresh) { s.locked = true; close(); askPin(s); return toast(e2.message, true); }
+          err.textContent = e2.message;
+          err.hidden = false;
+          input.value = '';
+          input.focus();
+        })
+        .then(function () { ok.disabled = false; });
+    });
+    document.body.appendChild(dlg);
+    setTimeout(function () { input.focus(); }, 50);
+  }
+
+  // Заметно сверху: фото здесь сжатые, оригиналы — по ссылке
+  function compressNote() {
+    return el('div', { class: 'note note--orig' }, [
+      el('span', {}, [el('b', { text: 'Здесь сжатые фото — только для выбора' }),
+        S.wfolio ? 'Не скриньте их: оригиналы в хорошем качестве — по кнопке' : 'Не скриньте их: оригиналы в хорошем качестве пришлёт Артур']),
+      S.wfolio ? el('a', { class: 'btn btn--orig', href: S.wfolio, target: '_blank', rel: 'noopener' }, ['Оригиналы', arrow()]) : null
+    ]);
   }
 
   function renderHeader() {
@@ -176,13 +280,29 @@
         t.by.hidden = !on;
         t.by.textContent = on ? gm[id] : '';
         t.el.hidden = onlyChosen && !on;
+      } else {
+        // на выбранном личном фото — куда оно пойдёт
+        var role = on ? (S.roles || {})[id] : '';
+        t.by.hidden = !role;
+        t.by.textContent = role ? SHORT[role] || role : '';
       }
     });
+    paintMine();
     Array.prototype.forEach.call(app.querySelectorAll('.sec[data-group]'), function (sec) {
       sec.hidden = !sec.querySelector('.tile:not([hidden])');
     });
-    var counts = { personal: (S.mine || []).length + '/' + S.personalMax, group: (S.group || []).length + '/' + S.groupMax, quote: S.quote ? '✓' : '' };
-    Array.prototype.forEach.call(app.querySelectorAll('.tabs [data-tab]'), function (b) { b.querySelector('b').textContent = counts[b.getAttribute('data-tab')] ? ' ' + counts[b.getAttribute('data-tab')] : ''; });
+    var texts = (S.quote ? 1 : 0) + (S.wish ? 1 : 0);
+    var info = {
+      personal: [(S.mine || []).length + ' из ' + S.personalMax + (rolesLeft().length && (S.mine || []).length ? ' · места' : ''), personalDone()],
+      group: [(S.group || []).length + ' из ' + S.groupMax, (S.group || []).length >= S.groupMax],
+      quote: [texts + ' из 2', texts === 2]
+    };
+    Array.prototype.forEach.call(app.querySelectorAll('.tabs [data-tab]'), function (b) {
+      var i = info[b.getAttribute('data-tab')];
+      if (!i) return;
+      b.querySelector('small').textContent = i[1] ? '✓ ' + i[0] : i[0];
+      b.classList.toggle('is-done', !!i[1] && !S.admin);
+    });
     var f = app.querySelector('[data-filter-n]');
     if (f) f.textContent = (S.group || []).length;
     var closed = app.querySelector('[data-closed]');
@@ -202,14 +322,19 @@
   var lbCount = el('span', { class: 'lb__n' });
   var lbPrev = el('button', { type: 'button', class: 'lb__nav lb__nav--prev', 'aria-label': 'Предыдущее фото', text: '‹' });
   var lbNext = el('button', { type: 'button', class: 'lb__nav lb__nav--next', 'aria-label': 'Следующее фото', text: '›' });
+  var lbRoles = el('div', { class: 'lb__roles', hidden: true });
+  var lbNote = el('p', { class: 'lb__note' });
   lb.appendChild(lbBy);
   lb.appendChild(lbCount);
   lb.appendChild(lbPrev);
   lb.appendChild(lbNext);
+  lb.insertBefore(lbNote, lb.querySelector('.lb__bar'));
+  lb.insertBefore(lbRoles, lb.querySelector('.lb__bar'));
 
-  function openLb(p) {
-    // листаем то, что видно сейчас на вкладке
-    lbList = photos.filter(function (x) { var t = tiles[x.id]; return t && !t.el.hidden; });
+  function openLb(p, mineOnly) {
+    // листаем то, что видно сейчас на вкладке (из «Вашего выбора» — только выбранные)
+    lbList = mineOnly ? (S.mine || []).map(function (id) { return byId[id]; }).filter(Boolean)
+      : photos.filter(function (x) { var t = tiles[x.id]; return t && !t.el.hidden; });
     lbAt = Math.max(0, lbList.indexOf(p));
     lb.hidden = false;
     document.body.style.overflow = 'hidden';
@@ -236,6 +361,10 @@
     lbPick.disabled = !canEdit() || !!pending[p.id];
     var by = p.group ? groupMap()[p.id] : undefined;
     lbBy.textContent = by !== undefined ? 'Выбрал(а): ' + by : '';
+    // куда пойдёт выбранное личное фото — можно отметить прямо здесь
+    lbRoles.hidden = p.group || !on || !S.me || !PLACES.length;
+    if (!lbRoles.hidden) fillRoles(lbRoles, p.id);
+    lbNote.textContent = 'Сжатая копия — только для выбора, не скриньте';
     lbCount.textContent = (lbAt + 1) + ' / ' + lbList.length;
     lbPrev.hidden = lbAt === 0;
     lbNext.hidden = lbAt >= lbList.length - 1;
@@ -274,8 +403,148 @@
     return g;
   }
 
-  // «Всё готово» — свои фото набраны и цитата есть
-  function finished() { return !!S.me && (S.mine || []).length >= S.personalMax && !!S.quote; }
+  // ---------- места в альбоме и доп. ретушь ----------
+  function rolesNeed() { return Math.min(PLACES.length, S.personalMax); }
+  function rolesUsed() { var r = S.roles || {}; return (S.mine || []).filter(function (id) { return r[id]; }); }
+  // Места, которые ещё не отмечены (пока отмечено меньше, чем нужно)
+  function rolesLeft() {
+    if (rolesUsed().length >= rolesNeed()) return [];
+    var taken = {};
+    rolesUsed().forEach(function (id) { taken[S.roles[id]] = true; });
+    return PLACES.filter(function (pl) { return !taken[pl[0]]; });
+  }
+  function personalDone() { return (S.mine || []).length >= S.personalMax && !rolesLeft().length; }
+
+  var rolePending = {};
+  function setRole(id, role) {
+    if (rolePending[id] || !canEdit()) return;
+    var cur = (S.roles || {})[id] || '';
+    var next = cur === role ? '' : role;
+    // место было у другого фото — оно перейдёт сюда
+    var from = next && (S.mine || []).filter(function (x) { return x !== id && S.roles[x] === next; })[0];
+    rolePending[id] = true;
+    paint();
+    api('/role', { photo: id, role: next })
+      .then(function () { if (from) toast(PLACES.filter(function (p) { return p[0] === next; })[0][1] + ' — теперь это фото'); })
+      .catch(function (e) { toast(e.message, true); })
+      .then(function () { delete rolePending[id]; paint(); });
+  }
+
+  function fillRoles(box, id) {
+    var cur = (S.roles || {})[id] || '';
+    if (box.dataset.sig === id + ':' + cur + ':' + !!rolePending[id] + ':' + canEdit() + ':' + JSON.stringify(S.roles)) return;
+    box.dataset.sig = id + ':' + cur + ':' + !!rolePending[id] + ':' + canEdit() + ':' + JSON.stringify(S.roles);
+    box.textContent = '';
+    var others = {};
+    (S.mine || []).forEach(function (x) { if (x !== id && S.roles && S.roles[x]) others[S.roles[x]] = true; });
+    PLACES.forEach(function (pl) {
+      box.appendChild(el('button', {
+        type: 'button', class: 'role' + (cur === pl[0] ? ' is-on' : '') + (others[pl[0]] ? ' is-taken' : ''),
+        'aria-pressed': cur === pl[0] ? 'true' : 'false', disabled: !canEdit() || rolePending[id] ? '' : null,
+        title: others[pl[0]] ? pl[1] + ' уже у другого фото — нажмите, чтобы перенести сюда' : pl[1],
+        onclick: function () { setRole(id, pl[0]); }
+      }, [cur === pl[0] ? '✓ ' : '', SHORT[pl[0]] || pl[1]]));
+    });
+  }
+
+  var mineBox = null, mineRows = {};
+  function renderMine(box) {
+    mineRows = {};
+    mineBox = el('section', { class: 'mine', id: 'mine' }, [
+      el('div', { class: 'mine__h' }, [el('h2', { text: 'Ваш выбор' }), el('span', { class: 'mine__n' })]),
+      el('p', { class: 'mine__status' }),
+      el('div', { class: 'mine__list' })
+    ]);
+    box.appendChild(mineBox);
+  }
+
+  function mineRow(id) {
+    var p = byId[id];
+    var roles = el('div', { class: 'roles' });
+    var ta = el('textarea', { maxlength: '500', rows: '2', placeholder: 'Например: убрать покраснение на щеке, чуть подправить нос', 'aria-label': 'Что подправить на ретуши' });
+    ta.value = (S.retouch || {})[id] || '';
+    var status = el('small', { class: 'save' });
+    var ret = el('div', { class: 'ret', hidden: !ta.value }, [ta, status]);
+    var retBtn = el('button', { type: 'button', class: 'ret__btn', onclick: function () {
+      ret.hidden = !ret.hidden;
+      hint = false;
+      paint();
+      if (!ret.hidden) ta.focus();
+    } });
+    autosave(ta, function (v, keep) { return api('/retouch', { photo: id, text: v }, keep); }, status);
+    var row = el('div', { class: 'mine__row' }, [
+      el('button', { type: 'button', class: 'mine__img', 'aria-label': 'Посмотреть крупно', onclick: function () { if (p) openLb(p, true); } }, [p ? el('img', { src: src(p), alt: '' }) : null]),
+      el('div', { class: 'mine__body' }, [
+        el('p', { class: 'mine__q', text: 'Куда в альбоме:' }), roles, retBtn, ret
+      ]),
+      el('button', { type: 'button', class: 'mine__x', 'aria-label': 'Убрать фото', title: 'Убрать фото', text: '×', onclick: function () { if (p) toggle(p); } })
+    ]);
+    return { el: row, roles: roles, ta: ta, ret: ret, retBtn: retBtn };
+  }
+
+  // Синхронизировать «Ваш выбор» с состоянием, не трогая поле, в котором сейчас пишут
+  function paintMine() {
+    if (!mineBox || !mineBox.isConnected) return;
+    var list = mineBox.querySelector('.mine__list');
+    var mine = (S.mine || []).filter(function (id) { return byId[id]; });
+    Object.keys(mineRows).forEach(function (id) {
+      if (mine.indexOf(id) === -1) { mineRows[id].el.remove(); delete mineRows[id]; }
+    });
+    mine.forEach(function (id) {
+      if (!mineRows[id]) mineRows[id] = mineRow(id);
+      list.appendChild(mineRows[id].el);   // порядок как в выборе
+      var r = mineRows[id];
+      fillRoles(r.roles, id);
+      var text = (S.retouch || {})[id] || '';
+      if (document.activeElement !== r.ta && !r.ta.dataset.dirty && r.ta.value !== text) r.ta.value = text;
+      r.ta.disabled = !canEdit();
+      r.el.querySelector('.mine__x').hidden = !canEdit();
+      r.retBtn.textContent = text ? '✎ Доп. ретушь: ' + (text.length > 40 ? text.slice(0, 40) + '…' : text) : '✎ Нужна доп. ретушь? Напишите';
+      r.retBtn.disabled = !canEdit() && !text;
+      r.retBtn.classList.toggle('is-hint', hint && !text && r.ret.hidden);
+      r.el.classList.toggle('needs-role', !(S.roles || {})[id] && rolesLeft().length > 0 && (hint || mine.length >= S.personalMax));
+    });
+    mineBox.querySelector('.mine__n').textContent = mine.length + ' из ' + S.personalMax;
+    var st = mineBox.querySelector('.mine__status');
+    var left = rolesLeft();
+    if (!mine.length) st.textContent = 'Выберите свои фото ниже: нажмите на кружок на фото или откройте фото и нажмите «Выбрать».';
+    else if (left.length) st.textContent = 'Отметьте, какое фото куда. Осталось: ' + left.slice(0, rolesNeed() - rolesUsed().length).map(function (p) { return p[1]; }).join(', ') + '.';
+    else if (mine.length < S.personalMax) st.textContent = 'Выберите ещё ' + (S.personalMax - mine.length) + ' фото.';
+    else st.textContent = 'Фото выбраны, места отмечены ✓';
+    st.classList.toggle('is-ok', personalDone());
+    mineBox.classList.toggle('is-hint', hint && left.length > 0);
+  }
+
+  function toMine() {
+    var m = document.getElementById('mine');
+    if (m) m.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Схема альбома: где обложка, личная страница и список класса. Это схема, а не дизайн
+  var SVG = {
+    cover: '<svg viewBox="0 0 60 80" aria-hidden="true"><rect x="2" y="2" width="56" height="76" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><rect x="10" y="10" width="40" height="46" rx="2" class="hl"/><rect x="14" y="62" width="32" height="4" rx="2" fill="currentColor" opacity=".5"/><rect x="20" y="69" width="20" height="3" rx="1.5" fill="currentColor" opacity=".3"/></svg>',
+    page: '<svg viewBox="0 0 100 70" aria-hidden="true"><rect x="2" y="2" width="96" height="66" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><line x1="50" y1="2" x2="50" y2="68" stroke="currentColor" stroke-width="1.5" opacity=".4"/><rect x="8" y="8" width="36" height="54" rx="2" class="hl"/><rect x="57" y="14" width="34" height="4" rx="2" fill="currentColor" opacity=".5"/><rect x="57" y="24" width="30" height="3" rx="1.5" fill="currentColor" opacity=".3"/><rect x="57" y="31" width="33" height="3" rx="1.5" fill="currentColor" opacity=".3"/><rect x="57" y="38" width="26" height="3" rx="1.5" fill="currentColor" opacity=".3"/></svg>',
+    list: '<svg viewBox="0 0 100 70" aria-hidden="true"><rect x="2" y="2" width="96" height="66" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>' +
+      [0, 1, 2].map(function (r) { return [0, 1, 2, 3, 4].map(function (c) { return '<rect x="' + (9 + c * 17.5) + '" y="' + (8 + r * 20) + '" width="12" height="12" rx="1.5" ' + (r === 1 && c === 2 ? 'class="hl"' : 'fill="currentColor" opacity=".22"') + '/><rect x="' + (8 + c * 17.5) + '" y="' + (22 + r * 20) + '" width="14" height="2" rx="1" fill="currentColor" opacity=".3"/>'; }).join(''); }).join('') + '</svg>'
+  };
+  var ABOUT = { cover: 'крупно, на вашем альбоме', page: 'ваша страница внутри', list: 'маленькое, среди всего класса' };
+  function scheme() {
+    var d = el('details', { class: 'scheme', open: (S.mine || []).length ? null : '' }, [
+      el('summary', { text: 'Как устроен альбом — куда какое фото' })
+    ]);
+    var row = el('div', { class: 'scheme__row' });
+    PLACES.forEach(function (pl) {
+      var pic = el('span', { class: 'scheme__pic' });
+      pic.innerHTML = SVG[pl[0]] || '';
+      row.appendChild(el('figure', {}, [pic, el('figcaption', {}, [el('b', { text: pl[1] }), ABOUT[pl[0]] || ''])]));
+    });
+    d.appendChild(row);
+    d.appendChild(el('p', { class: 'muted scheme__note', text: 'Это схема расположения, а не дизайн альбома. Из своих ' + S.personalMax + ' фото отметьте, какое куда.' }));
+    return d;
+  }
+
+  // «Всё готово» — фото выбраны, места отмечены, цитата и пожелание написаны
+  function finished() { return !!S.me && personalDone() && !!S.quote && !!S.wish; }
   function doneNote() {
     return el('div', { class: 'note note--done', 'data-done': '', hidden: !finished() || !!S.closed }, [
       el('b', { text: 'Готово, всё выбрано! 🎉' }),
@@ -286,8 +555,10 @@
   function renderPersonal(box) {
     box.appendChild(el('div', { class: 'note note--closed', 'data-closed': '', hidden: !S.closed }, [el('b', { text: 'Отбор закрыт' }), 'Ваш выбор сохранён, менять его уже нельзя.']));
     box.appendChild(doneNote());
-    box.appendChild(el('div', { class: 'note' }, [el('b', { text: 'Выберите ' + S.personalMax + ' своих фото' }), 'Нажмите на фото, чтобы посмотреть крупно, или на кружок, чтобы сразу выбрать. Передумали — нажмите ещё раз.']));
+    if (PLACES.length) box.appendChild(scheme());
+    renderMine(box);
     var secs = sections(false);
+    box.appendChild(el('div', { class: 'note' }, [el('b', { text: 'Выберите ' + S.personalMax + ' своих фото' }), 'Нажмите на фото, чтобы посмотреть крупно, или на кружок, чтобы сразу выбрать. Передумали — нажмите ещё раз.']));
     if (!secs.length) box.appendChild(el('p', { class: 'muted', text: 'Фото ещё не загружены.' }));
     secs.forEach(function (s) {
       box.appendChild(el('section', { class: 'sec' }, [el('h2', {}, [s.name, el('small', { text: s.list.length + ' фото' })]), grid(s.list)]));
@@ -312,28 +583,42 @@
     });
   }
 
-  function renderQuote(box) {
-    var ta = el('textarea', { maxlength: '400', placeholder: 'Например: «Не важно, где мы будем, важно — что мы были вместе»', 'aria-label': 'Цитата' });
-    ta.value = S.quote || '';
+  function textBlock(o) {
+    var ta = el('textarea', { maxlength: String(o.max), placeholder: o.placeholder, 'aria-label': o.title, rows: '5' });
+    ta.value = S[o.key] || '';
     ta.disabled = !canEdit();
-    var count = el('span', { class: 'muted' });
-    var btn = el('button', { type: 'button', class: 'btn btn--main', text: 'Сохранить цитату' });
-    function upd() { count.textContent = ' ' + ta.value.length + ' / 400'; }
+    var count = el('span', { class: 'muted count' });
+    var status = el('small', { class: 'save' });
+    function upd() { count.textContent = ta.value.length + ' / ' + o.max; }
     ta.addEventListener('input', upd);
     upd();
-    btn.disabled = !canEdit();
+    var saver = autosave(ta, function (v, keep) { return api(o.path, { text: v }, keep); }, status);
+    var btn = el('button', { type: 'button', class: 'btn btn--main', text: 'Сохранить', disabled: canEdit() ? null : '' });
     btn.addEventListener('click', function () {
       btn.disabled = true;
-      api('/quote', { text: ta.value }).then(function () { ta.value = S.quote || ''; upd(); toast('Цитата сохранена'); paint(); })
-        .catch(function (e) { toast(e.message, true); }).then(function () { btn.disabled = !canEdit(); });
+      saver.flush().then(function () { if (!status.classList.contains('is-bad')) toast(o.saved); })
+        .then(function () { btn.disabled = !canEdit(); });
     });
-    box.appendChild(el('div', { class: 'note note--closed', 'data-closed': '', hidden: !S.closed }, [el('b', { text: 'Отбор закрыт' }), 'Цитата сохранена, менять её уже нельзя.']));
+    return el('section', { class: 'quote' + (o.cls ? ' ' + o.cls : '') }, [
+      el('h2', { text: o.title }),
+      el('p', { class: 'muted', text: o.about }),
+      ta, el('div', { class: 'quote__foot' }, [btn, status, count])
+    ]);
+  }
+
+  function renderQuote(box) {
+    box.appendChild(el('div', { class: 'note note--closed', 'data-closed': '', hidden: !S.closed }, [el('b', { text: 'Отбор закрыт' }), 'Тексты сохранены, менять их уже нельзя.']));
     box.appendChild(doneNote());
-    box.appendChild(el('section', { class: 'quote' }, [
-      el('h2', { text: 'Ваша цитата для альбома' }),
-      el('p', { class: 'muted', text: 'Фраза, которая будет рядом с вашими фото. До 400 символов.' }),
-      ta, el('div', {}, [btn, count])
-    ]));
+    box.appendChild(textBlock({
+      key: 'quote', path: '/quote', max: 2000, title: 'Ваша цитата для альбома', saved: 'Цитата сохранена',
+      about: 'Будет в альбоме рядом с вашими фото. Можно короткую фразу, а можно несколько абзацев. Сохраняется сама.',
+      placeholder: 'Например: «Не важно, где мы будем, важно — что мы были вместе»'
+    }));
+    box.appendChild(textBlock({
+      key: 'wish', path: '/wish', max: 2000, title: '🔒 Пожелание себе в будущее', saved: 'Пожелание сохранено', cls: 'quote--wish',
+      about: 'Никто из класса его не увидит — только Артур, чтобы напечатать. В альбоме оно будет на заднике, спрятано под стираемой наклейкой: через годы откроете монеткой.',
+      placeholder: 'Что вы хотите сказать себе через 5–10 лет?'
+    }));
   }
 
   function renderBar() {
@@ -341,32 +626,48 @@
     var n, max, label;
     if (tab === 'personal') { n = (S.mine || []).length; max = S.personalMax; label = 'Ваши фото'; }
     else if (tab === 'group') { n = (S.group || []).length; max = S.groupMax; label = 'Групповые класса'; }
-    if (!label || (!S.me && !S.admin)) { if (bar) bar.remove(); return; }
+    if ((!label && !S.wfolio) || (!S.me && !S.admin)) { if (bar) bar.remove(); return; }
     if (!bar) {
-      bar = el('div', { class: 'bar' }, [el('div', { class: 'bar__in' }, [el('span', {}, [el('span', { 'data-l': '' }), el('small', { 'data-left': '' })]), el('span', { class: 'bar__n' })])]);
+      bar = el('div', { class: 'bar' }, [el('div', { class: 'bar__in' }, [
+        el('span', { class: 'bar__info' }, [el('span', { 'data-l': '' }), el('small', { 'data-left': '' })]),
+        el('span', { class: 'bar__n' }),
+        el('a', { class: 'bar__orig', target: '_blank', rel: 'noopener' }, ['Оригиналы', arrow()])
+      ])]);
       document.body.appendChild(bar);
     }
-    var left = max - n;
-    bar.querySelector('[data-l]').textContent = label;
-    bar.querySelector('[data-left]').textContent = left > 0 ? 'осталось выбрать ' + left : left === 0 ? 'всё выбрано' : 'выбрано больше нужного';
-    bar.querySelector('.bar__n').textContent = n + ' / ' + max;
+    var info = bar.querySelector('.bar__info');
+    info.hidden = !label;
+    bar.querySelector('.bar__n').hidden = !label;
+    if (label) {
+      var left = max - n;
+      bar.querySelector('[data-l]').textContent = label;
+      bar.querySelector('[data-left]').textContent = left > 0 ? 'осталось выбрать ' + left : left === 0 ? (tab === 'personal' && rolesLeft().length ? 'отметьте места' : 'всё выбрано') : 'выбрано больше нужного';
+      bar.querySelector('.bar__n').textContent = n + ' / ' + max;
+    }
+    var orig = bar.querySelector('.bar__orig');
+    orig.hidden = !S.wfolio;
+    if (S.wfolio) orig.href = S.wfolio;
   }
 
   function render() {
+    flushAll();
+    flushers = [];
     renderHeader();
     tiles = {};
+    mineBox = null;
     if (!S.me && !S.admin) { renderBar(); return renderWho(); }
-    var tabs = S.admin ? [['group', 'Групповые']] : [['personal', 'Мои фото'], ['group', 'Групповые'], ['quote', 'Цитата']];
+    var tabs = S.admin ? [['group', 'Групповые']] : [['personal', 'Мои фото'], ['group', 'Групповые'], ['quote', 'Тексты']];
     if (!tab || !tabs.some(function (t) { return t[0] === tab; })) tab = tabs[0][0];
     app.textContent = '';
-    var nav = el('div', { class: 'tabs', role: 'tablist' });
+    if (!S.admin) app.appendChild(compressNote());
+    var nav = el('div', { class: 'tabs tabs--' + tabs.length, role: 'tablist' });
     tabs.forEach(function (t) {
       nav.appendChild(el('button', { type: 'button', role: 'tab', 'data-tab': t[0], 'aria-selected': tab === t[0] ? 'true' : 'false', onclick: function () {
         if (tab === t[0]) return;
         tab = t[0];
         render();
         window.scrollTo(0, 0);
-      } }, [t[1], el('b')]));
+      } }, [el('b', { text: t[1] }), el('small')]));
     });
     app.appendChild(nav);
     var box = el('div');
@@ -382,9 +683,10 @@
     if (document.hidden || (!S.me && !S.admin)) return;
     fetch(base + '/state', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j) return;
-      var before = JSON.stringify([S.group, S.mine, S.closed, S.personalMax, S.groupMax]);
+      var key = function () { return JSON.stringify([S.group, S.mine, S.roles, S.retouch, S.closed, S.personalMax, S.groupMax, S.wfolio]); };
+      var before = key();
       if (setState(j)) return render();
-      if (JSON.stringify([S.group, S.mine, S.closed, S.personalMax, S.groupMax]) !== before) paint();
+      if (key() !== before) paint();
     }).catch(function () {});
   }
   setInterval(poll, 6000);

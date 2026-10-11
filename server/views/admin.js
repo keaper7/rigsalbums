@@ -113,7 +113,7 @@ ${o.sess ? html`<meta name="csrf" content="${o.sess.csrf}">
 ${o.sess ? html`<header class="ah">
   <div class="ah__in">
     <a class="ah__logo" href="/admin"><b>RIGSARTHUR</b><span>админка</span></a>
-    <a class="ah__site" href="/" target="_blank" rel="noopener">Открыть сайт ↗</a>
+    <a class="ah__site" href="/" target="_blank" rel="noopener">Открыть сайт<svg class="arr" viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 11.5l7-7M6 4.5h5.5V10"/></svg></a>
     <nav class="ah__nav">${nav.map(n => html`<a href="${n[1]}"${o.nav === n[0] ? raw(' aria-current="page"') : ''}>${n[2]}</a>`)}</nav>
   </div>
 </header>

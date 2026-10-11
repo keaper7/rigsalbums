@@ -14,7 +14,7 @@ const { Site, SLOTS, COVER, coverKey, coverSrc, GALLERIES, TEXTS, TOGGLES, PAGES
 const klassView = require('./views/klass');
 const A = require('./views/admin');
 const PV = require('./views/photos');
-const { Photos, PHOTO_ID } = require('./lib/photos');
+const { Photos, PHOTO_ID, PIN_RE, ROLES } = require('./lib/photos');
 
 const RESERVED = ['admin', 'assets', 'state', 'vote', 'react', 'new', 'media'];
 const VOTER_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -995,6 +995,8 @@ function createApp(cfg) {
   // Админка: /admin/c/:id/photos. Ученики: /f/:slug — отдельная ссылка, голосование /k/ не трогаем
 
   const pickLimit = new Limiter(600, 10 * 60 * 1000);
+  // Неверный код ученика: 10 попыток за 15 минут на имя, чтобы код из 4 цифр нельзя было подобрать
+  const pinLimit = new Limiter(10, 15 * 60 * 1000);
 
   function albumFor(cls) {
     return photos.ensureAlbum(cls.id, slugify(cls.title + '-' + cls.school).slice(0, 30) + '-' + randomCode(6));
@@ -1004,7 +1006,7 @@ function createApp(cfg) {
     const album = albumFor(cls);
     const list = photos.photos(cls.id);
     const students = photos.students(cls.id);
-    const picks = new Map(students.map(s => [s.id, photos.personal(s.id, album)]));
+    const picks = new Map(students.map(s => [s.id, photos.personalInfo(s.id, album)]));
     const counts = new Map(students.map(s => [s.id, picks.get(s.id).length]));
     const group = photos.group(cls.id, album);
     const inGroup = new Set(group.map(g => g.photo_id));
@@ -1048,6 +1050,31 @@ function createApp(cfg) {
   pact('settings', (ctx, cls, album) => {
     photos.updateAlbum(cls.id, { personal_max: int(ctx.form.personal_max, 1, 20, album.personal_max), group_max: int(ctx.form.group_max, 1, 300, album.group_max) });
     pback(ctx, cls, 'saved');
+  });
+
+  // Ссылка на оригиналы в wfolio — кнопка «Скачать оригиналы» у учеников
+  pact('wfolio', (ctx, cls) => {
+    const url = str(ctx.form.wfolio, 500);
+    if (url && !/^https?:\/\/[^\s<>"']+$/i.test(url)) return page(ctx, 400, photosView(ctx, cls, { err: 'Ссылка должна начинаться с https://' }));
+    photos.updateAlbum(cls.id, { wfolio: url });
+    pback(ctx, cls, 'saved');
+  });
+
+  pact('resetpin', (ctx, cls) => {
+    photos.resetPin(cls.id, +ctx.form.student);
+    pback(ctx, cls, 'pinreset');
+  });
+
+  pact('retouched', (ctx, cls) => {
+    const sid = +ctx.form.student;
+    photos.setRetouchDone(cls.id, sid, ctx.form.on === '1');
+    back(ctx, '/admin/c/' + cls.id + '/photos#st-' + sid);
+  });
+
+  pact('slim', (ctx, cls, album) => {
+    if (!album.closed_at) return page(ctx, 400, photosView(ctx, cls, { err: 'Сначала закройте отбор: пока он открыт, ученикам нужны все фото' }));
+    photos.slim(cls.id);
+    pback(ctx, cls, 'slim');
   });
 
   pact('sections', (ctx, cls) => {
@@ -1103,6 +1130,10 @@ function createApp(cfg) {
 
   // ----- страница учеников -----
   const PK_COOKIE = id => 'rp' + id;
+  // В cookie — номер ученика и подпись, в которую входит его код: подделать cookie нельзя,
+  // а если Артур сбросит код, вход в этом браузере тоже сбросится
+  const pkSig = s => crypto.createHmac('sha256', auth.secret).update('pk:' + s.class_id + ':' + s.id + ':' + s.pin).digest('base64url').slice(0, 24);
+  const pkCookie = s => s.id + '.' + pkSig(s);
 
   function pickCtx(ctx) {
     const album = photos.albumBySlug(ctx.params.slug);
@@ -1110,8 +1141,9 @@ function createApp(cfg) {
     const cls = store.getClass(album.class_id);
     if (!cls) return null;
     const admin = !!auth.session(ctx.cookies.rs);
-    const sid = +ctx.cookies[PK_COOKIE(cls.id)] || 0;
-    const me = sid ? photos.student(cls.id, sid) : null;
+    const m = /^(\d{1,10})\.([A-Za-z0-9_-]{24})$/.exec(String(ctx.cookies[PK_COOKIE(cls.id)] || ''));
+    let me = m ? photos.student(cls.id, +m[1]) : null;
+    if (me && !(me.pin && crypto.timingSafeEqual(Buffer.from(pkSig(me)), Buffer.from(m[2])))) me = null;
     return { album: album, cls: cls, admin: admin, me: me };
   }
 
@@ -1119,13 +1151,19 @@ function createApp(cfg) {
     const students = photos.students(p.cls.id);
     const names = {};
     students.forEach(s => { names[s.id] = s.name; });
+    const mine = p.me ? photos.personalInfo(p.me.id, p.album) : [];
     return {
       closed: !!p.album.closed_at,
       personalMax: p.album.personal_max,
       groupMax: p.album.group_max,
       group: photos.group(p.cls.id, p.album).map(g => [g.photo_id, g.student_id ? names[g.student_id] || 'ученик' : 'Артур']),
-      mine: p.me ? photos.personal(p.me.id, p.album) : [],
+      mine: mine.map(x => x.id),
+      roles: Object.fromEntries(mine.filter(x => x.role).map(x => [x.id, x.role])),
+      retouch: Object.fromEntries(mine.filter(x => x.retouch).map(x => [x.id, x.retouch])),
       quote: p.me ? p.me.quote : '',
+      wish: p.me ? p.me.wish : '',
+      wfolio: p.album.wfolio || '',
+      slim: !!p.album.slim_at,
       me: p.me ? { id: p.me.id, name: p.me.name } : null,
       admin: p.admin && !p.me
     };
@@ -1142,7 +1180,8 @@ function createApp(cfg) {
     const list = photos.ready(p.cls.id);
     const data = Object.assign(pickState(p), {
       slug: p.album.slug,
-      students: (started => photos.students(p.cls.id).map(s => ({ id: s.id, name: s.name, started: started.has(s.id) })))(photos.startedIds(p.cls.id)),
+      students: (started => photos.students(p.cls.id).map(s => ({ id: s.id, name: s.name, started: started.has(s.id), locked: !!s.pin })))(photos.startedIds(p.cls.id)),
+      placeList: ROLES,
       photos: list.map(ph => [ph.id, ph.section, ph.w, ph.h, photos.isGroupSection(p.album, ph.section) ? 1 : 0, ph.ver])
     });
     H.send(ctx.res, 200, PV.pickPage({ cls: p.cls, data: data }), 'text/html; charset=utf-8', {
@@ -1161,16 +1200,40 @@ function createApp(cfg) {
   r.get('/f/:slug/p/:file', ctx => {
     const album = photos.albumBySlug(ctx.params.slug);
     const m = /^([a-z0-9]{16})(-sm)?\.jpg$/.exec(ctx.params.file);
-    if (!album || !m || !photos.photo(album.class_id, m[1])) return notFound(ctx);
-    if (!H.serveStatic(photos.classDir(album.class_id), ctx.req, ctx.res, '/' + ctx.params.file, [], { cache: 'private, max-age=604800' })) notFound(ctx);
+    const ph = album && m ? photos.photo(album.class_id, m[1]) : null;
+    if (!ph) return notFound(ctx);
+    // После «Освободить место» большой копии нет — показываем маленькую
+    const file = ph.slim ? ph.id + '-sm.jpg' : ctx.params.file;
+    if (!H.serveStatic(photos.classDir(album.class_id), ctx.req, ctx.res, '/' + file, [], { cache: 'private, max-age=604800' })) notFound(ctx);
   });
 
   r.post('/f/:slug/me', ctx => {
     const p = pickCtx(ctx);
     if (!p) return H.json(ctx.res, 404, { error: 'not_found' });
-    const s = photos.student(p.cls.id, +(ctx.body && ctx.body.student));
+    const b = ctx.body || {};
+    let s = photos.student(p.cls.id, +b.student);
     if (!s) return H.json(ctx.res, 400, { error: 'Такого ученика нет в списке' });
-    H.setCookie(ctx.res, PK_COOKIE(p.cls.id), String(s.id), cookieOpts(ctx, YEAR));
+    // Артур из админки входит за ученика без кода
+    if (!p.admin) {
+      const key = 'pin:' + s.id;
+      if (s.pin) {
+        if (pinLimit.blocked(key)) return H.json(ctx.res, 429, { error: 'Слишком много попыток. Подождите 15 минут или спросите код у Артура', pin: 'ask' });
+        if (String(b.pin || '') !== s.pin) {
+          pinLimit.hit(key);
+          return H.json(ctx.res, 403, { error: b.pin ? 'Неверный код. Забыли — спросите у Артура' : 'Введите код', pin: 'ask' });
+        }
+        pinLimit.reset(key);
+      } else {
+        if (!PIN_RE.test(String(b.newPin || ''))) return H.json(ctx.res, 400, { error: 'Придумайте код из 4 цифр', pin: 'new' });
+        // Код успел придумать кто-то другой (два человека выбрали одно имя одновременно)
+        if (!photos.setPin(p.cls.id, s.id, b.newPin)) return H.json(ctx.res, 409, { error: 'Под этим именем только что вошли и придумали код. Если это не вы — напишите Артуру', pin: 'ask' });
+        s = photos.student(p.cls.id, s.id);
+      }
+    } else if (!s.pin) {
+      // за ученика без кода Артур входит без cookie-подписи — подпись требует кода
+      return H.json(ctx.res, 400, { error: 'Ученик ещё не входил и не придумал код' });
+    }
+    H.setCookie(ctx.res, PK_COOKIE(p.cls.id), pkCookie(s), cookieOpts(ctx, YEAR));
     p.me = s;
     H.json(ctx.res, 200, pickState(p));
   });
@@ -1214,6 +1277,23 @@ function createApp(cfg) {
   pickWrite('quote', (ctx, p, b) => {
     if (!p.me) return { error: 'Сначала выберите себя в списке', status: 403 };
     p.me.quote = photos.setQuote(p.cls.id, p.me.id, b.text);
+  });
+
+  pickWrite('wish', (ctx, p, b) => {
+    if (!p.me) return { error: 'Сначала выберите себя в списке', status: 403 };
+    p.me.wish = photos.setWish(p.cls.id, p.me.id, b.text);
+  });
+
+  pickWrite('role', (ctx, p, b) => {
+    if (!p.me) return { error: 'Сначала выберите себя в списке', status: 403 };
+    const res = photos.setRole(p.album, p.me.id, String(b.photo || ''), String(b.role || ''));
+    if (!res.ok) return { error: 'Сначала выберите это фото' };
+  });
+
+  pickWrite('retouch', (ctx, p, b) => {
+    if (!p.me) return { error: 'Сначала выберите себя в списке', status: 403 };
+    const res = photos.setRetouch(p.album, p.me.id, String(b.photo || ''), b.text);
+    if (!res.ok) return { error: 'Сначала выберите это фото' };
   });
 
   // ---------- обработчик запросов ----------

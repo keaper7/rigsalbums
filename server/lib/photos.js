@@ -69,7 +69,19 @@ CREATE INDEX IF NOT EXISTS pk_log_class ON pk_log (class_id, at);
 
 // [таблица, поле, описание] — новые поля сюда, только с значением по умолчанию
 const COLUMNS = [
-  ['pk_photos', 'ver', 'INTEGER NOT NULL DEFAULT 0']
+  ['pk_photos', 'ver', 'INTEGER NOT NULL DEFAULT 0'],
+  // большая копия удалена кнопкой «Освободить место», осталась только маленькая
+  ['pk_photos', 'slim', 'INTEGER NOT NULL DEFAULT 0'],
+  // куда пойдёт личное фото (обложка, личная страница, список класса) и что подправить на ретуши
+  ['pk_personal', 'role', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_personal', 'retouch', "TEXT NOT NULL DEFAULT ''"],
+  // пожелание себе в будущее, код входа ученика, когда Артур отметил ретушь сделанной
+  ['pk_students', 'wish', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_students', 'pin', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_students', 'retouch_done_at', 'INTEGER'],
+  // ссылка на оригиналы в wfolio и когда освобождали место
+  ['pk_albums', 'wfolio', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_albums', 'slim_at', 'INTEGER']
 ];
 
 const IMAGE_MAX = 6 * 1024 * 1024;
@@ -78,11 +90,22 @@ const IMAGE_MAX = 6 * 1024 * 1024;
 const DISK_RESERVE = 1024 * 1024 * 1024;
 const PHOTO_ID = /^[a-z0-9]{16}$/;
 const NAME_MAX = 60;
-const QUOTE_MAX = 400;
+const QUOTE_MAX = 2000;
+const WISH_MAX = 2000;
+const RETOUCH_MAX = 500;
+const PIN_RE = /^\d{4}$/;
+// Места в альбоме для личных фото: у каждого ученика по одному фото на место.
+// Ключ хранится в базе, название — в интерфейсе и в имени файла при раскладке
+const ROLES = [['cover', 'Обложка'], ['page', 'Личная страница'], ['list', 'Список класса']];
+const ROLE_NAMES = Object.fromEntries(ROLES);
 // Раздел считается общими групповыми фото, если в названии есть «групп» (папка «Групповые»)
 const GROUP_RE = /групп/i;
 // IMG_2 раньше IMG_10, как в Finder
 const NATURAL = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
+
+function cleanText(t, max) {
+  return String(t || '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b-\u001f]/g, '').trim().slice(0, max);
+}
 
 function cleanName(n) {
   return String(n || '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
@@ -196,7 +219,7 @@ class Photos {
   }
 
   updateAlbum(classId, f) {
-    const keys = ['personal_max', 'group_max', 'closed_at', 'group_sections'].filter(k => k in f);
+    const keys = ['personal_max', 'group_max', 'closed_at', 'group_sections', 'wfolio', 'slim_at'].filter(k => k in f);
     if (!keys.length) return;
     const vals = keys.map(k => k === 'group_sections' ? JSON.stringify(f[k]) : f[k]);
     this.db.prepare('UPDATE pk_albums SET ' + keys.map(k => k + ' = ?').join(', ') + ' WHERE class_id = ?').run(...vals, classId);
@@ -266,23 +289,49 @@ class Photos {
 
   // Кто уже что-то выбрал или написал — для подсказки «под этим именем уже выбирали»
   startedIds(classId) {
-    const rows = this.db.prepare(`SELECT id FROM pk_students s WHERE s.class_id = ? AND (s.quote != ''
+    const rows = this.db.prepare(`SELECT id FROM pk_students s WHERE s.class_id = ? AND (s.quote != '' OR s.wish != '' OR s.pin != ''
       OR EXISTS (SELECT 1 FROM pk_personal p WHERE p.student_id = s.id)
       OR EXISTS (SELECT 1 FROM pk_group g WHERE g.student_id = s.id))`).all(classId);
     return new Set(rows.map(r => r.id));
   }
 
   studentBusy(id) {
-    const s = this.db.prepare('SELECT quote FROM pk_students WHERE id = ?').get(id);
+    const s = this.db.prepare('SELECT quote, wish, pin FROM pk_students WHERE id = ?').get(id);
     const n = this.db.prepare('SELECT COUNT(*) n FROM pk_personal WHERE student_id = ?').get(id).n;
     const g = this.db.prepare('SELECT COUNT(*) n FROM pk_group WHERE student_id = ?').get(id).n;
-    return !!(n || g || (s && s.quote));
+    return !!(n || g || (s && (s.quote || s.wish || s.pin)));
   }
 
   setQuote(classId, studentId, text) {
-    const q = String(text || '').replace(/\r\n/g, '\n').trim().slice(0, QUOTE_MAX);
+    const q = cleanText(text, QUOTE_MAX);
     this.db.prepare('UPDATE pk_students SET quote = ? WHERE class_id = ? AND id = ?').run(q, classId, studentId);
     return q;
+  }
+
+  setWish(classId, studentId, text) {
+    const q = cleanText(text, WISH_MAX);
+    this.db.prepare('UPDATE pk_students SET wish = ? WHERE class_id = ? AND id = ?').run(q, classId, studentId);
+    return q;
+  }
+
+  // Код ученик придумывает сам при первом входе. Только если кода ещё нет: два человека,
+  // одновременно выбравшие одно имя, не перезапишут код друг друга
+  setPin(classId, studentId, pin) {
+    if (!PIN_RE.test(String(pin))) return false;
+    return this.db.prepare("UPDATE pk_students SET pin = ? WHERE class_id = ? AND id = ? AND pin = ''").run(String(pin), classId, studentId).changes === 1;
+  }
+
+  resetPin(classId, studentId) {
+    this.db.prepare("UPDATE pk_students SET pin = '' WHERE class_id = ? AND id = ?").run(classId, studentId);
+  }
+
+  // Артур отметил, что ретушь ученика сделана. Ученик что-то поменял — отметка снимается
+  setRetouchDone(classId, studentId, on) {
+    this.db.prepare('UPDATE pk_students SET retouch_done_at = ? WHERE class_id = ? AND id = ?').run(on ? Date.now() : null, classId, studentId);
+  }
+
+  retouchChanged(studentId) {
+    this.db.prepare('UPDATE pk_students SET retouch_done_at = NULL WHERE id = ?').run(studentId);
   }
 
   // ---------- фото ----------
@@ -301,7 +350,7 @@ class Photos {
   // их всегда можно загрузить заново из папки с оригиналами), и тогда загрузка их догрузит
   ready(classId) {
     return this.photos(classId).filter(p => p.has_sm &&
-      fs.existsSync(this.file(classId, p.id + '.jpg')) && fs.existsSync(this.file(classId, p.id + '-sm.jpg')));
+      (p.slim || fs.existsSync(this.file(classId, p.id + '.jpg'))) && fs.existsSync(this.file(classId, p.id + '-sm.jpg')));
   }
 
   paths(classId) {
@@ -322,7 +371,7 @@ class Photos {
     // Маленькая копия до её загрузки считается неготовой: фото не покажется ученикам наполовину
     const now = Date.now();
     this.db.prepare(`INSERT INTO pk_photos (id, class_id, section, path, w, h, has_sm, ver, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
-      ON CONFLICT (class_id, path) DO UPDATE SET w = excluded.w, h = excluded.h, has_sm = 0, ver = excluded.ver`)
+      ON CONFLICT (class_id, path) DO UPDATE SET w = excluded.w, h = excluded.h, has_sm = 0, slim = 0, ver = excluded.ver`)
       .run(newId(), classId, sectionOf(p), p, size.w, size.h, now, now);
     const id = this.db.prepare('SELECT id FROM pk_photos WHERE class_id = ? AND path = ?').get(classId, p).id;
     const tmp = this.file(classId, id + '.jpg.' + process.pid + '.' + now + '.part');
@@ -351,6 +400,26 @@ class Photos {
     return list.length;
   }
 
+  // «Освободить место» после отбора: удаляем фото, которые никто не выбрал, а у выбранных —
+  // большую копию. Выбор, места, ретушь и тексты остаются, выбранные фото видно в маленьком размере.
+  // Оригиналы у Артура не трогаются, раскладка по папкам работает как раньше
+  slim(classId) {
+    const keep = new Set(this.db.prepare(`SELECT photo_id FROM pk_personal p JOIN pk_students s ON s.id = p.student_id WHERE s.class_id = ?
+      UNION SELECT photo_id FROM pk_group WHERE class_id = ?`).all(classId, classId).map(r => r.photo_id));
+    const all = this.db.prepare('SELECT id FROM pk_photos WHERE class_id = ?').all(classId);
+    const drop = all.filter(r => !keep.has(r.id));
+    const kept = all.filter(r => keep.has(r.id));
+    this.store.tx(() => {
+      drop.forEach(r => this.db.prepare('DELETE FROM pk_photos WHERE id = ?').run(r.id));
+      kept.forEach(r => this.db.prepare('UPDATE pk_photos SET slim = 1 WHERE id = ?').run(r.id));
+      this.updateAlbum(classId, { slim_at: Date.now() });
+    });
+    const rm = f => { try { fs.unlinkSync(this.file(classId, f)); } catch (e) {} };
+    drop.forEach(r => { rm(r.id + '.jpg'); rm(r.id + '-sm.jpg'); });
+    kept.forEach(r => rm(r.id + '.jpg'));
+    return { removed: drop.length, kept: kept.length };
+  }
+
   // Разделы, которые сейчас общие групповые. Если Артур переключил раздел уже после выбора,
   // старые отметки не удаляем, а просто не учитываем: вернёт галочку — вернутся и они
   groupSet(album) {
@@ -368,9 +437,18 @@ class Photos {
     return rows.filter(r => !grp || !grp.has(r.section)).map(r => r.photo_id);
   }
 
+  // Выбранные личные фото с местом в альбоме и пожеланием по ретуши
+  personalInfo(studentId, album) {
+    const rows = this.db.prepare(`SELECT p.photo_id, p.role, p.retouch, f.section FROM pk_personal p JOIN pk_photos f ON f.id = p.photo_id
+      WHERE p.student_id = ? ORDER BY p.created_at, p.rowid`).all(studentId);
+    const grp = album ? this.groupSet(album) : null;
+    return rows.filter(r => !grp || !grp.has(r.section)).map(r => ({ id: r.photo_id, role: ROLE_NAMES[r.role] ? r.role : '', retouch: r.retouch }));
+  }
+
   setPersonal(album, studentId, photoId, on) {
     if (!on) {
-      this.db.prepare('DELETE FROM pk_personal WHERE student_id = ? AND photo_id = ?').run(studentId, photoId);
+      const gone = this.db.prepare('DELETE FROM pk_personal WHERE student_id = ? AND photo_id = ?').run(studentId, photoId).changes;
+      if (gone) this.retouchChanged(studentId);
       return { ok: true };
     }
     return this.store.tx(() => {
@@ -378,8 +456,32 @@ class Photos {
       if (mine.indexOf(photoId) !== -1) return { ok: true };
       if (mine.length >= album.personal_max) return { ok: false, error: 'full' };
       this.db.prepare('INSERT INTO pk_personal (student_id, photo_id, created_at) VALUES (?, ?, ?)').run(studentId, photoId, Date.now());
+      this.retouchChanged(studentId);
       return { ok: true };
     });
+  }
+
+  // Место в альбоме для выбранного фото. Одно место — одно фото: если оно было у другого фото
+  // этого ученика, переходит сюда. '' — без места
+  setRole(album, studentId, photoId, role) {
+    if (role && !ROLE_NAMES[role]) return { ok: false, error: 'role' };
+    return this.store.tx(() => {
+      if (this.personal(studentId, album).indexOf(photoId) === -1) return { ok: false, error: 'not_mine' };
+      if (role) this.db.prepare("UPDATE pk_personal SET role = '' WHERE student_id = ? AND role = ? AND photo_id != ?").run(studentId, role, photoId);
+      this.db.prepare('UPDATE pk_personal SET role = ? WHERE student_id = ? AND photo_id = ?').run(role || '', studentId, photoId);
+      this.retouchChanged(studentId);
+      return { ok: true };
+    });
+  }
+
+  setRetouch(album, studentId, photoId, text) {
+    const t = cleanText(text, RETOUCH_MAX);
+    if (this.personal(studentId, album).indexOf(photoId) === -1) return { ok: false, error: 'not_mine' };
+    const cur = this.db.prepare('SELECT retouch FROM pk_personal WHERE student_id = ? AND photo_id = ?').get(studentId, photoId);
+    if (cur && cur.retouch === t) return { ok: true };
+    this.db.prepare('UPDATE pk_personal SET retouch = ? WHERE student_id = ? AND photo_id = ?').run(t, studentId, photoId);
+    this.retouchChanged(studentId);
+    return { ok: true };
   }
 
   // ---------- общий выбор групповых ----------
@@ -418,14 +520,19 @@ class Photos {
   exportPlan(classId) {
     const album = this.album(classId);
     const byId = new Map(this.photos(classId).map(p => [p.id, p]));
-    const students = this.students(classId).map(s => ({
-      name: s.name,
-      quote: s.quote,
-      photos: this.personal(s.id, album).map(id => byId.get(id)).filter(Boolean).map(p => p.path)
-    }));
+    // Фото с местом в альбоме при раскладке называются по месту: «Обложка.jpg»
+    const students = this.students(classId).map(s => {
+      const list = this.personalInfo(s.id, album).filter(x => byId.has(x.id));
+      return {
+        name: s.name,
+        quote: s.quote,
+        photos: list.map(x => byId.get(x.id).path),
+        roles: list.map(x => x.role ? ROLE_NAMES[x.role] : '')
+      };
+    });
     const group = this.group(classId, album).map(g => byId.get(g.photo_id)).filter(Boolean).map(p => p.path);
     return { students: students, group: group };
   }
 }
 
-module.exports = { Photos, cleanPath, sectionOf, PHOTO_ID, QUOTE_MAX };
+module.exports = { Photos, cleanPath, sectionOf, PHOTO_ID, QUOTE_MAX, WISH_MAX, RETOUCH_MAX, PIN_RE, ROLES, ROLE_NAMES };

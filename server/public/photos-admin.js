@@ -280,7 +280,8 @@
           // два ученика с похожими именами не должны попасть в одну папку
           var folder = safe(s.name), base = folder, k = 2;
           while (jobs.some(function (j) { return j.folder.toLowerCase() === folder.toLowerCase(); }) || folder.toLowerCase() === 'групповые') folder = base + ' (' + k++ + ')';
-          jobs.push({ folder: folder, files: s.photos, names: s.roles || [], quote: s.quote });
+          // имя файла: место, потом ученик — «обложка_Биттуев Азамат.jpg», дизайнер сразу видит, куда и чьё
+          jobs.push({ folder: folder, files: s.photos, names: (s.roles || []).map(function (r) { return r ? r.toLowerCase() + '_' + safe(s.name) : ''; }), quote: s.quote });
         });
         if (plan.group.length) jobs.push({ folder: 'Групповые', files: plan.group });
         var total = jobs.reduce(function (n, j) { return n + j.files.length; }, 0) || 1;
@@ -291,7 +292,7 @@
           return files.reduce(function (p, rel, i) {
             return p.then(function () {
               var name = rel.split('/').pop();
-              // фото с местом в альбоме называем по месту: «Обложка.jpg»
+              // фото с местом в альбоме называем по ученику и месту
               if (names && names[i]) name = names[i] + (/\.jpeg$/i.test(name) ? '.jpeg' : '.jpg');
               // одинаковые имена из разных папок не затираем
               if (used[name.toLowerCase()]) name = rel.split('/').slice(0, -1).join('-') + '-' + rel.split('/').pop();

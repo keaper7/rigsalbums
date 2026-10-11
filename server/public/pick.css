@@ -125,12 +125,12 @@ button { cursor: pointer; }
 .who li button { display: flex; align-items: center; justify-content: space-between; }
 .who__lock { font-size: 14px; opacity: .7; }
 
-.note--orig { display: flex; align-items: center; padding: 12px 14px; background: #2B1B1A; color: rgba(244, 239, 231, .8); box-shadow: none; font-size: 13.5px; line-height: 1.35; }
+.note--orig { display: flex; align-items: center; padding: 12px 14px; background: var(--wine); color: rgba(255, 255, 255, .85); box-shadow: none; font-size: 13.5px; line-height: 1.35; }
 .note--orig > span { flex: 1 1 auto; min-width: 0; }
 .note--orig b { color: #fff; font-size: 14.5px; }
 .btn--orig, .bar__orig { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 16px; border-radius: 99px; background: #fff; color: var(--ink); font-weight: 800; font-size: 14px; text-decoration: none; white-space: nowrap; }
 .note--orig .btn--orig { flex: 0 0 auto; margin-left: 12px; min-height: 38px; padding: 7px 14px; font-size: 13.5px; }
-.bar__orig { background: var(--ink); color: #fff; }
+.bar__orig { background: var(--wine); color: #fff; }
 .bar__orig[hidden], .bar__info[hidden], .bar__n[hidden] { display: none; }
 .bar__info { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar__info small { overflow: hidden; text-overflow: ellipsis; }
@@ -192,7 +192,7 @@ button { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .ret__btn.is-hint { animation: none; } }
 .ret { margin-top: 8px; }
 .ret[hidden] { display: none; }
-.ret textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 15px; line-height: 1.4; resize: vertical; }
+.ret textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 16px; line-height: 1.4; resize: vertical; }
 .save { display: block; min-height: 1.3em; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
 .save.is-ok { color: var(--ok); }
 .save.is-bad { color: var(--wine); }
@@ -202,10 +202,10 @@ button { cursor: pointer; }
 .quote__foot { display: flex; align-items: center; flex-wrap: wrap; }
 .quote__foot .save { margin-left: 12px; flex: 1 1 auto; }
 .quote__foot .count { margin-left: auto; font-size: 13px; }
-.quote--wish { background: #2B1B1A; color: #F4EFE7; }
-.quote--wish .muted { color: rgba(244, 239, 231, .75); }
+.quote--wish { background: var(--wine); color: #fff; }
+.quote--wish .muted { color: rgba(255, 255, 255, .85); }
 .quote--wish textarea { background: #F4EFE7; color: var(--ink); border-color: transparent; }
-.quote--wish .save { color: rgba(244, 239, 231, .8); }
+.quote--wish .save { color: rgba(255, 255, 255, .85); }
 .quote--wish .save.is-ok { color: #9fd3b4; }
 
 .lb__note { margin: 0; padding: 6px 16px 0; text-align: center; color: rgba(255, 255, 255, .6); font-size: 12.5px; font-weight: 600; }
@@ -218,3 +218,14 @@ button { cursor: pointer; }
 
 /* стрелка «откроется в новой вкладке»: короткая и плотная, цвет как у текста */
 .arr { display: inline-block; width: .8em; height: .8em; margin-left: .3em; vertical-align: -.02em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+
+/* окно «куда пойдёт это фото» — сразу после выбора, по центру экрана */
+.dlg__box--place { text-align: center; }
+.dlg__box--place img { display: block; width: 120px; height: 120px; margin: 0 auto 12px; border-radius: 14px; object-fit: cover; background: var(--paper-2); }
+.place-opts { margin-top: 14px; text-align: left; }
+.place-opt { display: block; width: 100%; margin-top: 8px; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); text-align: left; }
+.place-opt b { display: block; font-size: 16px; }
+.place-opt small { display: block; margin-top: 2px; font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.place-opt.is-taken small { color: var(--warn); }
+.place-opt:active { background: var(--paper); }
+.place-later { display: block; margin: 12px auto 0; border: 0; background: none; color: var(--ink-2); font-weight: 700; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }

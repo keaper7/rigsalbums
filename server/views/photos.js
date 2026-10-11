@@ -186,7 +186,7 @@ ${o.students.some(st => (counts.get(st.id) || 0) || st.quote || st.wish) ? html`
 
 <section class="card">
   <div class="card__h"><h2 class="h">Разложить по папкам</h2></div>
-  <p class="muted small">Работает в Chrome на компьютере. Сначала выберите ту же папку с оригиналами, потом папку, куда сложить. Появится папка класса, в ней папка каждого ученика с фото и цитатой, и папка «Групповые». Фото с отмеченным местом называются по нему: «${ROLES.map(r => r[1]).join('.jpg», «')}.jpg».</p>
+  <p class="muted small">Работает в Chrome на компьютере. Сначала выберите ту же папку с оригиналами, потом папку, куда сложить. Появится папка класса, в ней папка каждого ученика с фото и цитатой, и папка «Групповые». Фото с отмеченным местом называются по ученику и месту, например «обложка_Биттуев Азамат.jpg».</p>
   <button class="b b--main b--wide" type="button" data-pk-export="${c.id}" data-pk-title="${c.title} ${c.school}" style="margin-top:12px">Разложить по папкам</button>
   <div class="upl__state" data-pk-export-state hidden><div class="upl__bar"><i></i></div><p></p></div>
 </section>

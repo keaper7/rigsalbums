@@ -152,12 +152,15 @@
     return api(p.group ? '/group' : '/pick', { photo: p.id, on: !on })
       .then(function (changed) {
         if (changed) return render();
-        // подсказываем, что дальше, когда свои фото набраны: отметить места и написать про ретушь
-        if (!p.group && !on && before < S.personalMax && (S.mine || []).length >= S.personalMax) {
+        if (p.group || on) return;
+        var full = before < S.personalMax && (S.mine || []).length >= S.personalMax;
+        // сразу спрашиваем, куда пойдёт фото; последнее свободное место заполняем сами
+        return afterPick(p.id).then(function (auto) {
+          if (!full) return auto && toast('Это фото пойдёт сюда: ' + auto);
           hint = true;
           if (!lb.hidden) closeLb();
-          toast('Все ' + S.personalMax + ' фото выбраны! Теперь отметьте, какое куда в альбоме, и напишите, если нужна доп. ретушь', false, ['Наверх ↑', toMine]);
-        }
+          toast('Все ' + S.personalMax + ' фото выбраны!' + (auto ? ' Последнее пойдёт сюда: ' + auto + '.' : '') + ' Если нужна доп. ретушь, напишите под фото', false, ['Наверх ↑', toMine]);
+        });
       })
       .catch(function (e) { toast(e.message, true); })
       .then(function () { delete pending[p.id]; paint(); });
@@ -425,7 +428,14 @@
     rolePending[id] = true;
     paint();
     api('/role', { photo: id, role: next })
-      .then(function () { if (from) toast(PLACES.filter(function (p) { return p[0] === next; })[0][1] + ' теперь на этом фото'); })
+      .then(function () {
+        if (from) toast(PLACES.filter(function (p) { return p[0] === next; })[0][1] + ' теперь на этом фото');
+        // осталось одно фото без места и одно свободное место — ставим сами
+        var u = unplaced(), left = rolesLeft();
+        if ((S.mine || []).length >= S.personalMax && u.length === 1 && left.length === 1 && next) {
+          return api('/role', { photo: u[0], role: left[0][0] }).then(function () { toast('Оставшееся фото пойдёт сюда: ' + left[0][1]); });
+        }
+      })
       .catch(function (e) { toast(e.message, true); })
       .then(function () { delete rolePending[id]; paint(); });
   }
@@ -444,6 +454,47 @@
         title: others[pl[0]] ? pl[1] + ' уже у другого фото. Нажмите, чтобы перенести сюда' : pl[1],
         onclick: function () { setRole(id, pl[0]); }
       }, [cur === pl[0] ? '✓ ' : '', SHORT[pl[0]] || pl[1]]));
+    });
+  }
+
+  // Фото без места, когда места ещё нужны
+  function unplaced() { var r = S.roles || {}; return (S.mine || []).filter(function (id) { return !r[id]; }); }
+
+  // Только что выбранное фото: если свободное место одно и фото без места тоже одно —
+  // ставим его туда сами (иначе кто-то обязательно забудет), иначе спрашиваем окном
+  function afterPick(id) {
+    if (!PLACES.length || (S.roles || {})[id] || !rolesLeft().length) return Promise.resolve();
+    var left = rolesLeft();
+    if ((S.mine || []).length >= S.personalMax && left.length === 1 && unplaced().length === 1) {
+      return api('/role', { photo: id, role: left[0][0] }).then(function () {
+        paint();
+        return left[0][1];
+      }, function (e) { toast(e.message, true); });
+    }
+    return askPlace(id);
+  }
+
+  function askPlace(id) {
+    return new Promise(function (done) {
+      var p = byId[id];
+      var taken = {};
+      (S.mine || []).forEach(function (x) { if (x !== id && S.roles && S.roles[x]) taken[S.roles[x]] = true; });
+      var opts = el('div', { class: 'place-opts' });
+      var dlg;
+      function close() { dlg.remove(); paint(); done(); }
+      PLACES.forEach(function (pl) {
+        opts.appendChild(el('button', { type: 'button', class: 'place-opt' + (taken[pl[0]] ? ' is-taken' : ''), onclick: function () {
+          api('/role', { photo: id, role: pl[0] }).then(close, function (e) { toast(e.message, true); close(); });
+        } }, [el('b', { text: pl[1] }), el('small', { text: taken[pl[0]] ? 'Сейчас там другое фото, поставим это вместо него' : ABOUT[pl[0]] || '' })]));
+      });
+      dlg = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true' }, [el('div', { class: 'dlg__box dlg__box--place' }, [
+        p ? el('img', { src: src(p), alt: '' }) : null,
+        el('h2', { text: 'Куда пойдёт это фото?' }),
+        el('p', { class: 'muted', text: 'Выберите место в альбоме' }),
+        opts,
+        el('button', { type: 'button', class: 'place-later', text: 'Решу потом', onclick: close })
+      ])]);
+      document.body.appendChild(dlg);
     });
   }
 
@@ -616,7 +667,7 @@
     }));
     box.appendChild(textBlock({
       key: 'wish', path: '/wish', max: 2000, title: '🔒 Пожелание себе в будущее', saved: 'Пожелание сохранено', cls: 'quote--wish',
-      about: 'Его никто из класса не увидит. В альбоме оно будет на заднике под стираемой наклейкой, через годы откроете её монеткой.',
+      about: 'Напиши себе пожелание, совет или послание в будущее. Его никто кроме тебя не увидит, место будет секретом, узнаешь когда получишь альбом 🫶',
       placeholder: 'Что вы хотите сказать себе через 5–10 лет?'
     }));
   }

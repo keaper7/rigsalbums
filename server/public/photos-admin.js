@@ -170,9 +170,9 @@
           busy = false;
           input.parentNode.classList.remove('is-busy');
           if (stop) {
-            state(box, stop + '. Загружено ' + (done - failed.length) + ' из ' + total + (stopCode === 403 ? '. Войдите и выберите папку ещё раз — догрузится остальное' : ''), 1, true);
+            state(box, stop + '. Загружено ' + (done - failed.length) + ' из ' + total + (stopCode === 403 ? '. Войдите и выберите папку ещё раз, догрузится остальное' : ''), 1, true);
           } else if (failed.length) {
-            state(box, 'Загружено ' + (total - failed.length) + ' из ' + total + '. Не получилось: ' + failed.length + '. Выберите папку ещё раз — догрузятся только они', 1, true);
+            state(box, 'Загружено ' + (total - failed.length) + ' из ' + total + '. Не получилось: ' + failed.length + '. Выберите папку ещё раз, догрузятся только они', 1, true);
             var ul = document.createElement('ul');
             failed.slice(0, 10).forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
             box.appendChild(ul);
@@ -257,7 +257,7 @@
         return Promise.all([dst.isSameEntry ? dst.isSameEntry(src) : false, src.resolve ? src.resolve(dst) : null]);
       })
       .then(function (r) {
-        if (r[0] || r[1]) throw new Error('Выберите для раскладки другую папку — не папку с оригиналами и не папку внутри неё');
+        if (r[0] || r[1]) throw new Error('Для раскладки выберите другую папку: не ту, где оригиналы, и не папку внутри неё');
         return fetch('/admin/api/c/' + classId + '/photos/export', { credentials: 'same-origin' }).then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (j) {
             if (!r.ok) throw new Error(j.error || 'Сервер ответил ' + r.status);
@@ -315,7 +315,7 @@
         }).then(function () {
           var empty = plan.students.filter(function (s) { return !s.photos.length; }).map(function (s) { return s.name; });
           var msg = 'Готово: папка «' + title + '»';
-          if (missing.length === total && total > 1) msg = 'Ни одного оригинала не нашлось. Похоже, на шаге 1 выбрана не та папка — нужна та, внутри которой «Парни», «Девочки», «Групповые»';
+          if (missing.length === total && total > 1) msg = 'Ни одного оригинала не нашлось. Похоже, на шаге 1 выбрана не та папка. Нужна та, внутри которой «Парни», «Девочки», «Групповые»';
           else if (missing.length) msg += '. Не нашлись оригиналы: ' + missing.length;
           state(box, msg, 1, missing.length > 0);
           if (missing.length || empty.length) {

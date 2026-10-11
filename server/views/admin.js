@@ -354,7 +354,7 @@ function controlBlock(o) {
     ${untilField(now)}
     <button class="b b--main" type="submit">Начать сейчас</button>
   </form>
-  <p class="muted small until__hint">Можно указать точную дату окончания, например 12 октября 23:59 — тогда длительность не учитывается.</p>
+  <p class="muted small until__hint">Можно указать точную дату окончания, например 12 октября 23:59. Тогда длительность не учитывается.</p>
   <details class="more">
     <summary>Запланировать старт на время</summary>
     <form method="post" action="/admin/c/${c.id}/schedule" class="form plan">
@@ -446,7 +446,7 @@ ${resultsBlock(o)}
   <summary class="fold__h"><span><b>Варианты для этого класса</b><small>${offSteps.length ? 'Убрано из голосования: ' + offSteps.map(st => STEP_NAMES[st].toLowerCase()).join(', ') + (hiddenCount > offSteps.reduce((n, st) => n + all[st].filter(x => !x.hidden).length, 0) ? '; есть скрытые варианты' : '') : hiddenCount ? 'Скрыто для класса: ' + hiddenCount : 'Класс видит все варианты'}</small></span></summary>
   <form class="form" method="post" action="/admin/c/${c.id}/options">
   ${csrf(o.sess)}
-  <p class="muted small">Снимите галочку, чтобы вариант не показывался этому классу. Снимите все галочки в этапе — и этап уберётся из голосования целиком (например, место уже выбрали заранее; его можно написать в шпаргалке в поле «Ещё»).</p>
+  <p class="muted small">Снимите галочку, чтобы вариант не показывался этому классу. Если снять все галочки в этапе, он уберётся из голосования целиком. Например, когда место уже выбрали заранее: его можно написать в шпаргалке в поле «Ещё».</p>
   ${STEPS.map(step => html`<fieldset class="checks">
     <legend>${STEP_NAMES[step]}${offSteps.indexOf(step) !== -1 ? html` <small class="muted">убран из голосования</small>` : ''}</legend>
     ${all[step].map(x => {

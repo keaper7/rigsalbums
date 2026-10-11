@@ -47,18 +47,18 @@ function adminPage(o) {
   const left = o.students.filter(s => !finished(s));
   const hasGroup = sections.some(s => o.isGroup(s));
   const places = ROLES.map(r => r[1].toLowerCase()).join(', ');
-  const chat = 'Ребята, выбираем фото для выпускного альбома! 📸\n\n' + link + '\n\n' +
-    '1. Найдите себя в списке и придумайте код из 4 цифр. Запомните его — без кода в ваш выбор никто не зайдёт.\n' +
-    '2. «Мои фото» — выберите ' + a.personal_max + ' своих фото и отметьте, какое куда в альбоме' + (rolesNeed === ROLES.length ? ': ' + places : '') + '. Если нужна доп. ретушь — напишите под фото.\n' +
-    (hasGroup ? '3. «Групповые» — это ОБЩИЙ выбор всего класса: все видят одно и то же. Не убирайте чужие фото без причины — заменяйте, если очень хочется другое.\n4. «Тексты» — цитата для альбома и пожелание себе в будущее (его никто из класса не увидит).\n'
-      : '3. «Тексты» — цитата для альбома и пожелание себе в будущее (его никто из класса не увидит).\n') +
-    '\nФото на сайте сжатые — только для выбора, не скриньте их.' + (a.wfolio ? ' Оригиналы: ' + a.wfolio : '') +
-    '\n\nПоменять выбор можно, пока я не закрою отбор.';
+  const chat = 'Ребята, выбираем фото для выпускного альбома 📸\n\n' + link + '\n\n' +
+    '1. Найдите себя в списке и придумайте код из 4 цифр. Запомните его, без кода в ваш выбор никто не зайдёт.\n' +
+    '2. «Мои фото»: выберите ' + a.personal_max + ' своих фото и отметьте, какое куда в альбоме' + (rolesNeed === ROLES.length ? ' (' + places + ')' : '') + '. Если нужна доп. ретушь, напишите под фото.\n' +
+    (hasGroup ? '3. «Групповые»: это общий выбор всего класса, все видят одно и то же. Не убирайте чужие фото без причины.\n4. «Тексты»: цитата для альбома и пожелание себе в будущее, его никто из класса не увидит.\n'
+      : '3. «Тексты»: цитата для альбома и пожелание себе в будущее, его никто из класса не увидит.\n') +
+    '\nФото на сайте сжатые, они только для выбора, не скриньте их.' + (a.wfolio ? ' Оригиналы: ' + a.wfolio : '') +
+    '\n\nВыбор можно поменять, пока я не закрою отбор.';
   const remind = left.length ? 'Напоминаю про выбор фото для альбома. Ещё не закончили: ' + left.map(s => s.name).join(', ') + '.\n\n' + link : '';
   const body = html`
 <a class="back" href="/admin/c/${c.id}">← ${c.title} · ${c.school}</a>
 <h1 class="h1">Отбор фото</h1>
-<p class="muted small" style="margin:6px 0 18px">Пробная версия. Ученикам откроется только по ссылке ниже, голосование класса это не затрагивает.</p>
+<p class="muted small" style="margin:6px 0 18px">Ученикам открывается только по ссылке ниже, голосование класса это не затрагивает.</p>
 ${o.msg && MSG[o.msg] ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
 ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
 
@@ -69,7 +69,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
     <button class="b" type="button" data-copy="${link}">Скопировать ссылку</button>
     <a class="b" href="/f/${a.slug}?admin=1" target="_blank" rel="noopener">Открыть как Артур</a>
   </div>
-  <p class="muted small" style="margin-top:10px">«Открыть как Артур» — там вы заранее отмечаете общие групповые. Ученики видят ваш выбор и могут заменить.</p>
+  <p class="muted small" style="margin-top:10px">Через «Открыть как Артур» можно заранее отметить групповые. Ученики увидят ваш выбор и смогут заменить.</p>
   <details class="pk-msg">
     <summary>Сообщение для чата класса</summary>
     <textarea readonly rows="10">${chat}</textarea>
@@ -81,7 +81,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   <form class="form pk-wf" method="post" action="/admin/c/${c.id}/photos/wfolio">
     ${csrf(o.sess)}
     <label class="field"><span>Ссылка на оригиналы в wfolio</span><input name="wfolio" type="url" inputmode="url" maxlength="500" placeholder="https://…" value="${a.wfolio || ''}"></label>
-    <p class="muted small">У учеников на странице будет заметная кнопка «Оригиналы» — чтобы не скринили сжатые фото.</p>
+    <p class="muted small">У учеников появится кнопка «Оригиналы», чтобы не скринили сжатые фото.</p>
     <button class="b b--sm" type="submit">Сохранить ссылку</button>
   </form>
   <form method="post" action="/admin/c/${c.id}/photos/${a.closed_at ? 'open' : 'close'}" style="margin-top:14px"${a.closed_at ? '' : raw(' data-confirm="Закрыть отбор? Ученики больше не смогут менять выбор"')}>
@@ -92,13 +92,13 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
 
 <section class="card">
   <div class="card__h"><h2 class="h">Фото</h2><span class="muted small">${photosN(o.photos.length)}</span></div>
-  <p class="muted small">Выберите папку с оригиналами, внутри которой подпапки: «Парни», «Девочки», «Групповые» и т. д. Браузер сам сделает лёгкие копии и загрузит только их — оригиналы останутся у вас. Уже загруженные фото пропускаются, так что можно добавлять новые в любой момент.</p>
+  <p class="muted small">Выберите папку с оригиналами, внутри которой подпапки: «Парни», «Девочки», «Групповые» и т. д. Браузер сам сделает лёгкие копии и загрузит только их, оригиналы останутся у вас. Уже загруженные фото пропускаются, так что можно добавлять новые в любой момент.</p>
   <label class="b b--main b--wide upl" style="margin-top:12px">
     <input type="file" webkitdirectory multiple data-pk-upload="${c.id}">
     <span>Выбрать папку с фото</span>
   </label>
   <div class="upl__state" data-pk-state hidden><div class="upl__bar"><i></i></div><p></p></div>
-  ${o.disk ? html`<p class="muted small pk-disk${o.disk.free < 3 * GB ? ' is-low' : ''}">Копии фото этого класса: ${size(o.usage)}. Свободно на сервере: ${size(o.disk.free)} из ${size(o.disk.total)}${o.disk.free < 3 * GB ? ' — места мало: освободите место у классов, где отбор закончен' : ''}.</p>` : ''}
+  ${o.disk ? html`<p class="muted small pk-disk${o.disk.free < 3 * GB ? ' is-low' : ''}">Копии фото этого класса: ${size(o.usage)}. Свободно на сервере: ${size(o.disk.free)} из ${size(o.disk.total)}${o.disk.free < 3 * GB ? '. Места мало, освободите место у классов, где отбор закончен' : ''}.</p>` : ''}
   ${a.slim_at ? html`<p class="flash pk-slim">Место освобождено ${fmtWhen(a.slim_at)}: остались только выбранные фото в маленьком размере. Если загрузить папку снова, вернутся все фото.</p>`
     : o.photos.length ? html`<form method="post" action="/admin/c/${c.id}/photos/slim" class="pk-slim"${a.closed_at ? raw(' data-confirm="Удалить с сервера все фото, которые никто не выбрал? У выбранных останется маленькая копия, выбор, места, ретушь и тексты сохранятся. Оригиналы на компьютере не трогаются"') : ''}>
     ${csrf(o.sess)}
@@ -107,12 +107,12 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   </form>` : ''}
   ${sections.length ? html`<form method="post" action="/admin/c/${c.id}/photos/sections" class="secs">
     ${csrf(o.sess)}
-    <p class="muted small" style="margin:16px 0 8px">Галочка — общие групповые (один выбор на весь класс). Без галочки — личные фото, каждый выбирает себе.</p>
-    ${sections.every(x => o.isGroup(x)) ? html`<p class="flash flash--err">Все разделы отмечены как групповые — во вкладке «Мои фото» у учеников пусто. Снимите галочку с портретов («Парни», «Девочки») и нажмите «Сохранить разделы».</p>` : ''}
+    <p class="muted small" style="margin:16px 0 8px">С галочкой: групповые, один общий выбор на весь класс. Без галочки: личные, каждый выбирает себе.</p>
+    ${sections.every(x => o.isGroup(x)) ? html`<p class="flash flash--err">Все разделы отмечены как групповые, поэтому в «Мои фото» у учеников пусто. Снимите галочку с портретов («Парни», «Девочки») и нажмите «Сохранить разделы».</p>` : ''}
     ${sections.map(s => {
       const st = bySection.get(s);
       const grp = o.isGroup(s);
-      return html`<label class="check"><input type="checkbox" name="group" value="${s}"${grp ? raw(' checked') : ''}><span><b>${s}</b> <small>${photosN(st.ready)}${st.ready < st.n ? ' · не догрузились: ' + (st.n - st.ready) + ' — выберите папку ещё раз' : ''} · ${grp ? 'групповые' : 'личные'}</small></span></label>`;
+      return html`<label class="check"><input type="checkbox" name="group" value="${s}"${grp ? raw(' checked') : ''}><span><b>${s}</b> <small>${photosN(st.ready)}${st.ready < st.n ? ' · не догрузились: ' + (st.n - st.ready) + ', выберите папку ещё раз' : ''} · ${grp ? 'групповые' : 'личные'}</small></span></label>`;
     })}
     <button class="b b--sm" type="submit" style="margin-top:10px">Сохранить разделы</button>
   </form>` : ''}
@@ -131,7 +131,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   <form class="form" method="post" action="/admin/c/${c.id}/photos/students">
     ${csrf(o.sess)}
     <label class="field"><span>Имена, каждое с новой строки</span><textarea name="names" rows="${Math.min(14, Math.max(5, o.students.length + 1))}" placeholder="Анна Козлова&#10;Тимур Хасанов">${o.names !== undefined ? o.names : o.students.map(s => s.name).join('\n')}</textarea></label>
-    <p class="muted small">Новые имена добавятся, убранные — удалятся (если ученик ещё ничего не выбрал). Чтобы исправить опечатку у того, кто уже выбирал, нажмите на имя в таблице ниже.</p>
+    <p class="muted small">Новые имена добавятся, убранные удалятся, если ученик ещё ничего не выбрал. Опечатку у того, кто уже выбирал, можно исправить, нажав на имя в таблице.</p>
     <button class="b b--main" type="submit">Сохранить список</button>
   </form>
   ${o.students.length ? html`<div class="pk-scroll"><table class="pk-table">
@@ -143,7 +143,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
       return html`<tr><td><details class="pk-ren"><summary>${s.name}</summary><form method="post" action="/admin/c/${c.id}/photos/rename">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><input name="name" value="${s.name}" maxlength="60" required aria-label="Новое имя"><button class="b b--sm" type="submit">Сохранить</button></form></details></td><td class="${full ? 'ok' : n ? '' : 'muted'}">${n} из ${a.personal_max}${n && r < Math.min(n, rolesNeed) ? html`<small class="pk-warn">мест ${r} из ${rolesNeed}</small>` : ''}</td><td class="${s.quote ? 'ok' : 'muted'}">${s.quote ? '✓' : '—'}</td><td class="${s.wish ? 'ok' : 'muted'}">${s.wish ? '✓' : '—'}</td><td>${s.pin ? html`<span class="pk-pin">${s.pin}</span><form method="post" action="/admin/c/${c.id}/photos/resetpin" class="inline" data-confirm="Сбросить код ученика «${s.name}»? При следующем входе он придумает новый. Выбор сохранится">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><button class="pk-x" type="submit" title="Сбросить код" aria-label="Сбросить код">×</button></form>` : html`<span class="muted">—</span>`}</td></tr>`;
     })}</tbody>
   </table></div>
-  <p class="muted small" style="margin-top:8px">Код ученик придумывает сам при первом входе. Забыл — подскажите ему код. Если под чужим именем вошёл кто-то другой — сбросьте код (×), выбор сохранится.</p>` : ''}
+  <p class="muted small" style="margin-top:8px">Код ученик придумывает сам при первом входе, все коды видны здесь. Если под чужим именем зашёл кто-то другой, сбросьте код крестиком, выбор останется.</p>` : ''}
 </section>
 
 ${o.students.some(st => (counts.get(st.id) || 0) || st.quote || st.wish) ? html`<section class="card">
@@ -165,7 +165,7 @@ ${o.students.some(st => (counts.get(st.id) || 0) || st.quote || st.wish) ? html`
         return html`<figure class="pk-ph"><a href="/f/${a.slug}/p/${ph.id}.jpg?v=${ph.ver}" target="_blank" rel="noopener" title="${ph.path}"><img src="/f/${a.slug}/p/${ph.id}-sm.jpg?v=${ph.ver}" alt="${ph.path}" loading="lazy"></a><figcaption><b class="${x.role ? '' : 'muted'}">${x.role ? ROLE_NAMES[x.role] : 'без места'}</b>${x.retouch ? html`<span class="pk-ret">✎ ${x.retouch}</span>` : ''}</figcaption></figure>`;
       })}</div>` : ''}
       ${st.quote ? html`<p class="pk-lab">Цитата</p><blockquote>${st.quote}</blockquote>` : ''}
-      ${st.wish ? html`<p class="pk-lab">🔒 Пожелание себе в будущее <span class="muted">— видите только вы</span></p><blockquote class="pk-wish">${st.wish}</blockquote>` : ''}
+      ${st.wish ? html`<p class="pk-lab">🔒 Пожелание себе в будущее <span class="muted">(видите только вы)</span></p><blockquote class="pk-wish">${st.wish}</blockquote>` : ''}
     </div>`;
     })}
   </details>
@@ -186,7 +186,7 @@ ${o.students.some(st => (counts.get(st.id) || 0) || st.quote || st.wish) ? html`
 
 <section class="card">
   <div class="card__h"><h2 class="h">Разложить по папкам</h2></div>
-  <p class="muted small">Работает в Chrome на компьютере. Сначала выберите ту же папку с оригиналами, потом — куда сложить. Появится папка класса, в ней папка каждого ученика с фото и цитатой, и папка «Групповые». Фото с отмеченным местом называются по нему: «${ROLES.map(r => r[1]).join('.jpg», «')}.jpg».</p>
+  <p class="muted small">Работает в Chrome на компьютере. Сначала выберите ту же папку с оригиналами, потом папку, куда сложить. Появится папка класса, в ней папка каждого ученика с фото и цитатой, и папка «Групповые». Фото с отмеченным местом называются по нему: «${ROLES.map(r => r[1]).join('.jpg», «')}.jpg».</p>
   <button class="b b--main b--wide" type="button" data-pk-export="${c.id}" data-pk-title="${c.title} ${c.school}" style="margin-top:12px">Разложить по папкам</button>
   <div class="upl__state" data-pk-export-state hidden><div class="upl__bar"><i></i></div><p></p></div>
 </section>

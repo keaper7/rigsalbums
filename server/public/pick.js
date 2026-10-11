@@ -183,7 +183,7 @@
     app.appendChild(compressNote());
     app.appendChild(el('section', { class: 'who' }, [
       el('h2', { text: 'Найдите себя в списке' }),
-      el('p', { class: 'muted', text: 'Выбирайте только себя. При первом входе придумаете код из 4 цифр — без него в ваш выбор никто не зайдёт.' }),
+      el('p', { class: 'muted', text: 'Выбирайте только себя. При первом входе придумаете код из 4 цифр, чтобы никто другой не зашёл в ваш выбор.' }),
       input, list
     ]));
   }
@@ -197,8 +197,8 @@
     var form = el('form', { class: 'dlg__box', novalidate: '' }, [
       el('h2', { text: s.name }),
       el('p', { class: 'muted', text: fresh
-        ? 'Придумайте код из 4 цифр и запомните его (лучше сделайте скрин или запишите). С ним вы сможете зайти снова, а без него в ваш выбор никто не зайдёт.'
-        : 'Под этим именем уже вошли. Введите свой код. Забыли — спросите у Артура. Если вы здесь впервые и код не придумывали — напишите Артуру, он сбросит.' }),
+        ? 'Придумайте код из 4 цифр и запомните его, лучше сделайте скрин. С ним вы зайдёте снова, а без него в ваш выбор никто не попадёт.'
+        : 'Под этим именем уже заходили, введите свой код. Если забыли код или вы здесь впервые, напишите Артуру.' }),
       input, err,
       el('div', { class: 'dlg__btns' }, [el('button', { type: 'button', class: 'btn', text: 'Это не я', onclick: close }), ok])
     ]);
@@ -232,8 +232,8 @@
   // Заметно сверху: фото здесь сжатые, оригиналы — по ссылке
   function compressNote() {
     return el('div', { class: 'note note--orig' }, [
-      el('span', {}, [el('b', { text: 'Здесь сжатые фото — только для выбора' }),
-        S.wfolio ? 'Не скриньте их: оригиналы в хорошем качестве — по кнопке' : 'Не скриньте их: оригиналы в хорошем качестве пришлёт Артур']),
+      el('span', {}, [el('b', { text: 'Здесь сжатые фото, только для выбора' }),
+        S.wfolio ? 'Не скриньте их, оригиналы в хорошем качестве можно скачать по кнопке' : 'Не скриньте их, оригиналы в хорошем качестве Артур пришлёт отдельно']),
       S.wfolio ? el('a', { class: 'btn btn--orig', href: S.wfolio, target: '_blank', rel: 'noopener' }, ['Оригиналы', arrow()]) : null
     ]);
   }
@@ -246,7 +246,7 @@
       who.appendChild(el('button', { type: 'button', text: 'не вы?', onclick: function () {
         api('/leave').then(render).catch(function (e) { toast(e.message, true); });
       } }));
-    } else if (S.admin) who.textContent = 'Вы — Артур';
+    } else if (S.admin) who.textContent = 'Вы вошли как Артур';
   }
 
   // ---------- плитки ----------
@@ -364,7 +364,7 @@
     // куда пойдёт выбранное личное фото — можно отметить прямо здесь
     lbRoles.hidden = p.group || !on || !S.me || !PLACES.length;
     if (!lbRoles.hidden) fillRoles(lbRoles, p.id);
-    lbNote.textContent = 'Сжатая копия — только для выбора, не скриньте';
+    lbNote.textContent = 'Сжатая копия для выбора, не скриньте';
     lbCount.textContent = (lbAt + 1) + ' / ' + lbList.length;
     lbPrev.hidden = lbAt === 0;
     lbNext.hidden = lbAt >= lbList.length - 1;
@@ -425,7 +425,7 @@
     rolePending[id] = true;
     paint();
     api('/role', { photo: id, role: next })
-      .then(function () { if (from) toast(PLACES.filter(function (p) { return p[0] === next; })[0][1] + ' — теперь это фото'); })
+      .then(function () { if (from) toast(PLACES.filter(function (p) { return p[0] === next; })[0][1] + ' теперь на этом фото'); })
       .catch(function (e) { toast(e.message, true); })
       .then(function () { delete rolePending[id]; paint(); });
   }
@@ -441,7 +441,7 @@
       box.appendChild(el('button', {
         type: 'button', class: 'role' + (cur === pl[0] ? ' is-on' : '') + (others[pl[0]] ? ' is-taken' : ''),
         'aria-pressed': cur === pl[0] ? 'true' : 'false', disabled: !canEdit() || rolePending[id] ? '' : null,
-        title: others[pl[0]] ? pl[1] + ' уже у другого фото — нажмите, чтобы перенести сюда' : pl[1],
+        title: others[pl[0]] ? pl[1] + ' уже у другого фото. Нажмите, чтобы перенести сюда' : pl[1],
         onclick: function () { setRole(id, pl[0]); }
       }, [cur === pl[0] ? '✓ ' : '', SHORT[pl[0]] || pl[1]]));
     });
@@ -530,7 +530,7 @@
   var ABOUT = { cover: 'крупно, на вашем альбоме', page: 'ваша страница внутри', list: 'маленькое, среди всего класса' };
   function scheme() {
     var d = el('details', { class: 'scheme', open: (S.mine || []).length ? null : '' }, [
-      el('summary', { text: 'Как устроен альбом — куда какое фото' })
+      el('summary', { text: 'Как устроен альбом: куда какое фото' })
     ]);
     var row = el('div', { class: 'scheme__row' });
     PLACES.forEach(function (pl) {
@@ -548,7 +548,7 @@
   function doneNote() {
     return el('div', { class: 'note note--done', 'data-done': '', hidden: !finished() || !!S.closed }, [
       el('b', { text: 'Готово, всё выбрано! 🎉' }),
-      'Выбор сохранён — страницу можно закрыть. Пока Артур не закрыл отбор, его можно поменять.'
+      'Выбор сохранён, страницу можно закрыть. Пока Артур не закрыл отбор, всё можно поменять.'
     ]);
   }
 
@@ -558,7 +558,7 @@
     if (PLACES.length) box.appendChild(scheme());
     renderMine(box);
     var secs = sections(false);
-    box.appendChild(el('div', { class: 'note' }, [el('b', { text: 'Выберите ' + S.personalMax + ' своих фото' }), 'Нажмите на фото, чтобы посмотреть крупно, или на кружок, чтобы сразу выбрать. Передумали — нажмите ещё раз.']));
+    box.appendChild(el('div', { class: 'note' }, [el('b', { text: 'Выберите ' + S.personalMax + ' своих фото' }), 'Нажмите на фото, чтобы посмотреть крупно, или на кружок, чтобы сразу выбрать. Передумали? Нажмите ещё раз.']));
     if (!secs.length) box.appendChild(el('p', { class: 'muted', text: 'Фото ещё не загружены.' }));
     secs.forEach(function (s) {
       box.appendChild(el('section', { class: 'sec' }, [el('h2', {}, [s.name, el('small', { text: s.list.length + ' фото' })]), grid(s.list)]));
@@ -566,11 +566,11 @@
   }
 
   function renderGroup(box) {
-    box.appendChild(el('div', { class: 'note note--closed', 'data-closed': '', hidden: !S.closed }, [el('b', { text: 'Отбор закрыт' }), S.admin ? 'Ученики уже не могут менять выбор, вы — можете.' : 'Групповые выбраны.']));
+    box.appendChild(el('div', { class: 'note note--closed', 'data-closed': '', hidden: !S.closed }, [el('b', { text: 'Отбор закрыт' }), S.admin ? 'Ученики уже не могут менять выбор, а вы можете.' : 'Групповые выбраны.']));
     box.appendChild(el('div', { class: 'note note--group' }, [
       el('b', { text: 'Это общий выбор всего класса' }),
       S.admin ? 'Отметьте групповые, которые предлагаете. Ребята увидят и смогут заменить.'
-        : 'Все видят одни и те же отмеченные фото. Если уберёте фото — оно уберётся у всех. Всего можно ' + S.groupMax + ': чтобы добавить новое, когда набрано, сначала уберите другое.'
+        : 'Все видят одни и те же отмеченные фото. Если уберёте фото, оно уберётся у всех. Всего можно ' + S.groupMax + '. Когда набрано, чтобы добавить новое, сначала уберите другое.'
     ]));
     var f = el('input', { type: 'checkbox' });
     f.checked = onlyChosen;
@@ -616,7 +616,7 @@
     }));
     box.appendChild(textBlock({
       key: 'wish', path: '/wish', max: 2000, title: '🔒 Пожелание себе в будущее', saved: 'Пожелание сохранено', cls: 'quote--wish',
-      about: 'Никто из класса его не увидит — только Артур, чтобы напечатать. В альбоме оно будет на заднике, спрятано под стираемой наклейкой: через годы откроете монеткой.',
+      about: 'Его никто из класса не увидит. В альбоме оно будет на заднике под стираемой наклейкой, через годы откроете её монеткой.',
       placeholder: 'Что вы хотите сказать себе через 5–10 лет?'
     }));
   }

@@ -279,6 +279,15 @@ test('освободить место: невыбранные удаляются
   await kid.req('POST', '/f/' + slug + '/retouch', { json: { photo: p[1], text: 'нос' } });
   await kid.req('POST', '/f/' + slug + '/quote', { json: { text: 'Цитата' } });
   await kid.req('POST', '/f/' + slug + '/group', { json: { photo: g[0], on: true } });
+  // Старая отметка: пока «Парни» были групповыми, кто-то отметил там фото — потом раздел снова личный
+  const setGroups = list => {
+    const f = new URLSearchParams({ _csrf: admin.csrf });
+    list.forEach(x => f.append('group', x));
+    return admin.req('POST', '/admin/c/' + id + '/photos/sections', { form: f });
+  };
+  await setGroups(['Групповые', 'Парни']);
+  await admin.req('POST', '/f/' + slug + '/group', { json: { photo: p[3], on: true } });
+  await setGroups(['Групповые']);
   const dir = path.join(s.dataDir, 'photos', String(+id));
 
   // Пока отбор открыт — нельзя

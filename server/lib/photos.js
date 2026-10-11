@@ -404,8 +404,11 @@ class Photos {
   // большую копию. Выбор, места, ретушь и тексты остаются, выбранные фото видно в маленьком размере.
   // Оригиналы у Артура не трогаются, раскладка по папкам работает как раньше
   slim(classId) {
-    const keep = new Set(this.db.prepare(`SELECT photo_id FROM pk_personal p JOIN pk_students s ON s.id = p.student_id WHERE s.class_id = ?
-      UNION SELECT photo_id FROM pk_group WHERE class_id = ?`).all(classId, classId).map(r => r.photo_id));
+    // Оставляем только то, что засчитано сейчас. Старые отметки из разделов, у которых Артур потом
+    // поменял тип (личные ↔ групповые), не видны и в раскладку не идут — их фото не держим
+    const album = this.album(classId);
+    const keep = new Set(this.group(classId, album).map(g => g.photo_id));
+    this.students(classId).forEach(st => this.personal(st.id, album).forEach(id => keep.add(id)));
     const all = this.db.prepare('SELECT id FROM pk_photos WHERE class_id = ?').all(classId);
     const drop = all.filter(r => !keep.has(r.id));
     const kept = all.filter(r => keep.has(r.id));

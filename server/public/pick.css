@@ -220,12 +220,33 @@ button { cursor: pointer; }
 .arr { display: inline-block; width: .8em; height: .8em; margin-left: .3em; vertical-align: -.02em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
 
 /* окно «куда пойдёт это фото» — сразу после выбора, по центру экрана */
-.dlg__box--place { text-align: center; }
-.dlg__box--place img { display: block; width: 120px; height: 120px; margin: 0 auto 12px; border-radius: 14px; object-fit: cover; background: var(--paper-2); }
+.dlg__box--place { text-align: center; max-height: calc(100vh - 32px); overflow-y: auto; }
 .place-opts { margin-top: 14px; text-align: left; }
-.place-opt { display: block; width: 100%; margin-top: 8px; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); text-align: left; }
+.place-opt { display: flex; align-items: center; width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); text-align: left; }
+.place-opt__mock { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 104px; height: 78px; margin-right: 12px; }
+.place-opt__txt { flex: 1 1 auto; min-width: 0; }
 .place-opt b { display: block; font-size: 16px; }
 .place-opt small { display: block; margin-top: 2px; font-size: 13px; color: var(--ink-2); font-weight: 600; }
 .place-opt.is-taken small { color: var(--warn); }
 .place-opt:active { background: var(--paper); }
 .place-later { display: block; margin: 12px auto 0; border: 0; background: none; color: var(--ink-2); font-weight: 700; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+
+/* конструктор: макеты альбома с фото ученика */
+.mock { display: block; line-height: 0; box-shadow: 0 2px 10px -4px rgba(58, 35, 33, .35); border-radius: 3px; overflow: hidden; background: #fff; }
+.mock svg { display: block; width: 100%; height: auto; }
+.place-opt__mock .mock--cover { height: 78px; width: 55px; }
+.place-opt__mock .mock--page, .place-opt__mock .mock--list { width: 104px; height: 74px; }
+.place-opt__mock .mock svg { width: 100%; height: 100%; }
+.prev { margin-bottom: 20px; padding: 16px; border-radius: 18px; background: var(--card); box-shadow: 0 1px 0 var(--line); }
+.prev__row { display: flex; align-items: flex-end; margin-top: 12px; }
+.prev__card { flex: 1 1 0; min-width: 0; padding: 0; border: 0; background: none; text-align: center; color: var(--ink); }
+.prev__card + .prev__card { margin-left: 10px; }
+.prev__card--cover { flex: .62 1 0; }
+.prev__card b { display: block; margin-top: 8px; font-size: 13.5px; }
+.prev__card small { display: block; font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.mockview { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 80; background: rgba(20, 12, 11, .92); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.mockview__t { color: rgba(255, 255, 255, .75); font-size: 13px; font-weight: 700; margin-bottom: 12px; text-align: center; }
+.mockview .mock--big { width: 100%; max-width: 900px; }
+.mockview .mock--big.mock--cover { width: auto; height: min(70vh, 140vw); }
+.mockview .mock--big.mock--cover svg { height: 100%; width: auto; }
+.mockview .btn { margin-top: 16px; min-width: 160px; }

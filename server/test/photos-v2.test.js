@@ -373,3 +373,14 @@ test('старые таблицы отбора дополняются новым
   new Photos(store, require('os').tmpdir()); // повторный запуск ничего не ломает
   store.close();
 });
+
+test('конструктор: макеты альбома отдаются, на странице есть школа и класс', async t => {
+  const { s, slug } = await setup(t);
+  for (const f of ['pk-cover.png', 'pk-page.webp', 'pk-list.webp']) {
+    const r = await client(s.base).req('GET', '/admin/static/' + f);
+    assert.strictEqual(r.status, 200, f);
+  }
+  const r = await client(s.base).req('GET', '/f/' + slug);
+  const data = JSON.parse(/id="pk-data">([\s\S]*?)<\/script>/.exec(r.text)[1]);
+  assert.deepStrictEqual(data.klass, { school: 'Лицей', title: '11 «А»', year: 2026 });
+});

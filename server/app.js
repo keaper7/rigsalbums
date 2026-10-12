@@ -1182,6 +1182,7 @@ function createApp(cfg) {
       slug: p.album.slug,
       students: (started => photos.students(p.cls.id).map(s => ({ id: s.id, name: s.name, started: started.has(s.id), locked: !!s.pin })))(photos.startedIds(p.cls.id)),
       placeList: ROLES,
+      klass: { school: p.cls.school, title: p.cls.title, year: p.cls.year },
       photos: list.map(ph => [ph.id, ph.section, ph.w, ph.h, photos.isGroupSection(p.album, ph.section) ? 1 : 0, ph.ver])
     });
     H.send(ctx.res, 200, PV.pickPage({ cls: p.cls, data: data }), 'text/html; charset=utf-8', {

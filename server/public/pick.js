@@ -485,16 +485,127 @@
       PLACES.forEach(function (pl) {
         opts.appendChild(el('button', { type: 'button', class: 'place-opt' + (taken[pl[0]] ? ' is-taken' : ''), onclick: function () {
           api('/role', { photo: id, role: pl[0] }).then(close, function (e) { toast(e.message, true); close(); });
-        } }, [el('b', { text: pl[1] }), el('small', { text: taken[pl[0]] ? 'Сейчас там другое фото, поставим это вместо него' : ABOUT[pl[0]] || '' })]));
+        } }, [
+          // как это фото ляжет в макет
+          MOCK[pl[0]] ? el('span', { class: 'place-opt__mock' }, [mockEl(pl[0], p, false)]) : null,
+          el('span', { class: 'place-opt__txt' }, [el('b', { text: pl[1] }), el('small', { text: taken[pl[0]] ? 'Сейчас там другое фото, поставим это вместо него' : ABOUT[pl[0]] || '' })])
+        ]));
       });
       dlg = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true' }, [el('div', { class: 'dlg__box dlg__box--place' }, [
-        p ? el('img', { src: src(p), alt: '' }) : null,
         el('h2', { text: 'Куда пойдёт это фото?' }),
-        el('p', { class: 'muted', text: 'Выберите место в альбоме' }),
+        el('p', { class: 'muted', text: 'Выберите место в альбоме. Картинки — примерный просмотр, не дизайн' }),
         opts,
         el('button', { type: 'button', class: 'place-later', text: 'Решу потом', onclick: close })
       ])]);
       document.body.appendChild(dlg);
+    });
+  }
+
+  // ---------- конструктор: фото ученика в макетах альбома ----------
+  // Макеты дизайнера (PNG с прозрачными окнами под фото). Координаты — в пикселях исходного макета.
+  // Обложка: вшитые школа, класс, год и цитата убраны, их подставляем свои
+  var MOCK = {
+    cover: { w: 1420, h: 2000, tpl: '/admin/static/pk-cover.png', photo: [0, 0, 1420, 2000] },
+    page: { w: 2000, h: 1423, tpl: '/admin/static/pk-page.webp', photo: [0, 0, 1000, 1423] },
+    list: { w: 2000, h: 1423, tpl: '/admin/static/pk-list.webp', photo: [1346, 500, 265, 378], under: true }
+  };
+  var SERIF = "'Cormorant Garamond', 'Times New Roman', Georgia, serif";
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  // Короткие строки по словам, не больше n строк; лишнее — многоточием
+  function wrap(text, max, n) {
+    var words = String(text || '').replace(/\s+/g, ' ').trim().split(' '), lines = [], cur = '';
+    words.forEach(function (w) {
+      if (lines.length >= n) return;
+      if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim();
+    });
+    if (cur && lines.length < n) lines.push(cur);
+    var all = String(text || '').replace(/\s+/g, ' ').trim();
+    if (lines.join(' ').length < all.length && lines.length) lines[lines.length - 1] = lines[lines.length - 1].replace(/[.,;:!?…]*$/, '') + '…';
+    return lines;
+  }
+  function svgText(x, y, size, anchor, fill, text, extra) {
+    return '<text x="' + x + '" y="' + y + '" font-size="' + size + '" text-anchor="' + anchor + '" fill="' + fill + '" font-family="' + SERIF.replace(/"/g, '') + '"' + (extra || '') + '>' + esc(text) + '</text>';
+  }
+  function img(href, x, y, w, h, fit) {
+    return '<image href="' + href + '" xlink:href="' + href + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" preserveAspectRatio="' + (fit || 'none') + '"/>';
+  }
+  // SVG-макет: role — место, p — фото (или null), big — крупная копия фото
+  function mockSvg(role, p, big) {
+    var m = MOCK[role];
+    if (!m) return '';
+    var name = S.me ? S.me.name.toUpperCase() : 'ФАМИЛИЯ ИМЯ';
+    var k = D.klass || {};
+    var ph = p ? img(src(p, big), m.photo[0], m.photo[1], m.photo[2], m.photo[3], 'xMidYMid slice') : '';
+    var empty = p ? '' : '<rect x="' + m.photo[0] + '" y="' + m.photo[1] + '" width="' + m.photo[2] + '" height="' + m.photo[3] + '" fill="#E9E1D5"/>';
+    var tpl = img(m.tpl, 0, 0, m.w, m.h);
+    var out = m.under ? tpl + empty + ph : empty + ph + tpl;
+    var beige = '#BAA28A';
+    if (role === 'cover') {
+      var cls = String(k.title || '').toUpperCase();
+      if (cls && !/КЛАСС/.test(cls)) cls += ' КЛАСС';
+      out += svgText(1362, 224, 43, 'end', beige, String(k.school || '').toUpperCase(), ' letter-spacing="1"');
+      out += svgText(1362, 278, 43, 'end', beige, cls, ' letter-spacing="1"');
+      out += svgText(87, 278, 43, 'start', beige, k.year || '');
+      wrap(S.quote || 'Здесь будет ваша цитата', 44, 2).forEach(function (line, i) { out += svgText(710, 1905 + i * 60, 50, 'middle', beige, line); });
+    } else if (role === 'page') {
+      out += svgText(914, 1138, 44, 'end', '#fff', name, ' letter-spacing="1"');
+      out += svgText(912, 1160, 15, 'end', '#fff', (wrap(S.quote || 'Здесь будет ваша цитата', 70, 1)[0] || '').toUpperCase());
+    } else if (role === 'list') {
+      // под окном подписи нет — пишем имя ученика тем же размером, длинное ужимаем
+      var size = Math.min(30, Math.round(30 * 16 / Math.max(16, name.length)));
+      out += svgText(1478, 911, size, 'middle', '#1E1A18', name, ' letter-spacing="1"');
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' + m.w + ' ' + m.h + '" role="img" aria-label="Предпросмотр">' + out + '</svg>';
+  }
+  function mockEl(role, p, big, cls) {
+    var box = el('span', { class: 'mock mock--' + role + (cls ? ' ' + cls : '') });
+    box.innerHTML = mockSvg(role, p, big);
+    return box;
+  }
+  function photoFor(role) {
+    var r = S.roles || {};
+    var id = (S.mine || []).filter(function (x) { return r[x] === role; })[0];
+    return id ? byId[id] : null;
+  }
+
+  // Крупный просмотр макета
+  function openMock(role) {
+    var pl = PLACES.filter(function (x) { return x[0] === role; })[0];
+    var dlg = el('div', { class: 'mockview', role: 'dialog', 'aria-modal': 'true' }, [
+      el('p', { class: 'mockview__t', text: (pl ? pl[1] : '') + ' · предварительный просмотр, не дизайн' }),
+      mockEl(role, photoFor(role), true, 'mock--big'),
+      el('button', { type: 'button', class: 'btn', text: 'Закрыть', onclick: function () { dlg.remove(); document.body.style.overflow = ''; } })
+    ]);
+    document.body.style.overflow = 'hidden';
+    document.body.appendChild(dlg);
+  }
+
+  // «Как это будет в альбоме» — под «Ваш выбор»
+  var prevBox = null, prevSig = '';
+  function renderPreview(box) {
+    prevSig = '';
+    prevBox = el('section', { class: 'prev' }, [
+      el('div', { class: 'mine__h' }, [el('h2', { text: 'Как это будет в альбоме' })]),
+      el('p', { class: 'mine__status', text: 'Предварительный просмотр расположения, а не дизайн альбома. Нажмите, чтобы посмотреть крупнее.' }),
+      el('div', { class: 'prev__row' })
+    ]);
+    box.appendChild(prevBox);
+  }
+  function paintPreview() {
+    if (!prevBox || !prevBox.isConnected) return;
+    var sig = JSON.stringify([S.mine, S.roles, S.quote, S.me && S.me.name]);
+    if (sig === prevSig) return;
+    prevSig = sig;
+    var row = prevBox.querySelector('.prev__row');
+    row.textContent = '';
+    PLACES.forEach(function (pl) {
+      if (!MOCK[pl[0]]) return;
+      var p = photoFor(pl[0]);
+      row.appendChild(el('button', { type: 'button', class: 'prev__card prev__card--' + pl[0], onclick: function () { openMock(pl[0]); } }, [
+        mockEl(pl[0], p, false),
+        el('b', { text: pl[1] }),
+        el('small', { text: p ? 'ваше фото' : 'фото ещё не отмечено' })
+      ]));
     });
   }
 
@@ -564,6 +675,7 @@
     else st.textContent = 'Фото выбраны, места отмечены ✓';
     st.classList.toggle('is-ok', personalDone());
     mineBox.classList.toggle('is-hint', hint && left.length > 0);
+    paintPreview();
   }
 
   function toMine() {
@@ -608,6 +720,7 @@
     box.appendChild(doneNote());
     if (PLACES.length) box.appendChild(scheme());
     renderMine(box);
+    renderPreview(box);
     var secs = sections(false);
     box.appendChild(el('div', { class: 'note' }, [el('b', { text: 'Выберите ' + S.personalMax + ' своих фото' }), 'Нажмите на фото, чтобы посмотреть крупно, или на кружок, чтобы сразу выбрать. Передумали? Нажмите ещё раз.']));
     if (!secs.length) box.appendChild(el('p', { class: 'muted', text: 'Фото ещё не загружены.' }));
@@ -706,6 +819,7 @@
     renderHeader();
     tiles = {};
     mineBox = null;
+    prevBox = null;
     if (!S.me && !S.admin) { renderBar(); return renderWho(); }
     var tabs = S.admin ? [['group', 'Групповые']] : [['personal', 'Мои фото'], ['group', 'Групповые'], ['quote', 'Тексты']];
     if (!tab || !tabs.some(function (t) { return t[0] === tab; })) tab = tabs[0][0];

@@ -159,7 +159,9 @@
           if (!full) return auto && toast('Это фото пойдёт сюда: ' + auto);
           hint = true;
           if (!lb.hidden) closeLb();
-          toast('Все ' + S.personalMax + ' фото выбраны!' + (auto ? ' Последнее пойдёт сюда: ' + auto + '.' : '') + ' Если нужна доп. ретушь, напишите под фото', false, ['Наверх ↑', toMine]);
+          if (askRetouch()) return;
+          if (personalDone()) toast('Все ' + S.personalMax + ' фото выбраны, места отмечены ✓');
+          else toast('Все ' + S.personalMax + ' фото выбраны! Осталось отметить, какое куда', false, ['Наверх ↑', toMine]);
         });
       })
       .catch(function (e) { toast(e.message, true); })
@@ -215,8 +217,9 @@
       api('/me', fresh ? { student: s.id, newPin: input.value } : { student: s.id, pin: input.value })
         .then(function () {
           close();
-          if (fresh) toast('Ваш код: ' + input.value + '. Запомните его!', false, ['Понятно', function () {}]);
+          tab = 'personal';
           render();
+          if (fresh || !started()) showIntro(fresh ? input.value : '');
         })
         .catch(function (e2) {
           // код успели придумать раньше — дальше только ввод кода
@@ -245,7 +248,8 @@
     var who = document.querySelector('[data-who]');
     who.textContent = '';
     if (S.me) {
-      who.appendChild(document.createTextNode(S.me.name + ' · '));
+      who.appendChild(el('button', { type: 'button', class: 'pt__help', 'aria-label': 'Что нужно сделать', title: 'Что нужно сделать', text: '?', onclick: function () { showIntro(''); } }));
+      who.appendChild(el('span', { class: 'pt__name', text: S.me.name }));
       who.appendChild(el('button', { type: 'button', text: 'не вы?', onclick: function () {
         api('/leave').then(render).catch(function (e) { toast(e.message, true); });
       } }));
@@ -303,7 +307,10 @@
     Array.prototype.forEach.call(app.querySelectorAll('.tabs [data-tab]'), function (b) {
       var i = info[b.getAttribute('data-tab')];
       if (!i) return;
-      b.querySelector('small').textContent = i[1] ? '✓ ' + i[0] : i[0];
+      var sm = b.querySelector('small');
+      sm.textContent = '';
+      if (!S.admin) sm.appendChild(el('i', { class: 'dot' + (i[1] ? ' is-done' : ''), 'aria-hidden': 'true' }));
+      sm.appendChild(document.createTextNode(i[0]));
       b.classList.toggle('is-done', !!i[1] && !S.admin);
     });
     var f = app.querySelector('[data-filter-n]');
@@ -312,6 +319,7 @@
     if (closed) closed.hidden = !S.closed;
     var dn = app.querySelector('[data-done]');
     if (dn) dn.hidden = !finished() || !!S.closed;
+    paintNext();
     renderBar();
     if (!lb.hidden) paintLb();
   }
@@ -436,6 +444,7 @@
           return api('/role', { photo: u[0], role: left[0][0] }).then(function () { toast('Оставшееся фото пойдёт сюда: ' + left[0][1]); });
         }
       })
+      .then(function () { if (next && !retouchAsked && personalDone() && !lb.hidden) closeLb(); askRetouch(); })
       .catch(function (e) { toast(e.message, true); })
       .then(function () { delete rolePending[id]; paint(); });
   }
@@ -487,13 +496,13 @@
           api('/role', { photo: id, role: pl[0] }).then(close, function (e) { toast(e.message, true); close(); });
         } }, [
           // как это фото ляжет в макет
-          MOCK[pl[0]] ? el('span', { class: 'place-opt__mock' }, [mockEl(pl[0], p, false)]) : null,
+          MOCK[pl[0]] ? el('span', { class: 'place-opt__mock' }, [mockEl(pl[0], p, false, '', true)]) : null,
           el('span', { class: 'place-opt__txt' }, [el('b', { text: pl[1] }), el('small', { text: taken[pl[0]] ? 'Сейчас там другое фото, поставим это вместо него' : ABOUT[pl[0]] || '' })])
         ]));
       });
       dlg = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true' }, [el('div', { class: 'dlg__box dlg__box--place' }, [
         el('h2', { text: 'Куда пойдёт это фото?' }),
-        el('p', { class: 'muted', text: 'Выберите место в альбоме. Картинки — примерный просмотр, не дизайн' }),
+        el('p', { class: 'muted', text: 'Выберите место в альбоме. Картинки примерные, это ещё не дизайн' }),
         opts,
         el('button', { type: 'button', class: 'place-later', text: 'Решу потом', onclick: close })
       ])]);
@@ -503,11 +512,13 @@
 
   // ---------- конструктор: фото ученика в макетах альбома ----------
   // Макеты дизайнера (PNG с прозрачными окнами под фото). Координаты — в пикселях исходного макета.
-  // Обложка: вшитые школа, класс, год и цитата убраны, их подставляем свои
+  // Обложка: вшитые школа, класс, год и цитата убраны, их подставляем свои.
+  // under — фото кладём поверх макета;
+  // crop — какой кусок показывать в маленькой карточке, чтобы фото было видно
   var MOCK = {
     cover: { w: 1420, h: 2000, tpl: '/admin/static/pk-cover.png', photo: [0, 0, 1420, 2000] },
     page: { w: 2000, h: 1423, tpl: '/admin/static/pk-page.webp', photo: [0, 0, 1000, 1423] },
-    list: { w: 2000, h: 1423, tpl: '/admin/static/pk-list.webp', photo: [1346, 500, 265, 378], under: true }
+    list: { w: 2000, h: 1423, tpl: '/admin/static/pk-list.webp', photo: [1346, 500, 265, 378], under: true, crop: [1128, 230, 700, 986] }
   };
   var SERIF = "'Cormorant Garamond', 'Times New Roman', Georgia, serif";
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -529,8 +540,8 @@
   function img(href, x, y, w, h, fit) {
     return '<image href="' + href + '" xlink:href="' + href + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" preserveAspectRatio="' + (fit || 'none') + '"/>';
   }
-  // SVG-макет: role — место, p — фото (или null), big — крупная копия фото
-  function mockSvg(role, p, big) {
+  // SVG-макет: role — место, p — фото (или null), big — крупная копия фото, crop — только кусок вокруг фото
+  function mockSvg(role, p, big, crop) {
     var m = MOCK[role];
     if (!m) return '';
     var name = S.me ? S.me.name.toUpperCase() : 'ФАМИЛИЯ ИМЯ';
@@ -540,26 +551,25 @@
     var tpl = img(m.tpl, 0, 0, m.w, m.h);
     var out = m.under ? tpl + empty + ph : empty + ph + tpl;
     var beige = '#BAA28A';
+    var quote = S.quote || '';
     if (role === 'cover') {
       var cls = String(k.title || '').toUpperCase();
       if (cls && !/КЛАСС/.test(cls)) cls += ' КЛАСС';
       out += svgText(1362, 224, 43, 'end', beige, String(k.school || '').toUpperCase(), ' letter-spacing="1"');
       out += svgText(1362, 278, 43, 'end', beige, cls, ' letter-spacing="1"');
       out += svgText(87, 278, 43, 'start', beige, k.year || '');
-      wrap(S.quote || 'Здесь будет ваша цитата', 44, 2).forEach(function (line, i) { out += svgText(710, 1905 + i * 60, 50, 'middle', beige, line); });
-    } else if (role === 'page') {
-      out += svgText(914, 1138, 44, 'end', '#fff', name, ' letter-spacing="1"');
-      out += svgText(912, 1160, 15, 'end', '#fff', (wrap(S.quote || 'Здесь будет ваша цитата', 70, 1)[0] || '').toUpperCase());
+      wrap(quote || 'Здесь будет ваша цитата', 44, 2).forEach(function (line, i) { out += svgText(710, 1905 + i * 60, 50, 'middle', beige, line); });
     } else if (role === 'list') {
       // под окном подписи нет — пишем имя ученика тем же размером, длинное ужимаем
-      var size = Math.min(30, Math.round(30 * 16 / Math.max(16, name.length)));
-      out += svgText(1478, 911, size, 'middle', '#1E1A18', name, ' letter-spacing="1"');
+      var sz = Math.min(30, Math.round(30 * 16 / Math.max(16, name.length)));
+      out += svgText(1478, 911, sz, 'middle', '#1E1A18', name, ' letter-spacing="1"');
     }
-    return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ' + m.w + ' ' + m.h + '" role="img" aria-label="Предпросмотр">' + out + '</svg>';
+    var vb = crop && m.crop ? m.crop.join(' ') : '0 0 ' + m.w + ' ' + m.h;
+    return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="' + vb + '" role="img" aria-label="Предпросмотр">' + out + '</svg>';
   }
-  function mockEl(role, p, big, cls) {
-    var box = el('span', { class: 'mock mock--' + role + (cls ? ' ' + cls : '') });
-    box.innerHTML = mockSvg(role, p, big);
+  function mockEl(role, p, big, cls, crop) {
+    var box = el('span', { class: 'mock mock--' + role + (crop && MOCK[role].crop ? ' mock--crop' : '') + (cls ? ' ' + cls : '') });
+    box.innerHTML = mockSvg(role, p, big, crop);
     return box;
   }
   function photoFor(role) {
@@ -568,25 +578,56 @@
     return id ? byId[id] : null;
   }
 
-  // Крупный просмотр макета
+  // Крупный просмотр макета, между местами можно переключаться
   function openMock(role) {
-    var pl = PLACES.filter(function (x) { return x[0] === role; })[0];
-    var dlg = el('div', { class: 'mockview', role: 'dialog', 'aria-modal': 'true' }, [
-      el('p', { class: 'mockview__t', text: (pl ? pl[1] : '') + ' · предварительный просмотр, не дизайн' }),
-      mockEl(role, photoFor(role), true, 'mock--big'),
-      el('button', { type: 'button', class: 'btn', text: 'Закрыть', onclick: function () { dlg.remove(); document.body.style.overflow = ''; } })
+    var places = PLACES.filter(function (x) { return MOCK[x[0]]; });
+    var at = Math.max(0, places.map(function (x) { return x[0]; }).indexOf(role));
+    var stage = el('div', { class: 'mockview__stage' });
+    var chips = el('div', { class: 'mockview__chips' });
+    var title = el('p', { class: 'mockview__t' });
+    function close() { dlg.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', key); }
+    function show(i) {
+      at = (i + places.length) % places.length;
+      var r = places[at][0], p = photoFor(r);
+      title.textContent = p ? 'Примерный вид, в альбоме дизайн может немного отличаться' : 'Фото для этого места ещё не отмечено';
+      stage.textContent = '';
+      stage.appendChild(mockEl(r, p, true, 'mock--big'));
+      chips.textContent = '';
+      places.forEach(function (pl, j) {
+        chips.appendChild(el('button', { type: 'button', class: 'mockview__chip' + (j === at ? ' is-on' : ''), 'aria-pressed': j === at ? 'true' : 'false', text: SHORT[pl[0]] || pl[1], onclick: function () { show(j); } }));
+      });
+    }
+    function key(e) {
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft') show(at - 1);
+      else if (e.key === 'ArrowRight') show(at + 1);
+    }
+    var dlg = el('div', { class: 'mockview', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Как это будет в альбоме' }, [
+      chips, stage, title,
+      el('button', { type: 'button', class: 'btn', text: 'Закрыть', onclick: close })
     ]);
+    // свайп между местами
+    var sx = null;
+    stage.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+    stage.addEventListener('touchend', function (e) {
+      if (sx === null) return;
+      var dx = e.changedTouches[0].clientX - sx;
+      sx = null;
+      if (Math.abs(dx) > 50) show(at + (dx < 0 ? 1 : -1));
+    }, { passive: true });
+    show(at);
+    document.addEventListener('keydown', key);
     document.body.style.overflow = 'hidden';
     document.body.appendChild(dlg);
   }
 
-  // «Как это будет в альбоме» — под «Ваш выбор»
+  // «Как это будет в альбоме» — под «Ваш выбор». Разворот во всю ширину, обложка и список под ним
   var prevBox = null, prevSig = '';
   function renderPreview(box) {
     prevSig = '';
     prevBox = el('section', { class: 'prev' }, [
       el('div', { class: 'mine__h' }, [el('h2', { text: 'Как это будет в альбоме' })]),
-      el('p', { class: 'mine__status', text: 'Предварительный просмотр расположения, а не дизайн альбома. Нажмите, чтобы посмотреть крупнее.' }),
+      el('p', { class: 'mine__status', text: 'Примерный вид с вашими фото и цитатой. Нажмите, чтобы посмотреть крупнее.' }),
       el('div', { class: 'prev__row' })
     ]);
     box.appendChild(prevBox);
@@ -598,11 +639,12 @@
     prevSig = sig;
     var row = prevBox.querySelector('.prev__row');
     row.textContent = '';
-    PLACES.forEach(function (pl) {
-      if (!MOCK[pl[0]]) return;
-      var p = photoFor(pl[0]);
-      row.appendChild(el('button', { type: 'button', class: 'prev__card prev__card--' + pl[0], onclick: function () { openMock(pl[0]); } }, [
-        mockEl(pl[0], p, false),
+    ['page', 'cover', 'list'].forEach(function (key) {
+      var pl = PLACES.filter(function (x) { return x[0] === key; })[0];
+      if (!pl || !MOCK[key]) return;
+      var p = photoFor(key);
+      row.appendChild(el('button', { type: 'button', class: 'prev__card prev__card--' + key + (p ? '' : ' is-empty'), onclick: function () { openMock(key); } }, [
+        mockEl(key, p, false, '', true),
         el('b', { text: pl[1] }),
         el('small', { text: p ? 'ваше фото' : 'фото ещё не отмечено' })
       ]));
@@ -706,6 +748,128 @@
     return d;
   }
 
+  // ---------- этапы ----------
+  var seenGroup = false;   // групповые в этот раз уже смотрели
+  function stages() {
+    return [
+      { key: 'personal', name: 'Личные фото', about: 'Выберите ' + S.personalMax + ' своих фото и отметьте, куда пойдёт каждое: на обложку, личную страницу или в список класса. Если нужна доп. ретушь, напишите под фото', done: personalDone() },
+      { key: 'group', name: 'Групповые', about: 'Проверьте, выбраны ли групповые фото, где есть вы. Это общий выбор всего класса', done: (S.group || []).length >= S.groupMax },
+      { key: 'quote', name: 'Тексты', about: 'Напишите цитату для альбома и пожелание себе в будущее', done: !!S.quote && !!S.wish }
+    ];
+  }
+  function started() { return (S.mine || []).length > 0 || !!S.quote || !!S.wish; }
+  function goTab(key) {
+    tab = key;
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  // Окно «Что нужно сделать»: сразу после входа и по кнопке «?» в шапке
+  function introKey() { return 'pk-intro:' + D.slug + ':' + (S.me ? S.me.id : ''); }
+  function showIntro(pin) {
+    try { localStorage.setItem(introKey(), '1'); } catch (e) {}
+    var list = el('ol', { class: 'stg' });
+    var dlg;
+    function close() { dlg.remove(); }
+    stages().forEach(function (st) {
+      list.appendChild(el('li', { class: 'stg__i' + (st.done ? ' is-done' : '') }, [
+        el('i', { class: 'dot dot--big' + (st.done ? ' is-done' : ''), 'aria-hidden': 'true' }),
+        el('button', { type: 'button', class: 'stg__b', onclick: function () { close(); goTab(st.key); } }, [
+          el('b', { text: st.name + (st.done ? ' ✓' : '') }), el('span', { text: st.about })
+        ])
+      ]));
+    });
+    dlg = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Что нужно сделать' }, [el('div', { class: 'dlg__box dlg__box--intro' }, [
+      pin ? el('p', { class: 'intro__pin' }, ['Ваш код: ', el('b', { text: pin }), el('small', { text: 'Запомните его или сделайте скрин' })]) : null,
+      el('h2', { text: 'Что нужно сделать' }),
+      el('p', { class: 'muted', text: 'Всё сохраняется само, можно закрыть страницу и вернуться позже.' }),
+      list,
+      el('button', { type: 'button', class: 'btn btn--main intro__go', text: started() ? 'Понятно' : 'Начать', onclick: close })
+    ])]);
+    document.body.appendChild(dlg);
+  }
+
+  // Все фото выбраны и места отмечены — один раз спрашиваем про доп. ретушь, прямо в окне
+  var retouchAsked = false;
+  function askRetouch() {
+    if (retouchAsked || !S.me || !personalDone() || !canEdit()) return false;
+    retouchAsked = true;
+    var savers = [];
+    var go = el('button', { type: 'button', class: 'btn btn--main' });
+    function upd() {
+      var any = savers.some(function (x) { return x.ta.value.trim(); });
+      go.textContent = any ? 'Готово' : 'Не нужно';
+    }
+    var rows = el('div', { class: 'rtq' });
+    // по порядку мест: обложка, личная, список
+    var order = PLACES.map(function (pl) { return pl[0]; });
+    (S.mine || []).slice().sort(function (x, y) {
+      var a = order.indexOf((S.roles || {})[x]), c = order.indexOf((S.roles || {})[y]);
+      return (a < 0 ? 99 : a) - (c < 0 ? 99 : c);
+    }).forEach(function (id) {
+      var p = byId[id];
+      if (!p) return;
+      var role = (S.roles || {})[id];
+      var ta = el('textarea', { maxlength: '500', rows: '2', placeholder: 'Что подправить? Можно оставить пустым', 'aria-label': 'Доп. ретушь для фото: ' + (SHORT[role] || '') });
+      ta.value = (S.retouch || {})[id] || '';
+      var status = el('small', { class: 'save' });
+      var saver = autosave(ta, function (v, keep) { return api('/retouch', { photo: id, text: v }, keep); }, status);
+      savers.push({ ta: ta, saver: saver });
+      ta.addEventListener('input', upd);
+      rows.appendChild(el('div', { class: 'rtq__row' }, [
+        el('span', { class: 'rtq__img' }, [el('img', { src: src(p), alt: '' }), role ? el('em', { text: SHORT[role] || role }) : null]),
+        el('div', { class: 'rtq__body' }, [ta, status])
+      ]));
+    });
+    var dlg = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Доп. ретушь' }, [el('div', { class: 'dlg__box dlg__box--rt' }, [
+      el('h2', { text: 'Нужна доп. ретушь?' }),
+      el('p', { class: 'muted', text: 'Если хотите что-то подправить, напишите под нужным фото. Например: убрать покраснение, поправить волосы. Если всё нравится, нажмите «Не нужно».' }),
+      rows, go
+    ])]);
+    go.addEventListener('click', function () {
+      go.disabled = true;
+      Promise.all(savers.map(function (x) { return x.saver.flush(); })).then(function () {
+        dlg.remove();
+        hint = false;
+        paint();
+        var next = nextStage('personal');
+        toast('Личные фото готовы ✓', false, next ? ['Дальше: ' + next.name, function () { goTab(next.key); }] : null);
+      }, function () { go.disabled = false; });
+    });
+    upd();
+    document.body.appendChild(dlg);
+    return true;
+  }
+
+  // Следующий незаконченный этап после текущего
+  function nextStage(cur) {
+    var all = stages(), at = all.map(function (x) { return x.key; }).indexOf(cur);
+    for (var i = 1; i < all.length; i++) {
+      var st = all[(at + i) % all.length];
+      if (!st.done && !(st.key === 'group' && seenGroup)) return st;
+    }
+    return null;
+  }
+  // Плашка «Дальше» внизу вкладки: показываем, когда этот этап готов (у групповых — всегда)
+  function nextNote(cur) {
+    return el('div', { class: 'next', 'data-next': cur, hidden: true }, [
+      el('span', { class: 'next__t' }), el('button', { type: 'button', class: 'btn btn--main next__go' })
+    ]);
+  }
+  function paintNext() {
+    Array.prototype.forEach.call(app.querySelectorAll('[data-next]'), function (box) {
+      var cur = box.getAttribute('data-next');
+      var me = stages().filter(function (x) { return x.key === cur; })[0];
+      var next = nextStage(cur);
+      box.hidden = !S.me || !next || (cur !== 'group' && !me.done);
+      if (box.hidden) return;
+      box.querySelector('.next__t').textContent = cur === 'group' ? 'Нашли себя на групповых?' : me.name + ' готовы ✓';
+      var b = box.querySelector('.next__go');
+      b.textContent = 'Дальше: ' + next.name + ' →';
+      b.onclick = function () { goTab(next.key); };
+    });
+  }
+
   // «Всё готово» — фото выбраны, места отмечены, цитата и пожелание написаны
   function finished() { return !!S.me && personalDone() && !!S.quote && !!S.wish; }
   function doneNote() {
@@ -721,6 +885,7 @@
     if (PLACES.length) box.appendChild(scheme());
     renderMine(box);
     renderPreview(box);
+    box.appendChild(nextNote('personal'));
     var secs = sections(false);
     box.appendChild(el('div', { class: 'note' }, [el('b', { text: 'Выберите ' + S.personalMax + ' своих фото' }), 'Нажмите на фото, чтобы посмотреть крупно, или на кружок, чтобы сразу выбрать. Передумали? Нажмите ещё раз.']));
     if (!secs.length) box.appendChild(el('p', { class: 'muted', text: 'Фото ещё не загружены.' }));
@@ -745,6 +910,7 @@
     secs.forEach(function (s) {
       box.appendChild(el('section', { class: 'sec', 'data-group': '' }, [el('h2', {}, [s.name, el('small', { text: s.list.length + ' фото' })]), grid(s.list)]));
     });
+    if (!S.admin) box.appendChild(nextNote('group'));
   }
 
   function textBlock(o) {
@@ -763,10 +929,13 @@
       saver.flush().then(function () { if (!status.classList.contains('is-bad')) toast(o.saved); })
         .then(function () { btn.disabled = !canEdit(); });
     });
+    var look = o.preview && MOCK.cover ? el('button', { type: 'button', class: 'quote__look', onclick: function () {
+      saver.flush().then(null, function () {}).then(function () { openMock('cover'); });
+    } }, ['Посмотреть, как будет в альбоме']) : null;
     return el('section', { class: 'quote' + (o.cls ? ' ' + o.cls : '') }, [
       el('h2', { text: o.title }),
       el('p', { class: 'muted', text: o.about }),
-      ta, el('div', { class: 'quote__foot' }, [btn, status, count])
+      ta, el('div', { class: 'quote__foot' }, [btn, status, count]), look
     ]);
   }
 
@@ -774,7 +943,7 @@
     box.appendChild(el('div', { class: 'note note--closed', 'data-closed': '', hidden: !S.closed }, [el('b', { text: 'Отбор закрыт' }), 'Тексты сохранены, менять их уже нельзя.']));
     box.appendChild(doneNote());
     box.appendChild(textBlock({
-      key: 'quote', path: '/quote', max: 2000, title: 'Ваша цитата для альбома', saved: 'Цитата сохранена',
+      key: 'quote', path: '/quote', max: 2000, title: 'Ваша цитата для альбома', saved: 'Цитата сохранена', preview: true,
       about: 'Будет в альбоме рядом с вашими фото. Можно короткую фразу, а можно несколько абзацев. Сохраняется сама.',
       placeholder: 'Например: «Не важно, где мы будем, важно — что мы были вместе»'
     }));
@@ -783,6 +952,7 @@
       about: 'Напиши себе пожелание, совет или послание в будущее. Его никто кроме тебя не увидит, место будет секретом, узнаешь когда получишь альбом 🫶',
       placeholder: 'Что вы хотите сказать себе через 5–10 лет?'
     }));
+    box.appendChild(nextNote('quote'));
   }
 
   function renderBar() {
@@ -836,6 +1006,7 @@
     });
     app.appendChild(nav);
     var box = el('div');
+    if (tab === 'group' && !S.admin) seenGroup = true;
     if (tab === 'personal') renderPersonal(box);
     else if (tab === 'group') renderGroup(box);
     else renderQuote(box);
@@ -858,4 +1029,9 @@
   document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
 
   render();
+  if (S.me && !started()) {
+    var seen = false;
+    try { seen = !!localStorage.getItem(introKey()); } catch (e) {}
+    if (!seen) showIntro('');
+  }
 })();

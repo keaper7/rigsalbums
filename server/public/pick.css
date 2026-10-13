@@ -223,7 +223,7 @@ button { cursor: pointer; }
 .dlg__box--place { text-align: center; max-height: calc(100vh - 32px); overflow-y: auto; }
 .place-opts { margin-top: 14px; text-align: left; }
 .place-opt { display: flex; align-items: center; width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); text-align: left; }
-.place-opt__mock { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 104px; height: 78px; margin-right: 12px; }
+.place-opt__mock { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 116px; height: 84px; margin-right: 12px; }
 .place-opt__txt { flex: 1 1 auto; min-width: 0; }
 .place-opt b { display: block; font-size: 16px; }
 .place-opt small { display: block; margin-top: 2px; font-size: 13px; color: var(--ink-2); font-weight: 600; }
@@ -234,19 +234,89 @@ button { cursor: pointer; }
 /* конструктор: макеты альбома с фото ученика */
 .mock { display: block; line-height: 0; box-shadow: 0 2px 10px -4px rgba(58, 35, 33, .35); border-radius: 3px; overflow: hidden; background: #fff; }
 .mock svg { display: block; width: 100%; height: auto; }
-.place-opt__mock .mock--cover { height: 78px; width: 55px; }
-.place-opt__mock .mock--page, .place-opt__mock .mock--list { width: 104px; height: 74px; }
+.place-opt__mock .mock--cover, .place-opt__mock .mock--crop { height: 84px; width: 60px; }
+.place-opt__mock .mock--page { width: 116px; height: 83px; }
 .place-opt__mock .mock svg { width: 100%; height: 100%; }
-.prev { margin-bottom: 20px; padding: 16px; border-radius: 18px; background: var(--card); box-shadow: 0 1px 0 var(--line); }
-.prev__row { display: flex; align-items: flex-end; margin-top: 12px; }
-.prev__card { flex: 1 1 0; min-width: 0; padding: 0; border: 0; background: none; text-align: center; color: var(--ink); }
-.prev__card + .prev__card { margin-left: 10px; }
-.prev__card--cover { flex: .62 1 0; }
-.prev__card b { display: block; margin-top: 8px; font-size: 13.5px; }
-.prev__card small { display: block; font-size: 12px; color: var(--ink-2); font-weight: 600; }
-.mockview { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 80; background: rgba(20, 12, 11, .92); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
-.mockview__t { color: rgba(255, 255, 255, .75); font-size: 13px; font-weight: 700; margin-bottom: 12px; text-align: center; }
-.mockview .mock--big { width: 100%; max-width: 900px; }
-.mockview .mock--big.mock--cover { width: auto; height: min(70vh, 140vw); }
+.prev { margin-bottom: 20px; padding: 16px 14px; border-radius: 18px; background: var(--card); box-shadow: 0 1px 0 var(--line); }
+/* телефон: разворот во всю ширину, под ним обложка и список (одинаковые по высоте) */
+.prev__row { display: flex; flex-wrap: wrap; align-items: flex-start; margin: 14px -6px 0; }
+.prev__card { flex: 1 1 0; min-width: 0; margin: 0 6px 14px; padding: 0; border: 0; background: none; text-align: center; color: var(--ink); }
+.prev__card--page { flex: 1 1 100%; }
+.prev__card .mock { border-radius: 4px; transition: transform .2s; }
+.prev__card:active .mock { transform: scale(.98); }
+.prev__card.is-empty .mock { opacity: .75; }
+.prev__card b { display: block; margin-top: 8px; font-size: 14px; }
+.prev__card small { display: block; font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+.prev__card.is-empty small { color: var(--warn); }
+/* широкий экран: все три в ряд, одной высоты */
+@media (min-width: 720px) {
+  .prev__row { flex-wrap: nowrap; margin-bottom: -14px; }
+  .prev__card--page { flex: 1.405 1 0; }
+  .prev__card--cover, .prev__card--list { flex: .71 1 0; }
+}
+.mockview { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 80; background: rgba(20, 12, 11, .94); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.mockview__chips { display: flex; margin-bottom: 14px; padding: 4px; border-radius: 99px; background: rgba(255, 255, 255, .1); }
+.mockview__chip { border: 0; border-radius: 99px; padding: 8px 16px; background: transparent; color: rgba(255, 255, 255, .8); font-weight: 800; font-size: 14px; }
+.mockview__chip.is-on { background: #fff; color: var(--ink); }
+.mockview__stage { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 1100px; min-height: 0; }
+.mockview__t { color: rgba(255, 255, 255, .7); font-size: 13px; font-weight: 600; margin-top: 12px; text-align: center; }
+.mockview .mock--big { width: 100%; max-height: calc(100vh - 190px); }
+.mockview .mock--big svg { max-height: calc(100vh - 190px); }
+.mockview .mock--big.mock--cover { width: auto; height: min(calc(100vh - 190px), 140vw); }
 .mockview .mock--big.mock--cover svg { height: 100%; width: auto; }
-.mockview .btn { margin-top: 16px; min-width: 160px; }
+@media (orientation: landscape) and (max-height: 500px) { .mockview .mock--big:not(.mock--cover) { width: auto; height: calc(100vh - 150px); } .mockview .mock--big:not(.mock--cover) svg { height: 100%; width: auto; } }
+.mockview .btn { margin-top: 14px; min-width: 160px; }
+
+/* этапы: кружки во вкладках и в окне «Что нужно сделать» */
+.dot { display: inline-block; flex: 0 0 auto; width: 12px; height: 12px; margin-right: 5px; border-radius: 50%; border: 2px solid currentColor; vertical-align: -1px; opacity: .55; position: relative; }
+.dot.is-done { opacity: 1; border-color: var(--ok); background: var(--ok); }
+.dot.is-done::after { content: ''; position: absolute; left: 2.5px; top: .5px; width: 3px; height: 6px; border: solid #fff; border-width: 0 1.6px 1.6px 0; transform: rotate(45deg); }
+.tabs button[aria-selected=true] .dot.is-done { border-color: #fff; background: #fff; }
+.tabs button[aria-selected=true] .dot.is-done::after { border-color: var(--wine); }
+.dot--big { width: 26px; height: 26px; margin: 0; border-width: 2.5px; color: var(--wine); opacity: 1; background: var(--card); }
+.dot--big.is-done::after { left: 7px; top: 2px; width: 6px; height: 12px; border-width: 0 2.5px 2.5px 0; }
+.stg { list-style: none; margin: 16px 0 4px; padding: 0; text-align: left; }
+.stg__i { position: relative; display: flex; align-items: flex-start; padding-bottom: 14px; }
+.stg__i:last-child { padding-bottom: 0; }
+/* линия между кружками */
+.stg__i:not(:last-child)::before { content: ''; position: absolute; left: 12px; top: 28px; bottom: 2px; width: 2px; background: var(--line); }
+.stg__i.is-done:not(:last-child)::before { background: var(--ok); opacity: .5; }
+.stg__b { flex: 1 1 auto; min-width: 0; margin-left: 12px; padding: 2px 0 0; border: 0; background: none; text-align: left; color: var(--ink); }
+.stg__b b { display: block; font-size: 16px; line-height: 1.25; }
+.stg__b span { display: block; margin-top: 2px; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+.stg__i.is-done .stg__b b { color: var(--ok); }
+.dlg__box--intro { max-width: 400px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.intro__pin { margin: -4px 0 16px; padding: 12px 14px; border-radius: 14px; background: var(--wine); color: rgba(255, 255, 255, .85); text-align: center; font-weight: 700; }
+.intro__pin b { color: #fff; font: 800 22px/1 var(--sans); letter-spacing: .25em; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.intro__pin small { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 600; }
+.intro__go { display: flex; width: 100%; margin-top: 18px; }
+.pt__help { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 8px; border-radius: 50%; border: 1.5px solid var(--wine) !important; text-decoration: none !important; font-size: 13px; line-height: 1; vertical-align: 1px; }
+
+/* окно «Нужна доп. ретушь?» */
+.dlg__box--rt { max-width: 420px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.rtq { margin: 14px 0 16px; }
+.rtq__row { display: flex; align-items: flex-start; }
+.rtq__row + .rtq__row { margin-top: 12px; }
+.rtq__img { position: relative; flex: 0 0 auto; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; background: var(--paper-2); }
+.rtq__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rtq__img em { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 2px 2px; font: normal 800 10.5px/1.1 var(--sans); color: #fff; text-align: center; background: linear-gradient(transparent, rgba(0, 0, 0, .65)); }
+.rtq__body { flex: 1 1 auto; min-width: 0; margin-left: 10px; }
+.rtq textarea { width: 100%; min-height: 64px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: 16px; line-height: 1.35; resize: vertical; }
+.rtq textarea:focus { border-color: var(--wine); outline: none; }
+.rtq .save { min-height: 1.1em; font-size: 12px; }
+.dlg__box--rt > .btn { display: flex; width: 100%; }
+
+/* «Дальше» — переход к следующему этапу */
+.next { display: flex; align-items: center; flex-wrap: wrap; margin: 4px 0 22px; padding: 14px 16px; border-radius: 16px; background: var(--ok-bg); }
+.next[hidden] { display: none; }
+.next__t { flex: 1 1 auto; margin-right: 12px; font-weight: 800; color: var(--ok); }
+.next__go { flex: 0 0 auto; min-height: 42px; padding: 8px 18px; font-size: 14.5px; }
+@media (max-width: 400px) { .next__go { width: 100%; margin-top: 10px; } }
+.quote + .next { margin-top: 16px; }
+.quote__look { display: block; margin-top: 12px; padding: 0; border: 0; background: none; color: var(--wine); font-weight: 800; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+.pt__who:has(.pt__help) { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+.pt__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pt__who .pt__help { flex: 0 0 auto; }
+.pt__name + button { flex: 0 0 auto; margin-left: 8px; }
+@media (max-width: 360px) { .pt__who { font-size: 12.5px; } .pt__help { margin-right: 6px; } }
+.quote--wish .btn--main { background: #fff; border-color: #fff; color: var(--wine); }

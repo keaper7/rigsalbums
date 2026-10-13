@@ -313,7 +313,6 @@ button { cursor: pointer; }
 .next__go { flex: 0 0 auto; min-height: 42px; padding: 8px 18px; font-size: 14.5px; }
 @media (max-width: 400px) { .next__go { width: 100%; margin-top: 10px; } }
 .quote + .next { margin-top: 16px; }
-.quote__look { display: block; margin-top: 12px; padding: 0; border: 0; background: none; color: var(--wine); font-weight: 800; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
 .pt__who:has(.pt__help) { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 .pt__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .pt__who .pt__help { flex: 0 0 auto; }

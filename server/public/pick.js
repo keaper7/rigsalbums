@@ -929,13 +929,10 @@
       saver.flush().then(function () { if (!status.classList.contains('is-bad')) toast(o.saved); })
         .then(function () { btn.disabled = !canEdit(); });
     });
-    var look = o.preview && MOCK.cover ? el('button', { type: 'button', class: 'quote__look', onclick: function () {
-      saver.flush().then(null, function () {}).then(function () { openMock('cover'); });
-    } }, ['Посмотреть, как будет в альбоме']) : null;
     return el('section', { class: 'quote' + (o.cls ? ' ' + o.cls : '') }, [
       el('h2', { text: o.title }),
       el('p', { class: 'muted', text: o.about }),
-      ta, el('div', { class: 'quote__foot' }, [btn, status, count]), look
+      ta, el('div', { class: 'quote__foot' }, [btn, status, count])
     ]);
   }
 
@@ -943,7 +940,7 @@
     box.appendChild(el('div', { class: 'note note--closed', 'data-closed': '', hidden: !S.closed }, [el('b', { text: 'Отбор закрыт' }), 'Тексты сохранены, менять их уже нельзя.']));
     box.appendChild(doneNote());
     box.appendChild(textBlock({
-      key: 'quote', path: '/quote', max: 2000, title: 'Ваша цитата для альбома', saved: 'Цитата сохранена', preview: true,
+      key: 'quote', path: '/quote', max: 2000, title: 'Ваша цитата для альбома', saved: 'Цитата сохранена',
       about: 'Будет в альбоме рядом с вашими фото. Можно короткую фразу, а можно несколько абзацев. Сохраняется сама.',
       placeholder: 'Например: «Не важно, где мы будем, важно — что мы были вместе»'
     }));

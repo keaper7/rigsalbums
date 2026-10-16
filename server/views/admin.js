@@ -46,6 +46,10 @@ const ERR = {
   lastopt: 'Это последний вариант этапа, его нельзя удалить'
 };
 
+// Пункт «Статистика» в меню. Пока скрыт: данные уже собираются, Артуру покажем позже.
+// Страница открывается по прямой ссылке /admin/stats
+const SHOW_STATS = false;
+
 const DURATIONS = [60, 120, 180];
 const REOPEN = [15, 30, 60];
 
@@ -91,7 +95,7 @@ function u(p) { return p ? '/' + String(p).replace(/^\/+/, '') : ''; }
 function csrf(sess) { return html`<input type="hidden" name="_csrf" value="${sess.csrf}">`; }
 
 function layout(o) {
-  const nav = [['classes', '/admin', 'Классы'], ['site', '/admin/site', 'Сайт'], ['catalog', '/admin/catalog', 'Варианты'], ['settings', '/admin/settings', 'Настройки']];
+  const nav = [['classes', '/admin', 'Классы'], ['work', '/admin/work', 'Работа']].concat(SHOW_STATS ? [['stats', '/admin/stats', 'Статистика']] : [], [['site', '/admin/site', 'Сайт'], ['catalog', '/admin/catalog', 'Варианты'], ['settings', '/admin/settings', 'Настройки']]);
   const err = o.err || (o.errCode && ERR[o.errCode]) || '';
   return '<!doctype html>\n' + html`<html lang="ru">
 <head>
@@ -457,6 +461,8 @@ ${resultsBlock(o)}
   <button class="b b--main" type="submit">Сохранить варианты</button>
   </form>
 </details>
+
+<a class="card fold__link" href="/admin/c/${c.id}/work"><b>Работа над альбомом</b><small>${o.work ? o.work : 'Статус для дизайнера, правки, съёмка и деньги'}</small></a>
 
 <a class="card fold__link" href="/admin/c/${c.id}/photos"><b>Отбор фото</b><small>${o.pk && (o.pk.photos || o.pk.students) ? (o.pk.closed ? 'Отбор закрыт · ' : '') + o.pk.photos + ' фото · начали выбирать ' + o.pk.started + ' из ' + o.pk.students : 'Личные фото, общие групповые, цитаты и раскладка по папкам'}</small></a>
 

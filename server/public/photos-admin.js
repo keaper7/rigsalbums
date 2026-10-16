@@ -314,6 +314,11 @@
         }, Promise.resolve()).then(function () {
           return quotes.length ? writeFile(out, 'Цитаты.txt', quotes.join('\n')) : null;
         }).then(function () {
+          // та же таблица для Excel: «Ученик; Цитата», дизайнеру удобно копировать из ячеек
+          var cell = function (v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; };
+          var rows = plan.students.filter(function (s) { return s.quote; }).map(function (s) { return cell(s.name) + ';' + cell(s.quote); });
+          return rows.length ? writeFile(out, 'Цитаты.csv', '\ufeff' + ['Ученик;Цитата'].concat(rows).join('\r\n') + '\r\n') : null;
+        }).then(function () {
           var empty = plan.students.filter(function (s) { return !s.photos.length; }).map(function (s) { return s.name; });
           var msg = 'Готово: папка «' + title + '»';
           if (missing.length === total && total > 1) msg = 'Ни одного оригинала не нашлось. Похоже, на шаге 1 выбрана не та папка. Нужна та, внутри которой «Парни», «Девочки», «Групповые»';

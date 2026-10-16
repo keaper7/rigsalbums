@@ -91,13 +91,22 @@
   // Поиск по списку классов
   var search = $('[data-search]');
   if (search) {
+    // Без разницы на заглавные буквы и «ё». Номер можно искать цифрами: «928 111», «8928…» и «+7928…» найдут одно и то же
+    var norm = function (s) { return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' '); };
+    // «+7 928…» и «8 928…» — один номер: первую 7 или 8 не учитываем
+    var digits = function (s) {
+      var d = String(s || '').replace(/\D/g, '');
+      return /^\s*(\+?7|8)/.test(s) && d.length > 3 ? d.slice(1) : d;
+    };
     search.addEventListener('input', function () {
-      var q = search.value.trim().toLowerCase();
+      var q = norm(search.value.trim());
+      var qd = /^[\d\s()+-]+$/.test(q) ? digits(q) : '';
       var any = false;
       $$('[data-group]').forEach(function (g) {
         var shown = 0;
         $$('[data-find]', g).forEach(function (row) {
-          var hit = !q || row.getAttribute('data-find').indexOf(q) !== -1;
+          var f = row.getAttribute('data-find');
+          var hit = !q || norm(f).indexOf(q) !== -1 || (qd.length >= 3 && f.replace(/\D/g, '').indexOf(qd) !== -1);
           row.hidden = !hit;
           if (hit) shown++;
         });

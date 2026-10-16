@@ -117,7 +117,7 @@ function stepSection(base, step, n, total, list, v) {
     ? html`<p class="step__ok">${STEP_OK[step]} <a href="#s-${next}">Дальше ${STEP_SHORT[next].toLowerCase()}</a>${undo}</p>`
     : html`<p class="step__ok">${STEP_OK[step]}${undo}</p>`;
   return html`
-<section class="step" id="s-${step}" data-step="${step}">
+<section class="step" id="s-${step}" data-step="${step}" data-st="${STEP_SHORT[step]}">
   <header class="step__head">
     <p class="step__n">Этап ${n} из ${total}</p>
     <h2>${STEP_TITLE[step]}</h2>
@@ -153,7 +153,7 @@ function resultSection(base, p) {
   ];
   const total = r ? p.state.voters : null;
   return html`
-<section class="result" id="result">
+<section class="result" id="result" data-st="Шпаргалка">
   <header class="result__head result__head--cheat">
     <p class="eyebrow">Голосование закрыто</p>
     <h2>Шпаргалка к съёмке</h2>
@@ -213,7 +213,7 @@ function classPage(p) {
   const voting = closed ? '' : html`
 <div class="voting">
 ${steps.map((s, i) => stepSection(base, s, i + 1, steps.length, opts[s], Object.assign({ next: steps[i + 1] }, v)))}
-<section class="done" id="done">
+<section class="done" id="done" data-st="Все голоса">
   <p class="eyebrow">Готово</p>
   <h2>${COUNT_WORD[steps.length] || 'Все голоса учтены'}</h2>
   <p>Когда голосование закроется, на этой странице останется выбор класса и всё, что нужно знать перед съёмкой. Ссылка та же.</p>
@@ -268,7 +268,7 @@ ${steps.map((s, i) => html`    <a href="#s-${s}" data-step="${s}"><i>${i + 1}</i
 
 <main id="top">
 
-<section class="hero">
+<section class="hero" data-st="Шапка">
   <p class="hero__spine" aria-hidden="true">RIGSARTHUR · SCHOOL ALBUMS · ${year}</p>
   <p class="eyebrow">Выпускной альбом ${year}</p>
   <h1 style="--w:${longest(p.cls.school)}"><span>${p.cls.school}</span><em>${p.cls.title}</em></h1>
@@ -304,6 +304,7 @@ ${voting}${closed || p.demo ? resultSection(base, p) : ''}
 ${cfg ? html`<script${nonce}>window.RIGS_CLASS = ${cfg};</script>
 ` : ''}<script src="${base}assets/carousel.js"></script>
 <script src="${base}assets/klass/klass.js"></script>
+<script src="${base}assets/st.js" defer></script>
 </body>
 </html>
 `.s;

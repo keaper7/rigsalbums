@@ -186,7 +186,7 @@ ${soon.length ? html`<section class="card wk-soon">
 </section>` : ''}
 ${rows.length > 4 ? html`<label class="search"><span class="sr">Поиск</span><input type="search" placeholder="Класс, школа или телефон" data-search autocomplete="off"></label>
 <p class="muted small search__none" hidden>Ничего не нашлось</p>` : ''}
-${rows.length ? '' : html`<div class="card empty"><h2 class="h">В этом сезоне классов нет</h2><p class="muted">Классы появляются здесь сами, как только вы их создадите. Сезон — это год выпуска класса.</p><a class="b b--main" href="/admin/new">Создать класс</a></div>`}
+${rows.length ? '' : html`<div class="card empty"><h2 class="h">В этом сезоне классов нет</h2><p class="muted">Классы появляются здесь сами, как только вы их создадите. Сезон это год выпуска класса.</p><a class="b b--main" href="/admin/new">Создать класс</a></div>`}
 ${groups.map(g => g[1].length ? html`<section class="group wk-stage" data-group>
   <h2 class="group__h">${g[0].name} <span>${g[1].length}</span></h2>
   <div class="wk-cards">${g[1].map(r => classCard(r, o.today))}</div>
@@ -213,7 +213,7 @@ ${ready.length ? html`<details class="group wk-stage" data-group>
   })}
   <form class="form wk-des__add" method="post" action="/admin/work/designer">
     ${csrf(o.sess)}
-    <label class="field"><span>${o.designers.length ? 'Ещё одна ссылка' : 'Имя дизайнера'}</span><input name="name" maxlength="60" placeholder="Например: Мадина" required autocomplete="off"></label>
+    <label class="field"><span>${o.designers.length ? 'Ещё одна ссылка' : 'Имя дизайнера'}</span><input name="name" maxlength="60" placeholder="Как её зовут" required autocomplete="off"></label>
     <button class="b${o.designers.length ? '' : ' b--main'}" type="submit">Создать ссылку</button>
   </form>
   </div>
@@ -328,7 +328,7 @@ function contactsCard(o) {
         <label class="field"><span class="sr">Номер</span><input name="phone" type="tel" value="${x.phone}" maxlength="40" placeholder="+7 …" autocomplete="off"></label>
         <label class="field"><span class="sr">Кто это</span><input name="pname" value="${x.name}" maxlength="60" placeholder="Кто: мама Азамата, кл. рук." autocomplete="off"></label>
       </div>`)}
-      <p class="muted small">Чтобы убрать номер, сотрите его. Нужно больше строк — сохраните, появится ещё одна.</p>
+      <p class="muted small">Чтобы убрать номер, сотрите его. Нужно больше строк: сохраните, появится ещё одна.</p>
       <button class="b b--sm b--main" type="submit">Сохранить телефоны</button>
     </form>
   </details>
@@ -462,7 +462,7 @@ function classMoneyPage(o) {
   ${m.missing.length ? html`<p class="flash flash--warn">Чтобы посчитать, укажите ${m.missing.join(', ')}${m.missing.some(x => /печати/.test(x)) ? html`. Цену можно добавить в <a href="/admin/work/money?year=${c.year}#prices">прайс сезона</a> или написать в «Печать одного альбома»` : ''}.</p>` : ''}
   <button class="b b--main" type="submit">Сохранить и посчитать</button>
 </form>
-<p class="muted small">Обработчик выбирается во вкладке «Работа». Дизайнер, СММ, прайс типографии и ставки обработчиков — в <a href="/admin/work/money?year=${c.year}#prices">ценах сезона</a>.</p>`;
+<p class="muted small">Обработчик выбирается во вкладке «Работа». Дизайнер, СММ, прайс типографии и ставки обработчиков меняются в <a href="/admin/work/money?year=${c.year}#prices">ценах сезона</a>.</p>`;
   return layout({ title: 'Деньги · ' + c.title, sess: o.sess, nav: 'work', body: body, scripts: ['/admin/static/work.js'] });
 }
 
@@ -544,7 +544,7 @@ ${o.rows.length ? html`<section class="card">
   <p class="muted small">Считаются для всех классов этого сезона. Новый сезон берёт цены прошлого, а если их поменять, прошлые классы останутся со старыми.</p>
   <div class="wk-money">${SEASON_FIELDS.map(f => html`<label class="field"><span>${f[1]}</span><input name="${f[0]}" inputmode="numeric" maxlength="8" value="${se[f[0]]}" required autocomplete="off">${f[2] ? html`<small class="muted">${f[2]}</small>` : ''}</label>`)}</div>
   <label class="field"><span>Обработчики и сколько платите за класс</span><textarea name="processors" rows="${Math.max(3, se.processors.length + 1)}" placeholder="Инал 4000">${procText}</textarea><small class="muted">Каждый с новой строки: имя и сумма. «Я сам» есть всегда, без расхода.</small></label>
-  <label class="field"><span>Прайс типографии: разворотов — печать альбома</span><textarea name="print" rows="8" class="wk-print">${printText}</textarea><small class="muted">Каждая строка: число разворотов и цена, например «22 — 1328». Новые строки можно дописать в конец.</small></label>
+  <label class="field"><span>Прайс типографии: разворотов и цена печати альбома</span><textarea name="print" rows="8" class="wk-print">${printText}</textarea><small class="muted">Каждая строка: число разворотов и цена, например «22 — 1328». Новые строки можно дописать в конец.</small></label>
   <button class="b b--main" type="submit">Сохранить цены</button>
   </form>
 </details>`;

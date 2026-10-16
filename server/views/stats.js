@@ -84,7 +84,7 @@ ${empty ? html`<div class="card empty"><h2 class="h">Пока данных не�
   <div class="card"><small>Просмотры страниц</small><b>${r.views}</b><span>${r.siteVisitors ? (r.siteViews / r.siteVisitors).toFixed(1).replace('.', ',') : 0} на человека</span></div>
   <div class="card"><small>С телефона</small><b>${pct(r.devices.mobile + r.devices.tablet, r.devices.mobile + r.devices.tablet + r.devices.desktop)}%</b><span>с компьютера ${r.devices.desktop}</span></div>
 </div>
-<p class="muted small st-note">«Хотели записаться» — нажали WhatsApp, Telegram или «Позвонить».</p>
+<p class="muted small st-note">«Хотели записаться»: нажали WhatsApp, Telegram или «Позвонить».</p>
 
 <section class="card">
   <div class="card__h"><h2 class="h">${today ? 'Сегодня по часам' : 'Посетители по дням'}</h2></div>
@@ -105,7 +105,7 @@ ${empty ? html`<div class="card empty"><h2 class="h">Пока данных не�
 <section class="card" id="blocks">
   <div class="card__h"><h2 class="h">Где задерживаются</h2></div>
   <nav class="wk-halves st-pagesel">${SITE_PAGES.filter(p => r.blocks[p]).map(p => html`<a href="/admin/stats?period=${o.period}&page=${p}#blocks"${p === o.page ? raw(' aria-current="page"') : ''}>${PAGE_NAMES[p]}</a>`)}</nav>
-  ${blockList.length ? html`<p class="muted small">${PAGE_NAMES[o.page]}: открыли ${pg.total} раз. Полоска — сколько людей долистали до блока, справа — сколько в среднем на нём пробыли.</p>
+  ${blockList.length ? html`<p class="muted small">${PAGE_NAMES[o.page]}: открыли ${pg.total} раз. Полоска показывает, сколько людей долистали до блока, справа сколько в среднем на нём пробыли.</p>
   <ul class="st-list st-blocks">${blockList.map(b => html`<li class="st-share"><div class="st-share__t"><span>${b.name}</span><b>${pct(b.reached, pg.total)}%<small>${b.timed ? secs(b.ms / b.timed / 1000) : '—'}</small></b></div><div class="st-share__bar"><i style="width:${pct(b.reached, pg.total)}%"></i></div></li>`)}</ul>` : html`<p class="muted small">Пока нет данных по этой странице.</p>`}
 </section>
 
@@ -154,7 +154,7 @@ ${r.classes.length ? html`<section class="card">
     <label class="field"><span>Куда ведёт</span><select name="page">${SITE_PAGES.map(p => html`<option value="${p}">${PAGE_NAMES[p]}</option>`)}</select></label>
     <button class="b b--main" type="submit">Создать ссылку</button>
   </form>
-  <p class="muted small">Цифры в списке — за выбранный сверху период.</p>
+  <p class="muted small">Цифры в списке за выбранный сверху период.</p>
 </section>`;
   return layout({ title: 'Статистика', nav: 'stats', sess: o.sess, body: body, scripts: ['/admin/static/stats-admin.js'] });
 }

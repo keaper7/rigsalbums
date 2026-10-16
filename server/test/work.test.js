@@ -70,8 +70,9 @@ test('расчёт денег как в таблице Артура', () => {
   assert.ok(!m.ready);
   assert.match(m.missing.join(), /37 разворотов/);
   assert.ok(calc({ students: 60, price: 4000, print: 1700 }, se, 0, '').ready);
-  // ученики из отбора, если вручную не написано
-  assert.strictEqual(calc({}, se, 12, '').students, 12);
+  // учеников Артур пишет сам: число из отбора в расчёт само не идёт
+  assert.strictEqual(calc({}, se, 12, '').students, 0);
+  assert.ok(!calc({}, se, 12, '').ready);
   assert.ok(!calc({}, se, 0, '').ready);
   assert.deepStrictEqual(parsePrint('10 — 1024\n11: 1 049 ₽\nчушь\n30 1530'), { 10: 1024, 11: 1049, 30: 1530 });
   assert.deepStrictEqual(parseProcessors('Инал 4000\nТамик — 4 500 ₽\nАртур 0\nИнал 1'), [{ name: 'Инал', rate: 4000 }, { name: 'Тамик', rate: 4500 }]);
@@ -90,7 +91,7 @@ test('сезоны, осень и весна: свои цены у каждог�
   // класс осенний: 2 ученика из отбора → 1 + 7 = 8 разворотов, в прайсе нет — своя цена печати
   await admin.post('/admin/c/' + id + '/work/half', { half: 'autumn' });
   await admin.post('/admin/c/' + id + '/work/info', { processor: 'Тамик' });
-  await admin.post('/admin/c/' + id + '/work/money', { teacher: '1', prepaid: '1', print: '1000' });
+  await admin.post('/admin/c/' + id + '/work/money', { students: '2', teacher: '1', prepaid: '1', print: '1000' });
   r = await admin.req('GET', '/admin/c/' + id + '/work/money');
   assert.strictEqual(r.status, 200);
   assert.match(r.text, /2 ÷ 2 → 1 \+ 7 = 8/);

@@ -207,9 +207,10 @@ function upcoming(w, today) {
   return (w.dates || []).filter(d => d.d >= today);
 }
 
-// Деньги по классу, как в таблице: own — поля класса, se — цены сезона, fallback — сколько учеников в отборе
+// Деньги по классу, как в таблице: own — поля класса, se — цены сезона.
+// Учеников Артур пишет сам (как в его таблице): число из отбора только подсказка в поле, в расчёт само не идёт
 function calc(own, se, fallback, processor) {
-  const n = amount(own.students) !== null ? amount(own.students) : fallback || 0;
+  const n = amount(own.students) !== null ? amount(own.students) : 0;
   const teacher = !!own.teacher;
   const books = n + (teacher ? 1 : 0);
   const price = amount(own.price) !== null ? amount(own.price) : se.price;

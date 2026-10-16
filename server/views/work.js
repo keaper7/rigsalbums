@@ -445,7 +445,7 @@ function classMoneyPage(o) {
 <form class="card form" method="post" action="/admin/c/${c.id}/work/money" id="money">
   ${csrf(o.sess)}
   <div class="two">
-    <label class="field"><span>Учеников</span><input name="students" inputmode="numeric" maxlength="4" value="${m.studentsOwn ? m.students : ''}" placeholder="${pk && pk.total ? pk.total + ' из отбора' : 'сколько'}" autocomplete="off"></label>
+    <label class="field"><span>Учеников</span><input name="students" inputmode="numeric" maxlength="4" value="${m.studentsOwn ? m.students : ''}" placeholder="${pk && pk.total ? 'в отборе ' + pk.total : 'сколько'}" autocomplete="off"></label>
     <label class="field"><span>Цена альбома</span><input name="price" inputmode="numeric" maxlength="8" value="${m.priceOwn ? m.price : ''}" placeholder="${o.se.price}" autocomplete="off"></label>
   </div>
   <label class="check"><input type="checkbox" name="teacher" value="1"${m.teacher ? raw(' checked') : ''}><span>Классный руководитель<small>+1 альбом в печать и +${rub(o.se.teacher)} к сумме для родителей</small></span></label>

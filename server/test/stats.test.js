@@ -116,6 +116,10 @@ test('просмотр, блоки, кнопки, онлайн, отчёт; Ар
   assert.strictEqual(rep.themes[0].name, 'CLASSIC');
   assert.strictEqual(rep.themes[0].opens, 1);
   assert.strictEqual(rep.classes[0].vote, 1);
+  // «когда заходят» — по людям: первый открыл две страницы за час, но это один человек
+  assert.strictEqual(rep.hours.reduce((n, x) => n + x, 0), 2);
+  assert.strictEqual(rep.week.reduce((n, x) => n + x, 0), 2);
+  assert.strictEqual(rep.byWeek.find(w => w.visitors).visitors, 3);
 
   // страница статистики
   r = await admin.req('GET', '/admin/stats?period=30');
@@ -128,6 +132,9 @@ test('просмотр, блоки, кнопки, онлайн, отчёт; Ар
   r = await admin.req('GET', '/admin/stats?period=today&page=designs.html');
   assert.strictEqual(r.status, 200);
   assert.match(r.text, /Сегодня по часам/);
+  // над столбиками числа, под графиком — когда больше всего
+  assert.match(r.text, /class="st-col[^"]*"[^>]*>\s*<b>[1-9]\d*<\/b>/);
+  assert.match(r.text, /Чаще всего заходили в/);
 });
 
 test('ссылки для постов: создать, переход по ссылке считается за ней, удалить', async t => {

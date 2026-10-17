@@ -193,6 +193,14 @@ class Stats {
   removeLink(slug) { return this.db.prepare('DELETE FROM st_links WHERE slug = ?').run(slug).changes === 1; }
 
   // ---------- сводка за период: from и to — дни «2026-10-01» включительно ----------
+  // Коротко за другой период — для сравнения: сколько людей и сколько хотели записаться
+  summary(from, to) {
+    const v = this.db.prepare('SELECT COUNT(DISTINCT visitor) n FROM st_views WHERE day >= ? AND day <= ?').get(from, to).n;
+    const c = this.db.prepare(`SELECT COUNT(DISTINCT v.visitor) n FROM st_clicks c JOIN st_views v ON v.id = c.view_id
+      WHERE c.day >= ? AND c.day <= ? AND c.kind IN ('whatsapp', 'phone', 'telegram')`).get(from, to).n;
+    return { visitors: v, contacts: c };
+  }
+
   report(from, to) {
     const views = this.db.prepare('SELECT * FROM st_views WHERE day >= ? AND day <= ?').all(from, to);
     const clicks = this.db.prepare('SELECT * FROM st_clicks WHERE day >= ? AND day <= ?').all(from, to);
@@ -211,6 +219,12 @@ class Stats {
       const vs = views.filter(v => v.day === d);
       return { day: d, visitors: new Set(vs.map(v => v.visitor)).size, views: vs.length };
     });
+    // по неделям — для длинного периода. Человек, заходивший несколько дней за неделю, считается один раз
+    const byWeek = [];
+    for (let i = 0; i < days.length; i += 7) {
+      const part = new Set(days.slice(i, i + 7));
+      byWeek.push({ day: days[i], visitors: new Set(views.filter(v => part.has(v.day)).map(v => v.visitor)).size });
+    }
 
     // откуда: первая страница визита (пришли не с нашего же сайта)
     const landings = views.filter(v => v.source !== 'internal');
@@ -265,10 +279,13 @@ class Stats {
       t.opens += b.n;
     });
 
-    // когда заходят
-    const hours = Array.from({ length: 24 }, () => 0);
-    const week = Array.from({ length: 7 }, () => 0);
-    site.forEach(v => { hours[v.hour]++; week[v.wd]++; });
+    // когда заходят: сколько людей. Один человек за день в один час считается один раз,
+    // сколько бы страниц он ни открыл; в разные дни — каждый день
+    const hourSets = Array.from({ length: 24 }, () => new Set());
+    const weekSets = Array.from({ length: 7 }, () => new Set());
+    site.forEach(v => { hourSets[v.hour].add(v.visitor + '|' + v.day); weekSets[v.wd].add(v.visitor + '|' + v.day); });
+    const hours = hourSets.map(x => x.size);
+    const week = weekSets.map(x => x.size);
 
     // телефон или компьютер — по людям
     const dev = { mobile: new Set(), desktop: new Set(), tablet: new Set() };
@@ -293,10 +310,15 @@ class Stats {
       (v.kind === 'class' ? x.vote : x.pick).add(v.visitor);
     });
 
+    // прошлый такой же период для сравнения: «вчера» для «сегодня», прошлые 7 дней для 7 дней
+    const len = days.length;
+    const prev = this.summary(day(Date.parse(from + 'T12:00:00Z') - len * 86400000), day(Date.parse(from + 'T12:00:00Z') - 86400000));
+
     return {
+      prev,
       visitors: visitors.size, siteVisitors: siteVisitors.size, views: views.length, siteViews: site.length,
       fresh: fresh.size, contacts: contactVisitors.size,
-      byDay, sources, pages, blocks, buttons, themes: Object.values(themes).sort((a, b) => (b.ms + b.opens * 4000) - (a.ms + a.opens * 4000)),
+      byDay, byWeek, sources, pages, blocks, buttons, themes: Object.values(themes).sort((a, b) => (b.ms + b.opens * 4000) - (a.ms + a.opens * 4000)),
       hours, week,
       devices: { mobile: dev.mobile.size, desktop: dev.desktop.size, tablet: dev.tablet.size },
       links: Object.fromEntries(Object.keys(linkStats).map(k => [k, { visitors: linkStats[k].visitors.size, contacts: linkStats[k].contacts.size }])),

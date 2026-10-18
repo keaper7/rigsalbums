@@ -91,16 +91,15 @@
     blocks.forEach(function (b) { mid.observe(b); seen.observe(b); });
   }
 
+  // Во время скролла только запоминаем, докуда долистали: число из scrollY ничего не пересчитывает.
+  // Высоту страницы меряем редко — когда отправляем данные, а не на каждом движении
+  var maxY = 0;
+  window.addEventListener('scroll', function () { if (window.pageYOffset > maxY) maxY = window.pageYOffset; }, { passive: true });
   function measure() {
-    var h = Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
-    var d = h ? Math.min(100, Math.round((window.scrollY + window.innerHeight) / h * 100)) : 0;
+    var h = document.documentElement.scrollHeight;
+    var d = h ? Math.min(100, Math.round((maxY + window.innerHeight) / h * 100)) : 0;
     if (d > depth) depth = d;
   }
-  var scrollTimer = null;
-  window.addEventListener('scroll', function () {
-    if (scrollTimer) return;
-    scrollTimer = setTimeout(function () { scrollTimer = null; measure(); }, 400);
-  }, { passive: true });
 
   function update(end) {
     if (!id || ended) return;

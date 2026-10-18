@@ -46,7 +46,7 @@
 
   // Блоки страниц по-человечески. В вёрстку ничего не добавляем: находим блоки по их классам
   var NAMES = {
-    'index.html': [['.hero', 'Первый экран'], ['#live', 'Видео «вживую»'], ['#price', 'Цены'], ['section.gallery', 'Галерея работ'], ['section.perks', 'Альбом собирают ребята'], ['.home-studio', 'Студия'], ['.has-plane', 'Как всё проходит'], ['section.designs', 'Дизайны'], ['section.classpg', 'Страница класса'], ['section.why', 'Почему так дорого'], ['#end', 'Запись']],
+    'index.html': [['.hero', 'Первый экран'], ['section.flip', 'Листающийся альбом'], ['#live', 'Видео «вживую»'], ['#price', 'Цены'], ['section.gallery', 'Галерея работ'], ['section.perks', 'Альбом собирают ребята'], ['.home-studio', 'Студия'], ['.has-plane', 'Как всё проходит'], ['section.designs', 'Дизайны'], ['section.classpg', 'Страница класса'], ['section.why', 'Почему так дорого'], ['#end', 'Запись']],
     'works.html': [['section.ph', 'Шапка'], ['#individual', 'Индивидуальная'], ['#spring', 'Природа: весна'], ['#autumn', 'Природа: осень'], ['#school', 'В школе'], ['#studio', 'В студии'], ['#end', 'Запись']],
     'albums.html': [['section.ph', 'Шапка'], ['#end', 'Запись'], ['section.why', 'Почему так дорого'], ['section.price', 'Что входит'], ['section.sec--tint', 'Цены'], ['section.sec', 'Альбом']],
     'designs.html': [['section.ph', 'Шапка'], ['.sec--coll', 'Тематики'], ['#end', 'Запись'], ['section.sec', 'Одежда']],

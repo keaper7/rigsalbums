@@ -2166,3 +2166,106 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 /* стрелка «откроется в новой вкладке»: короткая и плотная, цвет как у текста */
 .arr { display: inline-block; width: .8em; height: .8em; margin-left: .3em; vertical-align: -.02em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
 .ft__by .arr { width: 1em; height: 1em; margin-left: .15em; vertical-align: -.1em; }
+
+/* ---------- Листающийся альбом на главной (assets/book.js) ----------
+   Страница 760×1082, разворот из двух страниц: соотношение 1,405. Двигается только transform */
+.flip { padding: 72px 0 40px; }
+.flip__head { max-width: 760px; margin: 0 auto; text-align: center; }
+.flip__head .lede { margin-left: auto; margin-right: auto; }
+.bk { position: relative; margin-top: 30px; outline: none; }
+.bk__stage { position: relative; width: 100%; max-width: 940px; margin: 0 auto; -webkit-perspective: 2600px; perspective: 2600px; touch-action: pan-y; -webkit-user-select: none; user-select: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* мягкая тень под книгой: градиент, без размытия — ничего не пересчитывается при листании */
+.bk__stage:before { content: ''; position: absolute; left: 4%; right: 4%; bottom: -26px; height: 40px; background: radial-gradient(50% 50% at 50% 50%, rgba(58, 35, 33, .28), rgba(58, 35, 33, 0)); pointer-events: none; }
+.bk__book { position: relative; width: 100%; aspect-ratio: 1.405; -webkit-transform-style: preserve-3d; transform-style: preserve-3d; -webkit-transition: -webkit-transform 1s var(--ease); transition: transform 1s var(--ease); }
+@supports not (aspect-ratio: 1) { .bk__book { height: 0; padding-bottom: 71.2%; } }
+/* закрытая книга стоит по центру: видна одна обложка */
+.bk__book.is-closed { -webkit-transform: translateX(-25%); transform: translateX(-25%); }
+.bk__book.is-end { -webkit-transform: translateX(25%); transform: translateX(25%); }
+.bk__leaf { position: absolute; top: 0; left: 50%; width: 50%; height: 100%; -webkit-transform-origin: left center; transform-origin: left center; -webkit-transform-style: preserve-3d; transform-style: preserve-3d; -webkit-transition: -webkit-transform .9s cubic-bezier(.45, .05, .25, 1); transition: transform .9s cubic-bezier(.45, .05, .25, 1); }
+.bk__leaf.is-flipped { -webkit-transform: rotateY(-180deg); transform: rotateY(-180deg); }
+.bk__leaf.is-far { visibility: hidden; }
+.bk__leaf.is-moving { will-change: transform; }
+.bk__face { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; background: #3B2A22; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.bk__face--back { -webkit-transform: rotateY(180deg); transform: rotateY(180deg); }
+.bk__face img { width: 100%; height: 100%; -o-object-fit: cover; object-fit: cover; pointer-events: none; }
+/* корешок: страница темнеет к сгибу */
+.bk__face:after { content: ''; position: absolute; top: 0; bottom: 0; width: 9%; pointer-events: none; }
+.bk__face--front:after { left: 0; background: linear-gradient(90deg, rgba(0, 0, 0, .28), rgba(0, 0, 0, 0)); }
+.bk__face--back:after { right: 0; background: linear-gradient(270deg, rgba(0, 0, 0, .28), rgba(0, 0, 0, 0)); }
+.bk__leaf.is-cover .bk__face--front, .bk__leaf.is-last .bk__face--back { border-radius: 0 4px 4px 0; }
+.bk__leaf.is-last .bk__face--back { border-radius: 4px 0 0 4px; }
+.bk__leaf.is-cover .bk__face--front:after { width: 4%; background: linear-gradient(90deg, rgba(0, 0, 0, .35), rgba(255, 255, 255, .06) 60%, rgba(0, 0, 0, 0)); }
+.bk__still { width: 50%; margin: 0 auto; }
+.bk__bar { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 30px; }
+.bk__btn { width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); font-size: 26px; line-height: 1; color: var(--ink); cursor: pointer; padding: 0 0 3px; }
+.bk__btn:disabled { opacity: .35; cursor: default; }
+.bk__label { min-width: 9.5em; text-align: center; font-weight: 700; font-size: 14.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.bk__zoom { margin-left: 6px; padding: 10px 16px; border-radius: 99px; border: 1.5px solid var(--line); background: transparent; font-weight: 700; font-size: 14px; cursor: pointer; }
+@media (min-width: 900px) { .bk__zoom { display: none; } }
+/* крупно на весь экран: на телефоне развороты иначе мелкие */
+.bk.is-zoom { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1000; margin: 0; display: flex; flex-direction: column; justify-content: center; padding: 16px; background: #1A100E; }
+.bk.is-zoom .bk__stage { max-width: calc((100vh - 120px) * 1.405); max-width: calc((100svh - 120px) * 1.405); }
+.bk.is-zoom .bk__label { color: rgba(246, 233, 228, .8); }
+.bk.is-zoom .bk__btn { background: transparent; border-color: rgba(246, 233, 228, .3); color: var(--cream); }
+.bk.is-zoom .bk__zoom { display: inline-block; border-color: rgba(246, 233, 228, .3); color: var(--cream); }
+html.bk-lock { overflow: hidden; }
+@media (max-width: 599px) {
+  .flip { padding-top: 56px; }
+  .bk__bar { gap: 10px; }
+  .bk__label { min-width: 8.4em; font-size: 13.5px; }
+}
+/* тень на переворачиваемой странице: темнеет к середине поворота и светлеет обратно (только opacity) */
+.bk__face:before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 1; background: linear-gradient(90deg, rgba(0, 0, 0, .05), rgba(0, 0, 0, .3)); opacity: 0; pointer-events: none; }
+.bk__face--back:before { background: linear-gradient(270deg, rgba(0, 0, 0, .05), rgba(0, 0, 0, .3)); }
+.bk__leaf.is-moving .bk__face:before { -webkit-animation: bk-shade var(--bk-t, .9s) ease-in-out; animation: bk-shade var(--bk-t, .9s) ease-in-out; }
+@-webkit-keyframes bk-shade { 50% { opacity: 1; } }
+@keyframes bk-shade { 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bk__book, .bk__leaf { -webkit-transition-duration: .01s !important; transition-duration: .01s !important; } }
+/* фон страниц, пока картинка грузится: светлый, как бумага, у обложки — тёмный.
+   Светлый фон не виден тонкой полоской по краю, когда листы лежат друг на друге */
+.bk__face { background: #EFE8DD; }
+.bk__leaf.is-cover .bk__face--front, .bk__leaf.is-last .bk__face--back { background: #3B2A22; }
+/* на телефоне закрытая книга того же размера, что и открытая: при открытии ничего не уменьшается и не прыгает */
+@media (max-width: 599px) {
+  .bk { margin-top: 36px; }
+  .bk__bar { margin-top: 30px; }
+}
+/* разворот целиком помещается в экран по высоте: место под шапку и кнопки */
+@media (min-width: 600px) { .bk__stage { max-width: min(940px, calc((100vh - 230px) * 1.405)); } }
+/* Обложка больше страниц: страницы лежат внутри неё с отступом сверху, снизу и с внешнего края.
+   Края видны у первого листа (внутренняя сторона передней обложки) и у последнего (задней) */
+.bk__face, .bk__face.bk__face { background: transparent; overflow: visible; }
+.bk__face:before, .bk__face:after { content: none; }
+.bk__pg { position: absolute; top: 1.9%; bottom: 1.9%; left: 0; right: 2.7%; overflow: hidden; background: #EFE8DD; }
+.bk__face--back .bk__pg { left: 2.7%; right: 0; }
+.bk__leaf.is-cover .bk__face--front .bk__pg, .bk__leaf.is-last .bk__face--back .bk__pg { top: 0; bottom: 0; left: 0; right: 0; background: #3B2A22; }
+.bk__leaf.is-cover .bk__face--front .bk__pg, .bk__leaf.is-cover .bk__face--back { border-radius: 0 5px 5px 0; }
+.bk__leaf.is-last .bk__face--back .bk__pg, .bk__leaf.is-last .bk__face--front { border-radius: 5px 0 0 5px; }
+.bk__leaf.is-cover .bk__face--front, .bk__leaf.is-last .bk__face--back { border-radius: 0; }
+.bk__leaf.is-cover .bk__face--back, .bk__leaf.is-last .bk__face--front { background: #3B2A22; }
+/* оборот обложки отзеркален: скругления у внешнего края */
+.bk__leaf.is-cover .bk__face--back { border-radius: 5px 0 0 5px; }
+.bk__leaf.is-last .bk__face--front { border-radius: 0 5px 5px 0; }
+/* корешок: страница темнеет к сгибу */
+.bk__pg:after { content: ''; position: absolute; top: 0; bottom: 0; width: 9%; pointer-events: none; }
+.bk__face--front .bk__pg:after { left: 0; background: linear-gradient(90deg, rgba(0, 0, 0, .28), rgba(0, 0, 0, 0)); }
+.bk__face--back .bk__pg:after { right: 0; background: linear-gradient(270deg, rgba(0, 0, 0, .28), rgba(0, 0, 0, 0)); }
+.bk__leaf.is-cover .bk__face--front .bk__pg:after { width: 4%; background: linear-gradient(90deg, rgba(0, 0, 0, .35), rgba(255, 255, 255, .06) 60%, rgba(0, 0, 0, 0)); }
+.bk__leaf.is-last .bk__face--back .bk__pg:after { width: 4%; background: linear-gradient(270deg, rgba(0, 0, 0, .35), rgba(255, 255, 255, .06) 60%, rgba(0, 0, 0, 0)); }
+/* тень на переворачиваемой странице */
+.bk__pg:before { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 1; background: linear-gradient(90deg, rgba(0, 0, 0, .05), rgba(0, 0, 0, .3)); opacity: 0; pointer-events: none; }
+.bk__face--back .bk__pg:before { background: linear-gradient(270deg, rgba(0, 0, 0, .05), rgba(0, 0, 0, .3)); }
+.bk__leaf.is-moving .bk__pg:before { -webkit-animation: bk-shade var(--bk-t, .9s) ease-in-out; animation: bk-shade var(--bk-t, .9s) ease-in-out; }
+/* край обложки у корешка чуть темнее: видно сгиб переплёта */
+.bk__leaf.is-cover .bk__face--back { background: linear-gradient(270deg, #2A1D17, #3B2A22 3%); }
+.bk__leaf.is-last .bk__face--front { background: linear-gradient(90deg, #2A1D17, #3B2A22 3%); }
+/* Перспектива у каждого листа своя, с точкой схода на корешке посередине высоты.
+   Так страница при повороте растёт ровно вверх и вниз и нигде не «проседает» (общая перспектива
+   на сцене и 3D-сортировка листов давали сдвиг). Листы лежат в одной плоскости, порядок задаёт z-index */
+.bk__stage { -webkit-perspective: none; perspective: none; }
+.bk__book { -webkit-transform-style: flat; transform-style: flat; }
+.bk__leaf { -webkit-transform: perspective(var(--bk-p, 2600px)) rotateY(0deg); transform: perspective(var(--bk-p, 2600px)) rotateY(0deg); }
+.bk__leaf.is-flipped { -webkit-transform: perspective(var(--bk-p, 2600px)) rotateY(-180deg); transform: perspective(var(--bk-p, 2600px)) rotateY(-180deg); }
+/* перспектива далёкая: поднятая страница почти не вылезает за края обложки */
+.bk { --bk-p: 6000px; }
+@media (max-width: 599px) { .bk { --bk-p: 4400px; } }

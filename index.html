@@ -122,6 +122,28 @@
   </div>
 </div>
 
+<section class="flip" id="album">
+  <div class="wrap">
+    <div class="flip__head rv">
+      <p class="eyebrow">Пример работы</p>
+      <h2 class="h2">Полистайте <em>настоящий альбом</em></h2>
+      <p class="lede">Нажмите на страницу, смахните или листайте стрелками.</p>
+    </div>
+    <div class="bk" data-book data-base="assets/book/" data-spreads="23" tabindex="0" aria-label="Альбом: листайте стрелками влево и вправо">
+      <div class="bk__stage">
+        <div class="bk__book"></div>
+        <noscript><img class="bk__still" src="assets/book/front.jpg" alt="Обложка альбома"></noscript>
+      </div>
+      <div class="bk__bar">
+        <button class="bk__btn" type="button" data-bk-prev aria-label="Назад">‹</button>
+        <span class="bk__label" data-bk-label aria-live="polite">Обложка</span>
+        <button class="bk__btn" type="button" data-bk-next aria-label="Вперёд">›</button>
+        <button class="bk__zoom" type="button" data-bk-zoom>Крупно</button>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="live" id="live">
   <div class="wrap live__grid">
     <div class="live__text rv">
@@ -440,6 +462,7 @@
 
 <script src="assets/carousel.js"></script>
 <script src="assets/rigs.js"></script>
+<script src="assets/book.js"></script>
 <script src="assets/st.js" defer></script>
 </body>
 </html>

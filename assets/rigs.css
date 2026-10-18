@@ -2269,3 +2269,4 @@ html.bk-lock { overflow: hidden; }
 /* перспектива далёкая: поднятая страница почти не вылезает за края обложки */
 .bk { --bk-p: 6000px; }
 @media (max-width: 599px) { .bk { --bk-p: 4400px; } }
+.bk__leaf.is-buried .bk__pg { visibility: hidden; }

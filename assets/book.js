@@ -58,8 +58,14 @@
         var flipped = i < cur;
         lf.el.classList.toggle('is-flipped', flipped);
         if (!lf.el.classList.contains('is-moving')) lf.el.style.zIndex = flipped ? i + 1 : n + 1 - i;
-        // далёкие листы не рисуем: они всё равно закрыты соседними. Первый и последний оставляем — на них края обложки
-        lf.el.classList.toggle('is-far', !lf.el.classList.contains('is-moving') && i > 0 && i < n && (i < cur - 2 || i > cur + 1));
+        // Листы под верхними не рисуем: на телефоне их светлые края просвечивали тонкой полоской по стыку и низу.
+        // Пока что-то листается, оставляем по соседнему листу с каждой стороны — он виден из-под движущегося.
+        // У первого и последнего листа скрываем только страницу: на них края обложки
+        var moving = lf.el.classList.contains('is-moving');
+        var hidden = !moving && (busy ? (i < cur - 2 || i > cur + 1) : (i < cur - 1 || i > cur));
+        var edge = i === 0 || i === n;
+        lf.el.classList.toggle('is-far', hidden && !edge);
+        lf.el.classList.toggle('is-buried', hidden && edge);
       });
       el.classList.toggle('is-closed', cur === 0);
       el.classList.toggle('is-end', cur === n + 1);
@@ -74,7 +80,7 @@
       var i = dir > 0 ? cur : cur - 1;
       if (i < 0 || i > n) return false;
       var lf = leaves[i];
-      lf.el.classList.remove('is-far');
+      lf.el.classList.remove('is-far', 'is-buried');
       lf.el.classList.add('is-moving');
       lf.el.style.zIndex = 500 + busy;
       lf.el.style.transitionDuration = (speed || 900) + 'ms';
@@ -83,7 +89,7 @@
       cur += dir;
       // следующий лист должен быть виден под переворачиваемым
       var under = leaves[dir > 0 ? i + 1 : i - 1];
-      if (under) under.el.classList.remove('is-far');
+      if (under) under.el.classList.remove('is-far', 'is-buried');
       paint();
       var done = false;
       var end = function () {

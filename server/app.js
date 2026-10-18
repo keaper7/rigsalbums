@@ -465,6 +465,7 @@ function createApp(cfg) {
   }
 
   function classView(ctx, cls, extra) {
+    syncShoots();
     return A.classPage(Object.assign(resultsData(ctx, cls), {
       msg: ctx.q('m'),
       url: baseUrl(ctx) + '/k/' + cls.slug,
@@ -1398,7 +1399,8 @@ function createApp(cfg) {
     const album = photos.album(cls.id);
     if (!album) return null;
     const students = photos.students(cls.id);
-    const picks = new Map(students.map(s => [s.id, photos.personalInfo(s.id, album)]));
+    const all = photos.personalByStudent(album);
+    const picks = new Map(students.map(s => [s.id, all.get(s.id) || []]));
     const rolesNeed = Math.min(ROLES.length, album.personal_max);
     const finished = s => {
       const list = picks.get(s.id);
@@ -1411,11 +1413,8 @@ function createApp(cfg) {
       closed: !!album.closed_at,
       retouchWait: students.filter(s => picks.get(s.id).some(x => x.retouch) && !s.retouch_done_at).length,
       // классный руководитель: есть ли его папка и выбрал ли он всё
-      teacher: { n: teacherCount(cls.id), done: photos.teacherDone(album) }
+      teacher: { n: photos.teacherCount(cls.id), done: photos.teacherDone(album) }
     };
-  }
-  function teacherCount(classId) {
-    return store.db.prepare('SELECT section FROM pk_photos WHERE class_id = ? AND has_sm = 1').all(classId).filter(r => photos.isTeacherSection(r.section)).length;
   }
   // То же, плюс фото по id и групповые — для страницы класса
   function pkFull(cls) {
@@ -1441,12 +1440,20 @@ function createApp(cfg) {
     return p.year + '-' + String(p.month).padStart(2, '0') + '-' + String(p.day).padStart(2, '0');
   }
 
-  function workRows(filter, withArchive) {
+  // Съёмки, у которых дата прошла, отмечаются сами — перед тем как показать классы
+  function syncShoots() {
+    const p = tzParts(Date.now());
+    work.autoShoots(today(), p.hour * 60 + p.minute);
+  }
+
+  // noPick: вкладкам «Деньги» и «Телефоны» отбор фото не нужен — не считаем его, так быстрее
+  function workRows(filter, withArchive, noPick) {
+    syncShoots();
     const all = work.all();
     const open = work.openCounts();
     return store.listClasses().filter(c => withArchive || !c.archived).map(c => {
       const w = all.get(c.id) || work.get(c.id);
-      const pk = pkInfo(c);
+      const pk = noPick ? null : pkInfo(c);
       return { c: c, w: w, pk: pk, open: open.get(c.id) || 0, half: half(c, w), m: work.money(w, c, pk ? pk.total : 0) };
     }).filter(filter || (() => true));
   }
@@ -1487,13 +1494,13 @@ function createApp(cfg) {
   const byAdded = (a, b) => (a.c.created_at - b.c.created_at) || (a.c.id - b.c.id);
 
   r.get('/admin/work/phones', ctx => {
-    const rows = workRows().sort(byAdded);
+    const rows = workRows(null, false, true).sort(byAdded);
     page(ctx, 200, WV.phonesPage({ sess: ctx.sess, rows: rows, newLeads: work.newLeads() }));
   });
 
   // ----- деньги за сезон, осень и весну -----
   function moneyTotals(rows, deliveries) {
-    const t = { students: 0, total: 0, prepay: 0, prepaidN: 0, paid: 0, paidUpN: 0, rest: 0, print: 0, designer: 0, proc: {}, smm: 0, costs: 0, profit: 0, notReady: [] };
+    const t = { students: 0, total: 0, prepay: 0, prepaidN: 0, paid: 0, paidUpN: 0, rest: 0, restNet: 0, print: 0, designer: 0, proc: {}, smm: 0, costs: 0, profit: 0, notReady: [] };
     rows.forEach(r => {
       const m = r.m;
       if (m.prepaid) { t.prepay += m.prepay; t.prepaidN++; }
@@ -1503,6 +1510,7 @@ function createApp(cfg) {
       t.students += m.students;
       t.total += m.total;
       t.rest += Math.max(0, m.rest);
+      t.restNet += m.restNet;
       t.print += m.printAll;
       t.designer += m.designer;
       if (m.proc) t.proc[m.processor] = (t.proc[m.processor] || 0) + m.proc;
@@ -1516,7 +1524,7 @@ function createApp(cfg) {
   }
 
   function moneyView(ctx, extra) {
-    const sc = seasonCtx(ctx, workRows(null, true));
+    const sc = seasonCtx(ctx, workRows(null, true, true));
     sc.rows.sort(byAdded);
     const deliveries = work.deliveries(sc.year);
     const byHalf = h => sc.inYear.filter(r => r.half === h);
@@ -1600,6 +1608,7 @@ function createApp(cfg) {
   });
 
   function workData(ctx, cls, extra) {
+    syncShoots();
     const w = work.get(cls.id);
     const pk = pkFull(cls);
     return Object.assign({

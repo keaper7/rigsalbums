@@ -164,14 +164,14 @@ test('этапы: галочки, переход, даты съёмки, тел�
   // на доске видна только будущая дата
   assert.match(r.text, /20 мая · групповая/);
   assert.ok(r.text.indexOf('10 января, 10:00 · индивидуальная') === -1);
-  // силуэты: индивидуальная дата назначена (жёлтый), групповая тоже
-  assert.match(r.text, /wk-sh wk-sh--date" title="Индивидуальная: 10 января, 10:00"/);
+  // силуэты: индивидуальная дата прошла — отмечено само (зелёный), групповая назначена (жёлтый)
+  assert.match(r.text, /wk-sh wk-sh--done" title="Индивидуальная: отсняли"/);
   assert.match(r.text, /wk-sh wk-sh--date" title="Групповая: 20 мая"/);
   assert.match(r.text, /дальше: <b>Утвердили<\/b>/);
   // «Утвердили» — класс переходит в работу
   r = await step('approved', true);
   assert.strictEqual(r.data.stage, 1);
-  assert.strictEqual(r.data.next, 'Отсняли индивидуальную');
+  assert.strictEqual(r.data.next, 'Отсняли групповую');
   // съёмку видно и дизайнеру
   await step('shot_ind', true);
   assert.ok(s.app.work.get(+id).shot);

@@ -246,3 +246,71 @@ test('доска по школам: классы одной школы вмес�
   assert.match(r.text, /wk-stagename">Запись и подготовка/);
   assert.ok(r.text.indexOf('id="stage-prep"') === -1);
 });
+
+test('съёмка отмечается сама, когда дата прошла; один раз на дату', async t => {
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const id = await createClass(admin, 'Лицей', '11 «А»');
+  await admin.post('/admin/c/' + id + '/work/date', { d: '2020-05-10', t: '10:00', kind: 'ind' });
+  await admin.post('/admin/c/' + id + '/work/date', { d: '2099-05-10', kind: 'group' });
+  let r = await admin.req('GET', '/admin/work');
+  let w = s.app.work.get(+id);
+  assert.ok(w.steps.shot_ind, 'прошедшая индивидуальная отмечена');
+  assert.ok(!w.steps.shot_group, 'будущая групповая не отмечена');
+  assert.match(r.text, /wk-sh wk-sh--done" title="Индивидуальная: отсняли"/);
+  // Артур снял галочку (съёмку перенесли) — сама она больше не вернётся
+  await admin.api('/admin/api/c/' + id + '/work/step', { step: 'shot_ind', on: false });
+  await admin.req('GET', '/admin/work');
+  assert.ok(!s.app.work.get(+id).steps.shot_ind);
+  // сегодня, но время ещё не прошло — не отмечаем; через 3 часа после начала — отмечаем
+  s.app.work.autoShoots('2030-01-01', 9 * 60);
+  const id2 = await createClass(admin, 'Лицей', '11 «Б»');
+  s.app.work.addDate(+id2, { d: '2030-01-01', t: '10:00', kind: 'group' });
+  s.app.work.autoShoots('2030-01-01', 12 * 60);
+  assert.ok(!s.app.work.get(+id2).steps.shot_group);
+  s.app.work.autoShoots('2030-01-01', 13 * 60);
+  assert.ok(s.app.work.get(+id2).steps.shot_group);
+  // в истории видно, что отмечено само; дизайнеру эта запись не показывается
+  assert.ok(s.app.work.notes(+id2).some(n => /отмечено само/.test(n.text) && n.kind === 'admin'));
+});
+
+test('лид без номера: школа или заметка, без кнопок звонка', async t => {
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  let r = await admin.post('/admin/work/leads', { phone: '', school: '', note: '' });
+  assert.strictEqual(r.status, 400);
+  r = await admin.post('/admin/work/leads', { phone: '12', school: 'Лицей 1' });
+  assert.strictEqual(r.status, 400);
+  r = await admin.post('/admin/work/leads', { school: 'Лицей 1', title: '11-е', note: 'параллель будет брать, жду родителей' });
+  assert.strictEqual(r.status, 303);
+  r = await admin.req('GET', '/admin/work/leads');
+  assert.match(r.text, /<b>11-е · Лицей 1<\/b><span class="muted">номера пока нет<\/span>/);
+  assert.ok(r.text.indexOf('wa.me/') === -1);
+  const ld = s.app.work.leads()[0];
+  r = await admin.req('GET', '/admin/new?lead=' + ld.id);
+  assert.match(r.text, /name="school" value="Лицей 1"/);
+});
+
+test('деньги: «осталось получить» — чистыми, после расходов', async t => {
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const id = await createClass(admin, 'Лицей', '11 «А»');
+  await admin.post('/admin/c/' + id + '/work/money', { students: '20', prepaid: '1' });
+  const m = s.app.work.money(s.app.work.get(+id), s.app.store.getClass(+id), 0);
+  // 80 000 оплата, расходы 35 520, прибыль 44 480, предоплата 10 000 → чистыми осталось 34 480
+  assert.strictEqual(m.profit, 44480);
+  assert.strictEqual(m.restNet, 34480);
+  assert.strictEqual(m.rest, 70000);
+  let r = nb(await admin.req('GET', '/admin/c/' + id + '/work/money'));
+  assert.match(r.text, /Осталось получить чистыми<small>родители ещё отдадут 70 000 ₽<\/small><\/span><b>34 480 ₽/);
+  // кнопка оплаты — по деньгам от родителей
+  assert.match(r.text, /Класс доплатил остаток 70 000 ₽/);
+  r = nb(await admin.req('GET', '/admin/work/money?year=2026'));
+  assert.match(r.text, /Осталось получить чистыми<small>родители ещё отдадут 70 000 ₽<\/small><\/span><b>34 480 ₽/);
+  // когда получено больше прибыли, чистыми осталось 0, а не минус
+  await admin.post('/admin/c/' + id + '/work/pay', { sum: '50000' });
+  assert.strictEqual(s.app.work.money(s.app.work.get(+id), s.app.store.getClass(+id), 0).restNet, 0);
+});

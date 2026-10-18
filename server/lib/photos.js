@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS pk_log (
   at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS pk_photos_class ON pk_photos (class_id, section, path);
+CREATE INDEX IF NOT EXISTS pk_students_class ON pk_students (class_id, sort);
 CREATE INDEX IF NOT EXISTS pk_log_class ON pk_log (class_id, at);
 `;
 
@@ -462,6 +463,29 @@ class Photos {
       WHERE p.student_id = ? ORDER BY p.created_at, p.rowid`).all(studentId);
     const grp = album ? this.groupSet(album) : null;
     return rows.filter(r => (!grp || !grp.has(r.section)) && !this.isTeacherSection(r.section)).map(r => ({ id: r.photo_id, role: ROLE_NAMES[r.role] ? r.role : '', retouch: r.retouch }));
+  }
+
+  // Личный выбор всех учеников класса одним запросом: { ученик: [{ id, role, retouch }] }.
+  // То же, что personalInfo для каждого, но без отдельного запроса на каждого ученика — для доски с десятками классов
+  personalByStudent(album) {
+    const grp = this.groupSet(album);
+    // идём от учеников класса: выборы ищутся по ключу ученика, а не перебором всей таблицы
+    const rows = this.db.prepare(`SELECT p.student_id, p.photo_id, p.role, p.retouch, f.section FROM pk_students s
+      CROSS JOIN pk_personal p ON p.student_id = s.id JOIN pk_photos f ON f.id = p.photo_id
+      WHERE s.class_id = ? ORDER BY p.created_at, p.rowid`).all(album.class_id);
+    const out = new Map();
+    rows.forEach(r => {
+      if (grp.has(r.section) || this.isTeacherSection(r.section)) return;
+      if (!out.has(r.student_id)) out.set(r.student_id, []);
+      out.get(r.student_id).push({ id: r.photo_id, role: ROLE_NAMES[r.role] ? r.role : '', retouch: r.retouch });
+    });
+    return out;
+  }
+
+  // Сколько готовых фото в папке «кл рук» — одним коротким запросом по разделам
+  teacherCount(classId) {
+    return this.db.prepare('SELECT section, COUNT(*) n FROM pk_photos WHERE class_id = ? AND has_sm = 1 GROUP BY section').all(classId)
+      .filter(r => this.isTeacherSection(r.section)).reduce((n, r) => n + r.n, 0);
   }
 
   setPersonal(album, studentId, photoId, on) {

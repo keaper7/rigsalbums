@@ -70,7 +70,7 @@ test('оплата: весь остаток одной кнопкой или ч�
   assert.strictEqual(r.status, 303);
   r = await admin.req('GET', '/admin/c/' + id + '/work/money');
   assert.match(r.text, /Оплачено после предоплаты<\/span><b>−30 000 ₽/);
-  assert.match(r.text, /Осталось получить<\/span><b>40 000 ₽/);
+  assert.match(r.text, /родители ещё отдадут 40 000 ₽/);
   assert.match(r.text, /8 человек/);
   assert.strictEqual((await admin.post('/admin/c/' + id + '/work/pay', { sum: 'abc' })).status, 400);
   // остаток одной кнопкой
@@ -84,11 +84,11 @@ test('оплата: весь остаток одной кнопкой или ч�
   await admin.post('/admin/c/' + id + '/work/money', { students: '20', prepaid: '1', teacher: '1' });
   assert.strictEqual(s.app.work.get(+id).paid.length, 2);
   r = await admin.req('GET', '/admin/c/' + id + '/work/money');
-  assert.match(r.text, /Осталось получить<\/span><b>2 000 ₽/);
+  assert.match(r.text, /родители ещё отдадут 2 000 ₽/);
   // итог сезона и доска
   r = await admin.req('GET', '/admin/work/money?year=2026');
   assert.match(r.text, /Оплаты после предоплаты<\/span><b>70 000 ₽/);
-  assert.match(r.text, /Осталось получить<\/span><b>2 000 ₽/);
+  assert.match(r.text, /родители ещё отдадут 2 000 ₽/);
   // убрать ошибочную оплату
   await admin.post('/admin/c/' + id + '/work/paydel', { i: '1' });
   assert.deepStrictEqual(s.app.work.get(+id).paid.map(p => p.sum), [30000]);
@@ -178,6 +178,18 @@ test('классный руководитель: своя ссылка, толь
   assert.match(r.text, /кл рук<\/b> <small>2 фото · классный руководитель/);
   assert.match(r.text, /ещё не заходил/);
 
+  // быстрый подсчёт выбора для доски совпадает с обычным, фото кл. рука и групповые в него не входят
+  {
+    const album = s.app.photos.album(+id);
+    const anna0 = s.app.store.db.prepare('SELECT id FROM pk_students').get().id;
+    s.app.store.db.prepare('INSERT INTO pk_personal (student_id, photo_id, created_at) VALUES (?, ?, 1)').run(anna0, girl);
+    s.app.store.db.prepare('INSERT INTO pk_personal (student_id, photo_id, created_at) VALUES (?, ?, 2)').run(anna0, t1);
+    const fast = s.app.photos.personalByStudent(album).get(anna0) || [];
+    assert.deepStrictEqual(fast, s.app.photos.personalInfo(anna0, album));
+    assert.deepStrictEqual(fast.map(x => x.id), [girl]);
+    s.app.store.db.prepare('DELETE FROM pk_personal WHERE student_id = ?').run(anna0);
+    assert.strictEqual(s.app.photos.teacherCount(+id), 2);
+  }
   // ученик: в его списке нет фото кл. рука, выбрать их нельзя
   r = await client(s.base).req('GET', '/f/' + slug);
   assert.ok(r.text.indexOf(t1) === -1);

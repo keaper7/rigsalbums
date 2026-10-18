@@ -342,7 +342,9 @@ function calc(own, se, fallback, processor, payments, probes) {
     printOne: printOne, printOwn: printOwn !== null, printAll: printAll,
     designer: designer, processor: who, proc: proc, smm: smm, costs: costs,
     total: total, prepaid: !!own.prepaid, prepay: prepay, payments: pays, paid: paid, received: received,
-    rest: total - received, paidUp: total > 0 && received >= total,
+    // rest — сколько ещё отдадут родители; restNet — сколько из этого чистыми, после всех расходов
+    // (уже полученные деньги считаем полученной прибылью, как Артур и считает)
+    rest: total - received, restNet: Math.max(0, total - costs - received), paidUp: total > 0 && received >= total,
     profit: total - costs, missing: missing, ready: !missing.length
   };
 }
@@ -475,6 +477,37 @@ class Work {
     return { ok: true };
   }
 
+  // Дата съёмки прошла — «Отсняли индивидуальную/групповую» отмечается само.
+  // Прошла: на следующий день, а если указано время — через 3 часа после начала.
+  // Каждая дата срабатывает один раз (метка auto): если Артур снимет галочку (съёмку перенесли),
+  // она сама больше не вернётся — до новой даты
+  autoShoots(today, nowMin) {
+    const rows = this.db.prepare("SELECT class_id, steps, dates FROM wk_classes WHERE dates != '[]'").all();
+    let n = 0;
+    rows.forEach(row => {
+      const steps = parseJson(row.steps || '{}', {});
+      const dates = parseJson(row.dates || '[]', []);
+      if (!Array.isArray(dates)) return;
+      let changed = false;
+      dates.forEach(d => {
+        if (!d || d.auto || (d.kind !== 'ind' && d.kind !== 'group') || !DATE_RE.test(d.d)) return;
+        const m = TIME_RE.test(d.t || '') ? +d.t.slice(0, 2) * 60 + +d.t.slice(3, 5) : null;
+        const passed = d.d < today || (d.d === today && m !== null && nowMin >= m + 180);
+        if (!passed) return;
+        d.auto = 1;
+        changed = true;
+        const key = d.kind === 'ind' ? 'shot_ind' : 'shot_group';
+        if (!steps[key]) {
+          steps[key] = Date.now();
+          this.event(row.class_id, 'Артур', '✓ ' + STEP_NAMES[key] + ' (дата съёмки прошла, отмечено само)', true);
+          n++;
+        }
+      });
+      if (changed) this.db.prepare('UPDATE wk_classes SET steps = ?, dates = ?, updated_at = ? WHERE class_id = ?').run(JSON.stringify(steps), JSON.stringify(dates), Date.now(), row.class_id);
+    });
+    return n;
+  }
+
   removeDate(classId, i) {
     const w = this.get(classId);
     if (!w.dates[i]) return false;
@@ -573,9 +606,11 @@ class Work {
 
   lead(id) { return this.db.prepare('SELECT * FROM wk_leads WHERE id = ?').get(id) || null; }
 
+  // Номер не обязателен: бывает, что параллель «будет брать», а родители ещё не написали
   addLead(f) {
     const phone = line(f.phone, 40);
-    if (!/\d{5,}/.test(phone.replace(/\D/g, ''))) return { error: 'Напишите номер телефона' };
+    if (phone && !/\d{5,}/.test(phone.replace(/\D/g, ''))) return { error: 'Номер какой-то не такой, проверьте' };
+    if (!phone && !line(f.school, 60) && !line(f.title, 40) && !clean(f.note, 500)) return { error: 'Напишите номер, школу или заметку' };
     const now = Date.now();
     const id = this.db.prepare('INSERT INTO wk_leads (phone, school, title, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
       .run(phone, line(f.school, 60), line(f.title, 40), clean(f.note, 500), now, now).lastInsertRowid;

@@ -216,7 +216,7 @@ function classCard(r, today) {
       ${r.pk && r.pk.total && sg.index === 1 ? pkLine(r.pk) : ''}
       ${r.w.status !== 'todo' ? statusChip(r.w.status) : ''}
       ${r.open ? html`<span class="wk-warn">${fixesN(r.open)}</span>` : ''}
-      ${r.m.paidUp ? html`<span class="wk-paid">оплачено</span>` : sg.index >= 2 && r.m.ready && r.m.rest > 0 ? html`<span class="wk-warn">осталось получить ${rub(r.m.rest)}</span>` : ''}
+      ${r.m.paidUp ? html`<span class="wk-paid">оплачено</span>` : sg.index >= 2 && r.m.ready && r.m.rest > 0 ? html`<span class="wk-warn">с родителей ещё ${rub(r.m.rest)}</span>` : ''}
     </div>
   </div>`;
 }
@@ -346,10 +346,11 @@ function leadsPage(o) {
   const card = l => {
     const cls = l.class_id ? o.classes.get(l.class_id) : null;
     const newUrl = '/admin/new?lead=' + l.id;
+    const place = [l.title, l.school].filter(Boolean).join(' · ');
     return html`<li class="wk-lead wk-lead--${l.status}" id="lead-${l.id}" data-find="${l.phone} ${l.phone.replace(/\D/g, '')} ${l.school} ${l.title} ${l.note}">
       <div class="wk-lead__top">
-        <div class="wk-lead__main"><b>${l.phone}</b>${l.school || l.title ? html`<span>${[l.title, l.school].filter(Boolean).join(' · ')}</span>` : ''}<small class="muted">${fmtWhen(l.created_at)}</small></div>
-        <span class="wk-calls"><a class="wk-call wk-call--wa" href="${wa(l.phone)}" target="_blank" rel="noopener" aria-label="Написать в WhatsApp">${WA_ICON}</a><a class="wk-call" href="${tel(l.phone)}" aria-label="Позвонить">${PHONE_ICON}</a></span>
+        <div class="wk-lead__main">${l.phone ? html`<b>${l.phone}</b>${place ? html`<span>${place}</span>` : ''}` : html`<b>${place || 'Без номера'}</b>${place ? html`<span class="muted">номера пока нет</span>` : ''}`}<small class="muted">${fmtWhen(l.created_at)}</small></div>
+        ${l.phone ? html`<span class="wk-calls"><a class="wk-call wk-call--wa" href="${wa(l.phone)}" target="_blank" rel="noopener" aria-label="Написать в WhatsApp">${WA_ICON}</a><a class="wk-call" href="${tel(l.phone)}" aria-label="Позвонить">${PHONE_ICON}</a></span>` : ''}
       </div>
       ${l.note ? html`<p class="wk-lead__note">${l.note}</p>` : ''}
       <div class="wk-lead__btns">
@@ -357,7 +358,7 @@ function leadsPage(o) {
         ${l.status === 'new' ? html`<form method="post" action="/admin/work/leads/${l.id}" class="inline">${csrf(o.sess)}<input type="hidden" name="status" value="talk"><button class="b b--sm" type="submit">Связался</button></form>` : ''}
         ${l.status === 'new' || l.status === 'talk' ? html`<form method="post" action="/admin/work/leads/${l.id}" class="inline">${csrf(o.sess)}<input type="hidden" name="status" value="lost"><button class="b b--sm" type="submit">Не актуально</button></form>` : ''}
         ${l.status === 'lost' ? html`<form method="post" action="/admin/work/leads/${l.id}" class="inline">${csrf(o.sess)}<input type="hidden" name="status" value="new"><button class="b b--sm" type="submit">Вернуть</button></form>` : ''}
-        <form method="post" action="/admin/work/leads/${l.id}" class="inline" data-confirm="Удалить номер ${l.phone} из лидов?">${csrf(o.sess)}<input type="hidden" name="delete" value="1"><button class="b b--sm b--danger" type="submit">Удалить</button></form>
+        <form method="post" action="/admin/work/leads/${l.id}" class="inline" data-confirm="Удалить из лидов: ${l.phone || place || 'без номера'}?">${csrf(o.sess)}<input type="hidden" name="delete" value="1"><button class="b b--sm b--danger" type="submit">Удалить</button></form>
       </div>
     </li>`;
   };
@@ -371,10 +372,11 @@ function leadsPage(o) {
   const body = html`${flash(o)}<h1 class="h1 wk-h1">Работа</h1>
 ${sectionTabs('leads', '', o.leads.filter(l => l.status === 'new').length)}
 <details class="card fold wk-leadadd"${!o.leads.length || o.err ? raw(' open') : ''}>
-  <summary class="fold__h"><span><b>+ Добавить номер</b></span></summary>
+  <summary class="fold__h"><span><b>+ Новый лид</b></span></summary>
   <form class="form" method="post" action="/admin/work/leads">
   ${csrf(o.sess)}
-  <label class="field"><span>Телефон</span><input name="phone" type="tel" value="${f.phone || ''}" required maxlength="40" placeholder="+7 …" autocomplete="off"></label>
+  <label class="field"><span>Телефон</span><input name="phone" type="tel" value="${f.phone || ''}" maxlength="40" placeholder="+7 …" autocomplete="off"></label>
+  <p class="muted small">Можно и без номера, если пока известна только школа или класс.</p>
   <div class="two">
     <label class="field"><span>Школа</span><input name="school" value="${f.school || ''}" maxlength="60" autocomplete="off"></label>
     <label class="field"><span>Класс</span><input name="title" value="${f.title || ''}" maxlength="40" autocomplete="off"></label>
@@ -641,7 +643,8 @@ function moneyCalc(m) {
     <p><span>Оплата от родителей</span><b>${rub(m.total)}</b></p>
     <p><span>${m.prepaid ? 'Предоплата внесена' : 'Предоплаты нет'}</span><b>${m.prepaid ? '−' + rub(m.prepay) : ''}</b></p>
     ${m.paid ? html`<p><span>Оплачено после предоплаты</span><b>−${rub(m.paid)}</b></p>` : ''}
-    <p class="${m.paidUp ? 'wk-calc__ok' : ''}"><span>${m.paidUp ? (m.rest < 0 ? 'Оплачено, переплата' : 'Оплачено полностью') : 'Осталось получить'}</span><b>${m.paidUp ? (m.rest < 0 ? rub(-m.rest) : '✓') : rub(m.rest)}</b></p>
+    ${m.paidUp ? html`<p class="wk-calc__ok"><span>${m.rest < 0 ? 'Оплачено, переплата' : 'Оплачено полностью'}</span><b>${m.rest < 0 ? rub(-m.rest) : '✓'}</b></p>`
+      : html`<p class="wk-calc__left"><span>Осталось получить чистыми<small>родители ещё отдадут ${rub(m.rest)}</small></span><b>${rub(m.restNet)}</b></p>`}
     <p class="wk-calc__total"><span>Чистая прибыль</span><b class="${m.profit < 0 ? 'is-neg' : ''}">${rub(m.profit)}</b></p>
   </div>`;
 }
@@ -651,7 +654,7 @@ function payCard(o) {
   const c = o.cls, m = o.m, w = o.w;
   if (!m.ready && !w.paid.length) return '';
   return html`<section class="card" id="pay">
-  <div class="card__h"><h2 class="h">Оплата</h2>${m.paidUp ? html`<span class="chip chip--done">оплачено</span>` : m.ready ? html`<span class="chip chip--warn">осталось ${rub(m.rest)}</span>` : ''}</div>
+  <div class="card__h"><h2 class="h">Оплата</h2>${m.paidUp ? html`<span class="chip chip--done">оплачено</span>` : m.ready ? html`<span class="chip chip--warn">с родителей ещё ${rub(m.rest)}</span>` : ''}</div>
   <div class="wk-calc wk-calc--pay">
     <p><span>Нужно получить всего</span><b>${rub(m.total)}</b></p>
     <p><span>Предоплата</span><b>${m.prepaid ? rub(m.prepay) : html`<span class="muted">не отмечена</span>`}</b></p>
@@ -750,7 +753,7 @@ ${seasonNav(o, '/admin/work/money')}
     <p><span>Оплата от родителей</span><b>${rub(t.total)}</b></p>
     <p><span>Предоплаты внесены (${t.prepaidN} из ${o.rows.length})</span><b>${rub(t.prepay)}</b></p>
     <p><span>Оплаты после предоплаты</span><b>${rub(t.paid)}</b></p>
-    <p><span>Осталось получить${t.paidUpN ? ' (оплатили полностью: ' + t.paidUpN + ')' : ''}</span><b>${rub(t.rest)}</b></p>
+    <p class="wk-calc__left"><span>Осталось получить чистыми<small>родители ещё отдадут ${rub(t.rest)}${t.paidUpN ? ' · оплатили полностью: ' + t.paidUpN : ''}</small></span><b>${rub(t.restNet)}</b></p>
     <p class="wk-calc__sep"><span>Печать</span><b>${rub(t.print)}</b></p>
     <p><span>Дизайнер</span><b>${rub(t.designer)}</b></p>
     ${Object.keys(t.proc).map(k => html`<p><span>Обработка · ${k}</span><b>${rub(t.proc[k])}</b></p>`)}
@@ -767,7 +770,7 @@ ${o.rows.length ? html`<section class="card">
   <div class="pk-scroll"><table class="pk-table wk-table">
     <thead><tr><th>Класс</th><th>Уч.</th><th>Оплата</th><th>Затраты</th><th>Прибыль</th></tr></thead>
     <tbody>${o.rows.map(r => html`<tr class="${!r.m.prepaid ? 'is-noprepay' : ''}">
-      <td><a class="wk-tname" href="/admin/c/${r.c.id}/work/money">${r.c.title}</a>${schoolTag(r.c.school, r.w.city)}<small class="muted">${HALF_NAMES[r.half].toLowerCase()}${r.m.paidUp ? ' · оплачено ✓' : r.m.prepaid ? ' · предоплата ✓' + (r.m.ready ? ', осталось ' + rub(r.m.rest) : '') : ''}</small>${!r.m.prepaid ? html`<span class="wk-noprepay">без предоплаты</span>` : ''}</td>
+      <td><a class="wk-tname" href="/admin/c/${r.c.id}/work/money">${r.c.title}</a>${schoolTag(r.c.school, r.w.city)}<small class="muted">${HALF_NAMES[r.half].toLowerCase()}${r.m.paidUp ? ' · оплачено ✓' : r.m.prepaid ? ' · предоплата ✓' + (r.m.ready ? ', осталось чистыми ' + rub(r.m.restNet) : '') : ''}</small>${!r.m.prepaid ? html`<span class="wk-noprepay">без предоплаты</span>` : ''}</td>
       <td>${r.m.students || '—'}</td>
       <td>${r.m.ready ? rub(r.m.total) : '—'}</td>
       <td>${r.m.ready ? rub(r.m.costs) : '—'}</td>

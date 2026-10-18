@@ -252,9 +252,32 @@ function newClassPage(o) {
 <h1 class="h1">Новый класс</h1>
 <form class="card form" method="post" action="/admin/new">
   ${csrf(o.sess)}${pick}
-  <label class="field"><span>Школа</span><input name="school" value="${f.school || ''}" placeholder="Лицей №2" required maxlength="60" autocomplete="off"></label>
-  <label class="field"><span>Класс</span><input name="title" value="${f.title || ''}" placeholder="${o.nextTitle || '11 «Б»'}" required maxlength="400" autocomplete="off"></label>
-  <p class="muted small">Можно сразу несколько через запятую: 11А, 11Б, 11В. Каждому классу будет своя ссылка.</p>
+  ${f.lead ? html`<input type="hidden" name="lead" value="${f.lead}"><p class="flash">Данные из лида уже вписаны.</p>` : ''}
+  <div class="two">
+    <label class="field"><span>Школа</span><input name="school" value="${f.school || ''}" placeholder="Лицей №2" required maxlength="60" autocomplete="off" list="schools" data-school-city></label>
+    <label class="field"><span>Город</span><input name="city" value="${f.city || ''}" placeholder="Нальчик" maxlength="60" autocomplete="off" list="cities"></label>
+  </div>
+  <datalist id="schools">${(o.schools || []).map(x => html`<option value="${x.school}" data-city="${x.city}"></option>`)}</datalist>
+  <datalist id="cities">${Array.from(new Set((o.schools || []).map(x => x.city).filter(Boolean))).map(c => html`<option value="${c}"></option>`)}</datalist>
+  <label class="field"><span>Класс</span><input name="title" value="${f.title || ''}" placeholder="${o.nextTitle || '11 «Б»'}" required maxlength="400" autocomplete="off" data-titles></label>
+  <p class="muted small">Можно сразу несколько классов одной школы через запятую: 11А, 11Б, 11В. Каждому будет своя ссылка.</p>
+  <fieldset class="newwork">
+    <legend>Для работы <small class="muted">можно потом</small></legend>
+    <div class="two">
+      <label class="field"><span>Цена альбома</span><input name="price" inputmode="numeric" maxlength="8" value="${f.price || ''}" placeholder="как в сезоне" autocomplete="off"></label>
+      <label class="field" data-one><span>Учеников</span><input name="students" inputmode="numeric" maxlength="4" value="${f.students || ''}" placeholder="сколько" autocomplete="off"></label>
+    </div>
+    <div class="two" data-one>
+      <label class="field"><span>Телефон</span><input name="phone" type="tel" value="${f.phone || ''}" maxlength="40" placeholder="+7 …" autocomplete="off"></label>
+      <label class="field"><span>Чей</span><input name="pname" value="${f.pname || ''}" maxlength="60" placeholder="кл. рук, мама Азамата" autocomplete="off"></label>
+    </div>
+    <div class="wk-date3" data-one>
+      <label class="field"><span>Дата съёмки</span><input type="date" name="sd" value="${f.sd || ''}"></label>
+      <label class="field"><span>Время</span><input type="time" name="st" value="${f.st || ''}"></label>
+      <label class="field"><span>Съёмка</span><select name="sk"><option value="ind"${f.sk === 'group' ? '' : raw(' selected')}>Индивидуальная</option><option value="group"${f.sk === 'group' ? raw(' selected') : ''}>Групповая</option></select></label>
+    </div>
+    <p class="muted small" data-many hidden>Цена и город запишутся всем классам. Учеников, телефон и дату впишете у каждого отдельно.</p>
+  </fieldset>
   <div class="two">
     <label class="field"><span>Год выпуска</span><input name="year" type="number" inputmode="numeric" min="2020" max="2100" value="${f.year || d.year}" required></label>
     <label class="field"><span>Голосование длится</span>${durationSelect('duration_min', +(f.duration_min || d.duration_min))}</label>
@@ -419,7 +442,7 @@ function classPage(o) {
     title: c.title + ' · ' + c.school, nav: 'classes', sess: o.sess, msg: o.msg, err: o.err,
     body: html`<a class="back" href="/admin">← Классы</a>
 <div class="head head--class">
-  <div><h1 class="h1">${c.title}</h1><p class="muted">${c.school} · ${c.year}${c.archived ? ' · в архиве' : ''}</p></div>
+  <div><h1 class="h1">${c.title}</h1><p class="muted">${c.school}${o.city ? ' · ' + o.city : ''} · ${c.year}${c.archived ? ' · в архиве' : ''} · <a href="#info">изменить</a></p></div>
 </div>
 
 <div class="card share">
@@ -429,6 +452,12 @@ function classPage(o) {
     <a class="b" href="https://wa.me/?text=${encodeURIComponent(share)}" data-share data-share-text="${share}" target="_blank" rel="noopener">Отправить</a>
     <a class="b" href="${url}" target="_blank" rel="noopener">Открыть</a>
   </div>
+</div>
+
+<div class="cls-links">
+<a class="card fold__link" href="/admin/c/${c.id}/work"><b>Работа над альбомом</b><small>${o.work ? o.work : 'Статус для дизайнера, правки, съёмка и деньги'}</small></a>
+
+<a class="card fold__link" href="/admin/c/${c.id}/photos"><b>Отбор фото</b><small>${o.pk && (o.pk.photos || o.pk.students) ? (o.pk.closed ? 'Отбор закрыт · ' : '') + o.pk.photos + ' фото · начали выбирать ' + o.pk.started + ' из ' + o.pk.students : 'Личные фото, общие групповые, цитаты и раскладка по папкам'}</small></a>
 </div>
 
 ${controlBlock(o)}
@@ -461,16 +490,15 @@ ${resultsBlock(o)}
   </form>
 </details>
 
-<a class="card fold__link" href="/admin/c/${c.id}/work"><b>Работа над альбомом</b><small>${o.work ? o.work : 'Статус для дизайнера, правки, съёмка и деньги'}</small></a>
-
-<a class="card fold__link" href="/admin/c/${c.id}/photos"><b>Отбор фото</b><small>${o.pk && (o.pk.photos || o.pk.students) ? (o.pk.closed ? 'Отбор закрыт · ' : '') + o.pk.photos + ' фото · начали выбирать ' + o.pk.started + ' из ' + o.pk.students : 'Личные фото, общие групповые, цитаты и раскладка по папкам'}</small></a>
-
 <details class="card fold" id="info"${o.open === 'info' ? raw(' open') : ''}>
-  <summary class="fold__h"><span><b>Название, год, адрес ссылки</b><small>${c.school} · ${c.title} · ${c.year}</small></span></summary>
+  <summary class="fold__h"><span><b>Название, школа, город, год</b><small>${c.title} · ${c.school}${o.city ? ' · ' + o.city : ''} · ${c.year}</small></span></summary>
   <form class="form" method="post" action="/admin/c/${c.id}/info">
   ${csrf(o.sess)}
-  <label class="field"><span>Школа</span><input name="school" value="${c.school}" required maxlength="60"></label>
   <label class="field"><span>Класс</span><input name="title" value="${c.title}" required maxlength="40"></label>
+  <div class="two">
+    <label class="field"><span>Школа</span><input name="school" value="${c.school}" required maxlength="60"></label>
+    <label class="field"><span>Город</span><input name="city" value="${o.city || ''}" maxlength="60" placeholder="Нальчик"></label>
+  </div>
   <div class="two">
     <label class="field"><span>Год выпуска</span><input name="year" type="number" inputmode="numeric" min="2020" max="2100" value="${c.year}" required></label>
     <label class="field"><span>Длительность</span>${durationSelect('duration_min', c.duration_min)}</label>

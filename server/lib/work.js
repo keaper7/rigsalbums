@@ -6,7 +6,10 @@
 // Всё лежит в своих таблицах wk_*: голосование и отбор фото это не задевает.
 // Класс попадает сюда сам — запись создаётся при первом обращении
 
+const fs = require('fs');
+const path = require('path');
 const { token } = require('./util');
+const { newId, jpegSize } = require('./media');
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS wk_classes (
@@ -58,6 +61,27 @@ CREATE TABLE IF NOT EXISTS wk_delivery (
   note TEXT NOT NULL DEFAULT '',
   at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS wk_fix_files (
+  id TEXT PRIMARY KEY,
+  fix_id INTEGER NOT NULL REFERENCES wk_fixes(id) ON DELETE CASCADE,
+  class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  label TEXT NOT NULL DEFAULT '',
+  w INTEGER NOT NULL DEFAULT 0,
+  h INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS wk_leads (
+  id INTEGER PRIMARY KEY,
+  phone TEXT NOT NULL,
+  school TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'new',
+  class_id INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS wk_fix_files_fix ON wk_fix_files (fix_id);
 CREATE INDEX IF NOT EXISTS wk_fixes_class ON wk_fixes (class_id, done_at, created_at);
 CREATE INDEX IF NOT EXISTS wk_notes_class ON wk_notes (class_id, at);
 `;
@@ -70,14 +94,21 @@ const COLUMNS = [
   ['wk_classes', 'dates', "TEXT NOT NULL DEFAULT '[]'"],
   ['wk_classes', 'contacts', "TEXT NOT NULL DEFAULT '[]'"],
   ['wk_classes', 'half', "TEXT NOT NULL DEFAULT ''"],
+  // оплаты после предоплаты: [{ sum, note, at }]
+  ['wk_classes', 'paid', "TEXT NOT NULL DEFAULT '[]'"],
+  // город и пробники (альбомы «для себя» в расход): [{ name, at }]
+  ['wk_classes', 'city', "TEXT NOT NULL DEFAULT ''"],
+  ['wk_classes', 'probes', "TEXT NOT NULL DEFAULT '[]'"],
   ['wk_delivery', 'half', "TEXT NOT NULL DEFAULT ''"]
 ];
 
 // Этапы работы с классом, как их ведёт Артур. Последний пункт этапа переводит класс на следующий,
-// «Альбом забрали» — класс готов. auto: пункт отмечается сам (предоплата — из денег, даты — когда добавлены)
+// «Альбом забрали» — класс готов. auto: пункт отмечается сам (предоплата — из денег, даты — когда добавлены).
+// «Отбор» — это чистка дублей у Артура, а выбор фото учениками — «Выборка», после загрузки.
+// «Сверка» — ученики проверяют свой макет, с дизайнером не связана
 const STAGES = [
   { key: 'prep', name: 'Запись и подготовка', steps: [['prepay', 'Предоплата', 'auto'], ['group', 'Группа'], ['talk', 'Обсуждение'], ['dates', 'Даты съёмки', 'auto'], ['approved', 'Утвердили']] },
-  { key: 'work', name: 'Работа', steps: [['shot_ind', 'Отсняли индивидуальную'], ['shot_group', 'Отсняли групповую'], ['pick', 'Отбор'], ['color', 'Цветокор'], ['retouch', 'Ретушь'], ['upload', 'Загрузка'], ['extra', 'Доп. ретушь'], ['check', 'Сверка'], ['checked', 'Сверка пройдена']] },
+  { key: 'work', name: 'Работа', steps: [['shot_ind', 'Отсняли индивидуальную'], ['shot_group', 'Отсняли групповую'], ['pick', 'Отбор'], ['color', 'Цветокор'], ['retouch', 'Ретушь'], ['upload', 'Загрузка'], ['select', 'Выборка'], ['extra', 'Доп. ретушь'], ['check', 'Сверка'], ['checked', 'Сверка пройдена']] },
   { key: 'print', name: 'Печать и отдача', steps: [['verify', 'Проверка'], ['ship', 'Отгрузка'], ['printing', 'Печать'], ['pack', 'Упаковка'], ['notify', 'Уведомить родителей'], ['taken', 'Альбом забрали']] }
 ];
 const STEP_NAMES = {};
@@ -85,8 +116,9 @@ STAGES.forEach(st => st.steps.forEach(x => { STEP_NAMES[x[0]] = x[1]; }));
 const HALVES = [['autumn', 'Осень'], ['spring', 'Весна']];
 const HALF_NAMES = Object.fromEntries(HALVES);
 // Какая съёмка в дате
-const DATE_KINDS = [['ind', 'Индивидуальная'], ['group', 'Групповая'], ['other', 'Съёмка']];
-const DATE_KIND_NAMES = Object.fromEntries(DATE_KINDS);
+// «Съёмка» без уточнения больше не выбирается, но у старых дат остаётся
+const DATE_KINDS = [['ind', 'Индивидуальная'], ['group', 'Групповая']];
+const DATE_KIND_NAMES = Object.assign({ other: 'Съёмка' }, Object.fromEntries(DATE_KINDS));
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // Статусы класса в том порядке, как идёт работа
@@ -113,10 +145,19 @@ const FIXES = [
   ['mixup', 'Перепутаны цитаты', 'С кем перепутали'],
   ['photo', 'Обновить фото', 'Ссылка на новое фото или что поменять'],
   ['swap', 'Поменять фото местами', 'Например: обложку и личную страницу'],
+  ['group_swap', 'Заменить групповое фото', 'Комментарий'],
+  ['group_del', 'Удалить групповое фото', 'Какое фото убрать'],
   ['name', 'Ошибка в имени', 'Как правильно'],
-  ['other', 'Другое', 'Что сделать']
+  ['other', 'Другое', 'Что сделать'],
+  // появляется сама, в формах её нет
+  ['teacher_wish', 'Новое пожелание классу', '', 'auto']
 ];
 const FIX_NAMES = Object.fromEntries(FIXES.map(f => [f[0], f[1]]));
+// Подписи к прикреплённым фото: для замены — что убрать и что поставить
+const FILE_LABELS = { remove: 'Убрать', add: 'Поставить', '': '' };
+const FILE_MAX = 6 * 1024 * 1024;
+const FILES_PER_FIX = 6;
+const FILE_ID = /^[a-z0-9]{16}$/;
 
 // Деньги считаются как в таблице Артура. Цены и расходы свои у каждого сезона (сезон — год выпуска):
 // когда дизайнер или типография поднимут цены, прошлые классы посчитаются по старым
@@ -138,7 +179,7 @@ const SEASON_DEFAULT = {
 // Поля сезона, которые правит Артур: [ключ, подпись, подсказка]
 const SEASON_FIELDS = [
   ['price', 'Цена альбома', 'если у класса не указана своя'],
-  ['teacher', 'Классный руководитель', 'прибавляется к сумме для родителей, плюс 1 альбом в печать'],
+  ['teacher', 'Альбом классному руководителю', 'за каждый альбом, плюс 1 альбом в печать'],
   ['designer', 'Дизайнер за класс', ''],
   ['prepay', 'Предоплата с класса', ''],
   ['smm_per', 'СММ и помощь: за ученика', ''],
@@ -146,6 +187,40 @@ const SEASON_FIELDS = [
   ['divisor', 'Учеников на разворот', ''],
   ['extra', 'Разворотов сверху', 'групповые, общий список и т. д.']
 ];
+
+// Лиды: новый → связался → стал классом, или не актуально
+const LEAD_STATUSES = [['new', 'Новые'], ['talk', 'Связался'], ['class', 'Стали классами'], ['lost', 'Не актуально']];
+const LEAD_STATUS = Object.fromEntries(LEAD_STATUSES);
+
+// Шаблоны сообщений на этапах: [ключ, где, текст по умолчанию]. Артур правит текст сам.
+// {класс}, {школа}, {отбор}, {wfolio} подставляются; строка, где нечего подставить, убирается
+const TEMPLATES = [
+  ['prepay', 'Предоплата: напоминание', 'Здравствуйте! Напоминаю про предоплату за выпускные альбомы {класс}: {сумма}. Как будет удобно, напишите, пожалуйста.'],
+  ['upload', 'Загрузка: ученикам, выбор фото', 'Фото готовы 📸 Выбираем фото для альбома:\n{отбор}\n\nОригиналы всех фото:\n{wfolio}\n\nНайдите себя в списке, выберите свои фото, напишите цитату и пожелание себе в будущее.'],
+  ['check', 'Сверка: ученикам, проверить макет', 'Макет альбома готов. Проверьте, пожалуйста, всё ли правильно: фото, имя и цитата.\n{отбор}\n\nЕсли что-то не так, напишите мне.'],
+  ['notify', 'Уведомить родителей: альбомы готовы', 'Здравствуйте! Выпускные альбомы {класс} готовы 🎓 Напишите, пожалуйста, когда вам удобно их забрать.']
+];
+const TEMPLATE_STEP = { prepay: 'prepay', upload: 'upload', check: 'check', notify: 'notify' };
+
+function fill(text, vars) {
+  const lines = String(text || '').split('\n');
+  const out = [];
+  lines.forEach(l => {
+    let empty = false;
+    const t = l.replace(/\{(класс|школа|отбор|wfolio|сумма)\}/gi, (m, k) => {
+      const v = vars[k.toLowerCase()] || '';
+      if (!v) empty = true;
+      return v;
+    });
+    if (empty) {
+      // строку-подпись перед пустой ссылкой («Оригиналы всех фото:») тоже убираем
+      if (out.length && /:\s*$/.test(out[out.length - 1])) out.pop();
+      return;
+    }
+    out.push(t);
+  });
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
 
 const TEXT_MAX = 2000;
 const NAME_MAX = 60;
@@ -165,6 +240,24 @@ function amount(v) {
   if (!s) return null;
   const n = Math.round(Number(s));
   return Number.isFinite(n) && n >= 0 && n <= 100000000 ? n : null;
+}
+
+// Тело запроса с фото целиком, с пределом
+function readFile(req, limit) {
+  return new Promise((resolve, reject) => {
+    const big = () => Object.assign(new Error('Фото слишком большое'), { status: 413, expose: true });
+    if (+req.headers['content-length'] > limit) return reject(big());
+    let size = 0, over = false;
+    const chunks = [];
+    req.on('data', ch => {
+      if (over) return;
+      size += ch.length;
+      if (size > limit) { over = true; chunks.length = 0; reject(big()); return; }
+      chunks.push(ch);
+    });
+    req.on('end', () => { if (!over) resolve(Buffer.concat(chunks)); });
+    req.on('error', reject);
+  });
 }
 
 function parseJson(s, def) {
@@ -209,10 +302,12 @@ function upcoming(w, today) {
 
 // Деньги по классу, как в таблице: own — поля класса, se — цены сезона.
 // Учеников Артур пишет сам (как в его таблице): число из отбора только подсказка в поле, в расчёт само не идёт
-function calc(own, se, fallback, processor) {
+function calc(own, se, fallback, processor, payments, probes) {
   const n = amount(own.students) !== null ? amount(own.students) : 0;
-  const teacher = !!own.teacher;
-  const books = n + (teacher ? 1 : 0);
+  // альбомов классному руководителю: обычно 1, бывает 2. Каждый +1 в печать и +цена для родителей
+  const teachers = Math.min(5, amount(own.teacher) || 0);
+  const teacher = teachers > 0;
+  const books = n + teachers;
   const price = amount(own.price) !== null ? amount(own.price) : se.price;
   const divisor = Math.max(1, amount(own.divisor) || se.divisor || 2);
   const extra = amount(own.extra) !== null ? amount(own.extra) : se.extra;
@@ -220,25 +315,34 @@ function calc(own, se, fallback, processor) {
   const printOwn = amount(own.print);
   const printOne = printOwn !== null ? printOwn : (se.print[spreads] !== undefined ? se.print[spreads] : null);
   const printAll = printOne !== null ? books * printOne : 0;
+  // пробники: альбомы для себя, только расход по цене печати одного альбома
+  const probeN = Array.isArray(probes) ? probes.length : 0;
+  const probeCost = printOne !== null ? probeN * printOne : 0;
   // обработчик: сам Артур — без расхода; не выбран — пока без расхода
   const who = String(processor || '');
   const p = se.processors.find(x => x.name === who);
   const proc = !who || who === SELF ? 0 : p ? p.rate : (se.processors[0] ? se.processors[0].rate : 0);
   const smm = n ? n * se.smm_per + se.smm_fixed : 0;
   const designer = n ? se.designer : 0;
-  const costs = printAll + designer + proc + smm;
-  const total = n * (price || 0) + (teacher ? se.teacher : 0);
+  const costs = printAll + probeCost + designer + proc + smm;
+  const total = n * (price || 0) + teachers * se.teacher;
   const prepay = own.prepaid ? se.prepay : 0;
+  // оплаты после предоплаты: остаток одной суммой или частями
+  const pays = Array.isArray(payments) ? payments : [];
+  const paid = pays.reduce((n, p) => n + (amount(p.sum) || 0), 0);
+  const received = prepay + paid;
   const missing = [];
   if (!n) missing.push('количество учеников');
   if (price === null || price === undefined) missing.push('цену альбома');
   if (n && printOne === null) missing.push('цену печати ' + spreads + ' разворотов');
   return {
-    students: n, studentsOwn: amount(own.students) !== null, teacher: teacher, books: books,
+    students: n, studentsOwn: amount(own.students) !== null, teacher: teacher, teachers: teachers, books: books,
+    probes: probeN, probeCost: probeCost,
     price: price, priceOwn: amount(own.price) !== null, divisor: divisor, extra: extra, spreads: spreads,
     printOne: printOne, printOwn: printOwn !== null, printAll: printAll,
     designer: designer, processor: who, proc: proc, smm: smm, costs: costs,
-    total: total, prepaid: !!own.prepaid, prepay: prepay, rest: total - prepay,
+    total: total, prepaid: !!own.prepaid, prepay: prepay, payments: pays, paid: paid, received: received,
+    rest: total - received, paidUp: total > 0 && received >= total,
     profit: total - costs, missing: missing, ready: !missing.length
   };
 }
@@ -276,9 +380,11 @@ function normSeason(se) {
 }
 
 class Work {
-  constructor(store) {
+  constructor(store, dir) {
     this.store = store;
     this.db = store.db;
+    // фото и скрины к правкам: <dir>/<класс>/<id>.jpg
+    this.dir = dir || '';
     this.db.exec(SCHEMA);
     COLUMNS.forEach(c => {
       const have = this.db.prepare('PRAGMA table_info(' + c[0] + ')').all().map(r => r.name);
@@ -290,7 +396,7 @@ class Work {
   parse(row, classId) {
     const r = row ? Object.assign({}, row) : {
       class_id: classId, status: 'todo', status_at: null, shot: 0, shoot_date: '', shoot_place: '',
-      processor: '', phone: '', note: '', done: '{}', money: '{}', steps: '{}', dates: '[]', contacts: '[]', half: '',
+      processor: '', phone: '', note: '', done: '{}', money: '{}', steps: '{}', dates: '[]', contacts: '[]', half: '', paid: '[]', city: '', probes: '[]',
       created_at: 0, updated_at: 0
     };
     r.done = parseJson(r.done, {});
@@ -299,6 +405,8 @@ class Work {
     r.dates = (Array.isArray(parseJson(r.dates || '[]', [])) ? parseJson(r.dates || '[]', []) : []).filter(d => d && DATE_RE.test(d.d))
       .sort((a, b) => (a.d + (a.t || '')).localeCompare(b.d + (b.t || '')));
     r.contacts = (Array.isArray(parseJson(r.contacts || '[]', [])) ? parseJson(r.contacts || '[]', []) : []).filter(c => c && c.phone);
+    r.probes = (Array.isArray(parseJson(r.probes || '[]', [])) ? parseJson(r.probes || '[]', []) : []).filter(p => p && p.name);
+    r.paid = (Array.isArray(parseJson(r.paid || '[]', [])) ? parseJson(r.paid || '[]', []) : []).filter(p => p && amount(p.sum));
     if (!r.contacts.length && r.phone) r.contacts = [{ name: '', phone: r.phone }];
     if (!STATUS_NAMES[r.status]) r.status = 'todo';
     if (!HALF_NAMES[r.half]) r.half = '';
@@ -340,14 +448,14 @@ class Work {
     if (key === 'prepay') {
       const was = stepOn(this.get(classId), 'prepay');
       this.setPrepaid(classId, on);
-      if (was !== !!on) this.event(classId, who, (on ? '✓ ' : 'снято: ') + 'Предоплата');
+      if (was !== !!on) this.event(classId, who, (on ? '✓ ' : 'снято: ') + 'Предоплата', true);
       return true;
     }
     const w = this.get(classId);
     if (!!w.steps[key] === !!on) return true;
     if (on) w.steps[key] = Date.now(); else delete w.steps[key];
     this.save(classId, 'steps', w.steps);
-    this.event(classId, who, (on ? '✓ ' : 'снято: ') + STEP_NAMES[key]);
+    this.event(classId, who, (on ? '✓ ' : 'снято: ') + STEP_NAMES[key], true);
     return true;
   }
 
@@ -362,7 +470,7 @@ class Work {
     const t = TIME_RE.test(String(f.t || '')) ? f.t : '';
     const w = this.get(classId);
     if (w.dates.length >= 20) return { error: 'Слишком много дат' };
-    w.dates.push({ d: d, t: t, kind: DATE_KIND_NAMES[f.kind] ? f.kind : 'other', note: line(f.note, 80) });
+    w.dates.push({ d: d, t: t, kind: f.kind === 'group' ? 'group' : 'ind', note: line(f.note, 80) });
     this.save(classId, 'dates', w.dates);
     return { ok: true };
   }
@@ -394,7 +502,9 @@ class Work {
     const m = {};
     ['students', 'price', 'divisor', 'extra', 'print'].forEach(k => { const n = amount(f[k]); if (n !== null) m[k] = n; });
     if (m.divisor === 0) delete m.divisor;
-    if (f.teacher) m.teacher = 1;
+    // раньше была галочка (1), теперь число альбомов
+    const tn = amount(f.teacher);
+    if (tn) m.teacher = Math.min(5, tn);
     if (f.prepaid) m.prepaid = 1;
     this.db.prepare('UPDATE wk_classes SET money = ?, updated_at = ? WHERE class_id = ?').run(JSON.stringify(m), Date.now(), classId);
   }
@@ -404,6 +514,106 @@ class Work {
     const m = this.get(classId).money;
     if (on) m.prepaid = 1; else delete m.prepaid;
     this.db.prepare('UPDATE wk_classes SET money = ?, updated_at = ? WHERE class_id = ?').run(JSON.stringify(m), Date.now(), classId);
+  }
+
+  // Оплата после предоплаты. Сумма пустая — значит «весь остаток»
+  addPayment(classId, sum, note, rest) {
+    // пустое поле — весь остаток, а непонятная сумма — ошибка, а не «весь остаток»
+    const empty = !String(sum === undefined || sum === null ? '' : sum).trim();
+    let n = amount(sum);
+    if (empty && rest > 0) n = rest;
+    if (!n) return { error: 'Напишите сумму' };
+    const w = this.get(classId);
+    if (w.paid.length >= 50) return { error: 'Слишком много оплат' };
+    w.paid.push({ sum: n, note: line(note, 80), at: Date.now() });
+    this.save(classId, 'paid', w.paid);
+    this.event(classId, 'Артур', 'оплата ' + n + ' ₽' + (note ? ' · ' + line(note, 80) : ''), true);
+    return { ok: true, sum: n };
+  }
+
+  removePayment(classId, i) {
+    const w = this.get(classId);
+    if (!w.paid[i]) return false;
+    const p = w.paid.splice(i, 1)[0];
+    this.save(classId, 'paid', w.paid);
+    this.event(classId, 'Артур', 'убрана оплата ' + p.sum + ' ₽', true);
+    return true;
+  }
+
+  setCity(classId, city) {
+    this.save(classId, 'city', line(city, 60));
+  }
+
+  // Пробник: альбом для себя, подписан фамилией, чтобы знать, чей
+  addProbe(classId, name) {
+    const n = line(name, NAME_MAX);
+    if (!n) return { error: 'Напишите фамилию' };
+    const w = this.get(classId);
+    if (w.probes.length >= 20) return { error: 'Слишком много пробников' };
+    w.probes.push({ name: n, at: Date.now() });
+    this.save(classId, 'probes', w.probes);
+    this.event(classId, 'Артур', 'пробник: ' + n, true);
+    return { ok: true };
+  }
+
+  removeProbe(classId, i) {
+    const w = this.get(classId);
+    if (!w.probes[i]) return false;
+    w.probes.splice(i, 1);
+    this.save(classId, 'probes', w.probes);
+    return true;
+  }
+
+  // ---------- лиды: кто спрашивал про съёмку ----------
+  newLeads() { return this.db.prepare("SELECT COUNT(*) n FROM wk_leads WHERE status = 'new'").get().n; }
+
+  leads() {
+    return this.db.prepare("SELECT * FROM wk_leads ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'talk' THEN 1 ELSE 2 END, created_at DESC, id DESC").all();
+  }
+
+  lead(id) { return this.db.prepare('SELECT * FROM wk_leads WHERE id = ?').get(id) || null; }
+
+  addLead(f) {
+    const phone = line(f.phone, 40);
+    if (!/\d{5,}/.test(phone.replace(/\D/g, ''))) return { error: 'Напишите номер телефона' };
+    const now = Date.now();
+    const id = this.db.prepare('INSERT INTO wk_leads (phone, school, title, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(phone, line(f.school, 60), line(f.title, 40), clean(f.note, 500), now, now).lastInsertRowid;
+    return { ok: true, id: Number(id) };
+  }
+
+  updateLead(id, f) {
+    const l = this.lead(id);
+    if (!l) return false;
+    const upd = {};
+    if ('status' in f && LEAD_STATUS[f.status]) upd.status = f.status;
+    if ('note' in f) upd.note = clean(f.note, 500);
+    if ('classId' in f) upd.class_id = f.classId || null;
+    const keys = Object.keys(upd);
+    if (!keys.length) return true;
+    this.db.prepare('UPDATE wk_leads SET ' + keys.map(k => k + ' = ?').join(', ') + ', updated_at = ? WHERE id = ?').run(...keys.map(k => upd[k]), Date.now(), id);
+    return true;
+  }
+
+  removeLead(id) {
+    return this.db.prepare('DELETE FROM wk_leads WHERE id = ?').run(id).changes === 1;
+  }
+
+  // ---------- шаблоны сообщений на этапах ----------
+  templates() {
+    const own = this.store.getSetting('work.templates', null) || {};
+    const out = {};
+    TEMPLATES.forEach(t => { out[t[0]] = typeof own[t[0]] === 'string' && own[t[0]].trim() ? own[t[0]] : t[2]; });
+    return out;
+  }
+
+  setTemplates(f) {
+    const own = {};
+    TEMPLATES.forEach(t => {
+      const v = clean(f[t[0]], 3000);
+      if (v && v !== t[2]) own[t[0]] = v;
+    });
+    this.store.setSetting('work.templates', own);
   }
 
   // ---------- сезоны ----------
@@ -436,7 +646,7 @@ class Work {
     return se;
   }
 
-  money(w, cls, fallback) { return calc(w.money, this.season(cls.year), fallback, w.processor); }
+  money(w, cls, fallback) { return calc(w.money, this.season(cls.year), fallback, w.processor, w.paid, w.probes); }
 
   // ---------- доставка: за сезон, суммы вручную ----------
   deliveries(season) {
@@ -489,7 +699,7 @@ class Work {
   // Новая правка. Если дизайнер уже отдала работу, класс возвращается к ней: «Новые корректировки»
   addFix(classId, f) {
     if (!FIX_NAMES[f.kind]) return { error: 'Выберите, что исправить' };
-    const text = clean(f.text, TEXT_MAX);
+    const text = clean(f.text, f.kind === 'teacher_wish' ? 4000 : TEXT_MAX);
     if (f.kind === 'other' && !text) return { error: 'Напишите, что сделать' };
     this.ensure(classId);
     const id = this.db.prepare('INSERT INTO wk_fixes (class_id, student_id, student_name, kind, text, who, auto, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
@@ -517,7 +727,61 @@ class Work {
   }
 
   deleteFix(classId, id) {
-    return this.db.prepare('DELETE FROM wk_fixes WHERE class_id = ? AND id = ?').run(classId, id).changes === 1;
+    const files = this.fixFiles(classId, id);
+    const gone = this.db.prepare('DELETE FROM wk_fixes WHERE class_id = ? AND id = ?').run(classId, id).changes === 1;
+    if (gone) files.forEach(f => this.unlinkFile(classId, f.id));
+    return gone;
+  }
+
+  // ---------- фото и скрины к правкам ----------
+  // Браузер сам ужимает фото перед отправкой, здесь только проверяем, что это JPEG, и сохраняем
+  fileDir(classId) { return path.join(this.dir, String(+classId)); }
+  filePath(classId, id) { return path.join(this.fileDir(classId), id + '.jpg'); }
+
+  fixFiles(classId, fixId) {
+    return this.db.prepare('SELECT * FROM wk_fix_files WHERE class_id = ? AND fix_id = ? ORDER BY created_at, rowid').all(classId, fixId);
+  }
+
+  // Все файлы правок класса: { правка: [файлы] }
+  filesByFix(classId) {
+    const m = new Map();
+    this.db.prepare('SELECT * FROM wk_fix_files WHERE class_id = ? ORDER BY created_at, rowid').all(classId).forEach(f => {
+      if (!m.has(f.fix_id)) m.set(f.fix_id, []);
+      m.get(f.fix_id).push(f);
+    });
+    return m;
+  }
+
+  fixFile(classId, id) {
+    if (!FILE_ID.test(String(id))) return null;
+    return this.db.prepare('SELECT * FROM wk_fix_files WHERE class_id = ? AND id = ?').get(classId, id) || null;
+  }
+
+  saveFixFile(classId, fixId, label, buf) {
+    if (!this.dir) return { error: 'Файлы не настроены' };
+    const f = this.fix(classId, fixId);
+    if (!f) return { error: 'Правка не найдена' };
+    if (this.fixFiles(classId, fixId).length >= FILES_PER_FIX) return { error: 'К одной правке можно прикрепить до ' + FILES_PER_FIX + ' фото' };
+    if (!buf || buf.length > FILE_MAX) return { error: 'Фото слишком большое' };
+    const size = jpegSize(buf);
+    if (!size) return { error: 'Это не похоже на фото' };
+    const id = newId();
+    fs.mkdirSync(this.fileDir(classId), { recursive: true });
+    const tmp = this.filePath(classId, id) + '.' + process.pid + '.part';
+    fs.writeFileSync(tmp, buf);
+    fs.renameSync(tmp, this.filePath(classId, id));
+    this.db.prepare('INSERT INTO wk_fix_files (id, fix_id, class_id, label, w, h, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(id, f.id, classId, FILE_LABELS[label] !== undefined ? label : '', size.w, size.h, Date.now());
+    return { ok: true, id: id };
+  }
+
+  unlinkFile(classId, id) {
+    try { fs.unlinkSync(this.filePath(classId, id)); } catch (e) {}
+  }
+
+  // Класс удалён: записи ушли каскадом, здесь — файлы
+  removeFiles(classId) {
+    if (this.dir) fs.rmSync(this.fileDir(classId), { recursive: true, force: true });
   }
 
   // Ученик поменял цитату, когда дизайнер уже начала: правка «Заменить цитату» появляется сама.
@@ -535,9 +799,25 @@ class Work {
     return true;
   }
 
+  // Классный руководитель поменял пожелание классу, когда дизайнер уже начала. Как с цитатой ученика
+  teacherWish(classId, wish) {
+    const w = this.db.prepare('SELECT status FROM wk_classes WHERE class_id = ?').get(classId);
+    if (!w || w.status === 'todo') return false;
+    const open = this.db.prepare("SELECT id FROM wk_fixes WHERE class_id = ? AND kind = 'teacher_wish' AND auto = 1 AND done_at IS NULL").get(classId);
+    const text = clean(wish, 4000);
+    if (open) {
+      this.db.prepare('UPDATE wk_fixes SET text = ?, created_at = ? WHERE id = ?').run(text, Date.now(), open.id);
+      return true;
+    }
+    this.addFix(classId, { studentName: 'Классный руководитель', kind: 'teacher_wish', text: text, who: 'Классный руководитель', auto: true });
+    return true;
+  }
+
   // ---------- переписка ----------
-  notes(classId, limit) {
-    return this.db.prepare('SELECT * FROM wk_notes WHERE class_id = ? ORDER BY at DESC, id DESC LIMIT ?').all(classId, limit || 80);
+  // Дизайнеру — без записей «только для Артура»: оплаты и его этапы. Старые записи этапов узнаём по началу
+  notes(classId, limit, forDesigner) {
+    const hide = forDesigner ? " AND kind != 'admin' AND NOT (kind = 'event' AND (text LIKE '✓ %' OR text LIKE 'снято: %'))" : '';
+    return this.db.prepare('SELECT * FROM wk_notes WHERE class_id = ?' + hide + ' ORDER BY at DESC, id DESC LIMIT ?').all(classId, limit || 80);
   }
 
   addNote(classId, who, text) {
@@ -548,8 +828,9 @@ class Work {
     return true;
   }
 
-  event(classId, who, text) {
-    this.db.prepare('INSERT INTO wk_notes (class_id, who, kind, text, at) VALUES (?, ?, ?, ?, ?)').run(classId, line(who, NAME_MAX) || 'Артур', 'event', text, Date.now());
+  // own — видит только Артур (деньги и его этапы), дизайнеру не показывается
+  event(classId, who, text, own) {
+    this.db.prepare('INSERT INTO wk_notes (class_id, who, kind, text, at) VALUES (?, ?, ?, ?, ?)').run(classId, line(who, NAME_MAX) || 'Артур', own ? 'admin' : 'event', text, Date.now());
   }
 
   // ---------- дизайнеры: вход по личной ссылке ----------
@@ -577,4 +858,4 @@ class Work {
   }
 }
 
-module.exports = { Work, calc, half, stepOn, stageOf, upcoming, STAGES, STEP_NAMES, HALVES, HALF_NAMES, DATE_KINDS, DATE_KIND_NAMES, amount, parsePrint, parseProcessors, normSeason, SELF, SEASON_DEFAULT, SEASON_FIELDS, STATUSES, STATUS_NAMES, DESIGNER_STATUSES, PARTS, PART_NAMES, FIXES, FIX_NAMES };
+module.exports = { Work, FILE_LABELS, FILE_MAX, readFile, LEAD_STATUSES, LEAD_STATUS, TEMPLATES, TEMPLATE_STEP, fill, calc, half, stepOn, stageOf, upcoming, STAGES, STEP_NAMES, HALVES, HALF_NAMES, DATE_KINDS, DATE_KIND_NAMES, amount, parsePrint, parseProcessors, normSeason, SELF, SEASON_DEFAULT, SEASON_FIELDS, STATUSES, STATUS_NAMES, DESIGNER_STATUSES, PARTS, PART_NAMES, FIXES, FIX_NAMES };

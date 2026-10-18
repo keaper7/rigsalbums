@@ -3,7 +3,7 @@
 // Отбор фото: страница в админке и страница для учеников
 const { html, raw, plural, fmtWhen } = require('../lib/util');
 const { layout } = require('./admin');
-const { ROLES, ROLE_NAMES } = require('../lib/photos');
+const { ROLES, ROLE_NAMES, TEACHER_WISH_MAX } = require('../lib/photos');
 
 function photosN(n) { return n + ' фото'; }
 const GB = 1024 * 1024 * 1024;
@@ -46,6 +46,7 @@ function adminPage(o) {
   const done = o.students.filter(finished).length;
   const left = o.students.filter(s => !finished(s));
   const hasGroup = sections.some(s => o.isGroup(s));
+  const pickSections = sections.filter(s => !o.isTeacher(s));
   const places = ROLES.map(r => r[1].toLowerCase()).join(', ');
   const chat = 'Ребята, выбираем фото для выпускного альбома 📸\n\n' + link + '\n\n' +
     '1. Найдите себя в списке и придумайте код из 4 цифр. Запомните его, без кода в ваш выбор никто не зайдёт.\n' +
@@ -108,9 +109,10 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   ${sections.length ? html`<form method="post" action="/admin/c/${c.id}/photos/sections" class="secs">
     ${csrf(o.sess)}
     <p class="muted small" style="margin:16px 0 8px">С галочкой: групповые, один общий выбор на весь класс. Без галочки: личные, каждый выбирает себе.</p>
-    ${sections.every(x => o.isGroup(x)) ? html`<p class="flash flash--err">Все разделы отмечены как групповые, поэтому в «Мои фото» у учеников пусто. Снимите галочку с портретов («Парни», «Девочки») и нажмите «Сохранить разделы».</p>` : ''}
+    ${pickSections.length && pickSections.every(x => o.isGroup(x)) ? html`<p class="flash flash--err">Все разделы отмечены как групповые, поэтому в «Мои фото» у учеников пусто. Снимите галочку с портретов («Парни», «Девочки») и нажмите «Сохранить разделы».</p>` : ''}
     ${sections.map(s => {
       const st = bySection.get(s);
+      if (o.isTeacher(s)) return html`<p class="check pk-tsec"><span><b>${s}</b> <small>${photosN(st.ready)} · классный руководитель, ученикам не видны</small></span></p>`;
       const grp = o.isGroup(s);
       return html`<label class="check"><input type="checkbox" name="group" value="${s}"${grp ? raw(' checked') : ''}><span><b>${s}</b> <small>${photosN(st.ready)}${st.ready < st.n ? ' · не догрузились: ' + (st.n - st.ready) + ', выберите папку ещё раз' : ''} · ${grp ? 'групповые' : 'личные'}</small></span></label>`;
     })}
@@ -145,6 +147,8 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   </table></div>
   <p class="muted small" style="margin-top:8px">Код ученик придумывает сам при первом входе, все коды видны здесь. Если под чужим именем зашёл кто-то другой, сбросьте код крестиком, выбор останется.</p>` : ''}
 </section>
+
+${teacherCard(o)}
 
 ${o.students.some(st => (counts.get(st.id) || 0) || st.quote || st.wish) ? html`<section class="card">
   <details class="pk-picks" open>
@@ -205,6 +209,96 @@ ${sections.length ? html`<section class="card">
   return layout({ title: 'Отбор фото · ' + c.title, sess: o.sess, nav: 'classes', body: body, scripts: ['/admin/static/photos-admin.js'] });
 }
 
+// Классный руководитель: своя ссылка, что выбрал
+function teacherCard(o) {
+  const c = o.cls, a = o.album, t = o.teacher;
+  const link = o.base + '/kr/' + t.token;
+  const p = t.picks;
+  const msg = 'Здравствуйте! Это Артур, фотограф. По ссылке можно выбрать ваши фото для выпускного альбома ' + c.title + ': одно на обложку и одно в общий список, и написать пожелание классу.\n\n' + link;
+  const ph = (x, role) => x ? html`<figure class="pk-ph"><a href="/f/${a.slug}/p/${x.id}.jpg?v=${x.ver}" target="_blank" rel="noopener" title="${x.path}"><img src="/f/${a.slug}/p/${x.id}-sm.jpg?v=${x.ver}" alt="${role}" loading="lazy"></a><figcaption><b>${role}</b></figcaption></figure>` : '';
+  return html`<section class="card" id="teacher">
+  <div class="card__h"><h2 class="h">Классный руководитель</h2>${t.done ? html`<span class="chip chip--done">выбрал</span>` : t.photos.length ? html`<span class="chip">${p.cover || p.list || a.teacher_wish ? 'выбирает' : 'ещё не заходил'}</span>` : ''}</div>
+  ${t.photos.length ? html`
+  <p class="muted small">Своя ссылка: фото на обложку, фото в общий список и пожелание классу. Фото берутся из папки «${t.photos[0].section}».</p>
+  <p class="link"><code>${link}</code></p>
+  <div class="two" style="margin-top:12px">
+    <button class="b" type="button" data-copy="${link}">Скопировать ссылку</button>
+    <a class="b" href="/kr/${t.token}" target="_blank" rel="noopener">Открыть</a>
+  </div>
+  <details class="pk-msg">
+    <summary>Сообщение для классного руководителя</summary>
+    <textarea readonly rows="6">${msg}</textarea>
+    <div class="two">
+      <button class="b b--sm" type="button" data-copy="${msg}">Скопировать</button>
+      <a class="b b--sm" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" data-share data-share-text="${msg}">Отправить</a>
+    </div>
+  </details>
+  <ul class="pk-tdone">
+    <li class="${p.cover ? 'ok' : 'muted'}">${p.cover ? '✓' : '—'} Обложка</li>
+    <li class="${p.list ? 'ok' : 'muted'}">${p.list ? '✓' : '—'} Общий список</li>
+    <li class="${a.teacher_wish ? 'ok' : 'muted'}">${a.teacher_wish ? '✓' : '—'} Пожелание классу</li>
+  </ul>
+  ${p.cover || p.list ? html`<div class="pk-thumbs">${ph(p.cover, 'Обложка')}${ph(p.list, 'Общий список')}</div>` : ''}
+  ${a.teacher_name ? html`<p class="pk-lab">Подпись в альбоме</p><p>${a.teacher_name}</p>` : ''}
+  ${a.teacher_wish ? html`<p class="pk-lab">Пожелание классу</p><blockquote>${a.teacher_wish}</blockquote>` : ''}`
+  : html`<p class="muted small">Положите его фото в папку «кл рук» рядом с «Парни» и «Девочки» и загрузите папку ещё раз. Ученики эти фото не увидят, а здесь появится его ссылка.</p>`}
+</section>`;
+}
+
+// ---------- страница классного руководителя: /kr/:token ----------
+function teacherPage(o) {
+  const c = o.cls, a = o.album, st = o.state;
+  const data = JSON.stringify({ token: o.token, state: st }).replace(/</g, '\\u003c');
+  const grid = role => html`<div class="kr-grid" data-role="${role}">${o.photos.map(ph => html`<div class="kr-ph${st[role] === ph.id ? ' is-on' : ''}"><button type="button" class="kr-sel" data-id="${ph.id}" aria-pressed="${st[role] === ph.id ? 'true' : 'false'}" aria-label="Выбрать фото ${ph.path.split('/').pop()}"${st.closed ? raw(' disabled') : ''}><img src="/f/${a.slug}/p/${ph.id}-sm.jpg?v=${ph.ver}" alt="" loading="lazy"><i class="kr-mark" aria-hidden="true">✓</i></button><button type="button" class="kr-zoom" data-big="/f/${a.slug}/p/${ph.id}.jpg?v=${ph.ver}" aria-label="Посмотреть крупно"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M10.5 4a6.5 6.5 0 0 1 5.2 10.4l4 4-1.4 1.4-4-4A6.5 6.5 0 1 1 10.5 4zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z" fill="currentColor"/></svg></button></div>`)}</div>`;
+  return '<!doctype html>\n' + html`<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Фото для альбома · ${c.title} · RIGSARTHUR</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F4EFE7">
+<link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="stylesheet" href="/assets/fonts/fonts.css">
+<link rel="stylesheet" href="/admin/static/pick.css">
+</head>
+<body class="kr">
+<header class="pt">
+  <div class="pt__in">
+    <a class="pt__logo" href="/"><b>RIGSARTHUR</b><span>выпускной альбом</span></a>
+  </div>
+</header>
+<main class="pm kr-m">
+  <p class="eyebrow">Выпускной альбом ${c.year}</p>
+  <h1>${c.school}<small>${c.title} · классный руководитель</small></h1>
+  ${st.closed ? html`<p class="kr-note">Выбор уже закрыт. Если нужно что-то поменять, напишите Артуру.</p>` : html`<p class="kr-lead">Всего три шага. Всё сохраняется само, можно вернуться позже.</p>`}
+  ${o.photos.length ? html`
+  <section class="kr-step" id="cover">
+    <h2><span class="kr-n">1</span>Фото на обложку</h2>
+    <p class="kr-hint">Нажмите на фото для вашей обложки.</p>
+    ${grid('cover')}
+  </section>
+  <section class="kr-step" id="list">
+    <h2><span class="kr-n">2</span>Фото в общий список класса</h2>
+    <p class="kr-hint">Можно выбрать то же самое фото, что и на обложку.</p>
+    ${grid('list')}
+  </section>` : html`<p class="kr-note">Фото ещё не загружены. Артур напишет, когда они появятся.</p>`}
+  <section class="kr-step" id="wish">
+    <h2><span class="kr-n">${o.photos.length ? '3' : '1'}</span>Пожелание классу</h2>
+    <p class="kr-hint">Оно будет в альбоме.</p>
+    <label class="kr-field"><span class="sr">Пожелание классу</span><textarea data-field="wish" rows="9" maxlength="${TEACHER_WISH_MAX}" placeholder="Дорогие мои выпускники…"${st.closed ? raw(' disabled') : ''}>${st.wish}</textarea></label>
+    <label class="kr-field"><span>Как подписать вас в альбоме</span><input data-field="name" maxlength="60" value="${st.name}" placeholder="Например: Фатима Руслановна" autocomplete="off"${st.closed ? raw(' disabled') : ''}></label>
+  </section>
+  <div class="kr-bar" data-bar><p data-status>${st.done ? 'Всё выбрано и сохранено ✓' : 'Сохраняется само'}</p></div>
+</main>
+<div class="lb" data-lb hidden><img alt=""><div class="lb__bar"><button type="button" data-lb-close>Закрыть</button></div></div>
+<p class="toast" role="status" aria-live="polite" hidden></p>
+<script type="application/json" id="kr-data">${raw(data)}</script>
+<script src="/admin/static/kr.js"></script>
+</body>
+</html>
+`.s;
+}
+
 // ---------- страница учеников: /f/:slug ----------
 function pickPage(o) {
   const c = o.cls;
@@ -242,4 +336,4 @@ function pickPage(o) {
 `.s;
 }
 
-module.exports = { adminPage, pickPage };
+module.exports = { adminPage, pickPage, teacherPage };

@@ -81,7 +81,14 @@ const COLUMNS = [
   ['pk_students', 'retouch_done_at', 'INTEGER'],
   // ссылка на оригиналы в wfolio и когда освобождали место
   ['pk_albums', 'wfolio', "TEXT NOT NULL DEFAULT ''"],
-  ['pk_albums', 'slim_at', 'INTEGER']
+  ['pk_albums', 'slim_at', 'INTEGER'],
+  // отдельный выбор классного руководителя: своя ссылка, обложка, фото в общий список, пожелание классу
+  ['pk_albums', 'teacher_token', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_albums', 'teacher_name', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_albums', 'teacher_cover', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_albums', 'teacher_list', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_albums', 'teacher_wish', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_albums', 'teacher_at', 'INTEGER']
 ];
 
 const IMAGE_MAX = 6 * 1024 * 1024;
@@ -100,6 +107,11 @@ const ROLES = [['cover', 'Обложка'], ['page', 'Личная страни�
 const ROLE_NAMES = Object.fromEntries(ROLES);
 // Раздел считается общими групповыми фото, если в названии есть «групп» (папка «Групповые»)
 const GROUP_RE = /групп/i;
+// Папка с фото классного руководителя: «кл рук», «Кл. рук», «Классный руководитель», «Учитель».
+// Её фото ученикам не показываются, их выбирает сам классный руководитель по своей ссылке
+const TEACHER_RE = /^(кл\.?\s*рук|классн|учител)/i;
+const TEACHER_WISH_MAX = 4000;
+const TEACHER_TOKEN = /^[a-z0-9]{20}$/;
 // IMG_2 раньше IMG_10, как в Finder
 const NATURAL = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' });
 
@@ -225,8 +237,11 @@ class Photos {
     this.db.prepare('UPDATE pk_albums SET ' + keys.map(k => k + ' = ?').join(', ') + ' WHERE class_id = ?').run(...vals, classId);
   }
 
+  isTeacherSection(section) { return TEACHER_RE.test(String(section || '').trim()); }
+
   // Какие разделы — общие групповые: выбранные Артуром, иначе по названию папки
   isGroupSection(album, section) {
+    if (this.isTeacherSection(section)) return false;
     if (album.group_sections && album.group_sections.length) return album.group_sections.indexOf(section) !== -1;
     return GROUP_RE.test(section);
   }
@@ -409,6 +424,7 @@ class Photos {
     const album = this.album(classId);
     const keep = new Set(this.group(classId, album).map(g => g.photo_id));
     this.students(classId).forEach(st => this.personal(st.id, album).forEach(id => keep.add(id)));
+    [album.teacher_cover, album.teacher_list].forEach(id => { if (id) keep.add(id); });
     const all = this.db.prepare('SELECT id FROM pk_photos WHERE class_id = ?').all(classId);
     const drop = all.filter(r => !keep.has(r.id));
     const kept = all.filter(r => keep.has(r.id));
@@ -437,7 +453,7 @@ class Photos {
     const rows = this.db.prepare(`SELECT p.photo_id, f.section FROM pk_personal p JOIN pk_photos f ON f.id = p.photo_id
       WHERE p.student_id = ? ORDER BY p.created_at, p.rowid`).all(studentId);
     const grp = album ? this.groupSet(album) : null;
-    return rows.filter(r => !grp || !grp.has(r.section)).map(r => r.photo_id);
+    return rows.filter(r => (!grp || !grp.has(r.section)) && !this.isTeacherSection(r.section)).map(r => r.photo_id);
   }
 
   // Выбранные личные фото с местом в альбоме и пожеланием по ретуши
@@ -445,7 +461,7 @@ class Photos {
     const rows = this.db.prepare(`SELECT p.photo_id, p.role, p.retouch, f.section FROM pk_personal p JOIN pk_photos f ON f.id = p.photo_id
       WHERE p.student_id = ? ORDER BY p.created_at, p.rowid`).all(studentId);
     const grp = album ? this.groupSet(album) : null;
-    return rows.filter(r => !grp || !grp.has(r.section)).map(r => ({ id: r.photo_id, role: ROLE_NAMES[r.role] ? r.role : '', retouch: r.retouch }));
+    return rows.filter(r => (!grp || !grp.has(r.section)) && !this.isTeacherSection(r.section)).map(r => ({ id: r.photo_id, role: ROLE_NAMES[r.role] ? r.role : '', retouch: r.retouch }));
   }
 
   setPersonal(album, studentId, photoId, on) {
@@ -519,6 +535,66 @@ class Photos {
     return this.db.prepare('SELECT * FROM pk_log WHERE class_id = ? ORDER BY at DESC, id DESC LIMIT ?').all(classId, limit || 60);
   }
 
+  // ---------- классный руководитель ----------
+  // Фото из папки «кл рук»: только готовые (обе копии загружены)
+  teacherPhotos(classId) {
+    return this.ready(classId).filter(p => this.isTeacherSection(p.section));
+  }
+
+  // Ссылка классного руководителя создаётся один раз, при первом показе в админке
+  teacherToken(classId) {
+    const a = this.album(classId);
+    if (!a) return '';
+    if (a.teacher_token) return a.teacher_token;
+    const t = newId() + newId().slice(0, 4);
+    this.db.prepare("UPDATE pk_albums SET teacher_token = ? WHERE class_id = ? AND teacher_token = ''").run(t, classId);
+    return this.album(classId).teacher_token;
+  }
+
+  albumByTeacher(t) {
+    if (!TEACHER_TOKEN.test(String(t || ''))) return null;
+    const row = this.db.prepare('SELECT class_id FROM pk_albums WHERE teacher_token = ?').get(t);
+    return row ? this.album(row.class_id) : null;
+  }
+
+  // Что выбрал классный руководитель: фото, которых уже нет (папку удалили), не считаются
+  teacherPicks(album, byId) {
+    const get = id => {
+      if (!id) return null;
+      const ph = byId ? byId.get(id) : this.photo(album.class_id, id);
+      return ph && this.isTeacherSection(ph.section) ? ph : null;
+    };
+    return { cover: get(album.teacher_cover), list: get(album.teacher_list) };
+  }
+
+  teacherDone(album) {
+    const t = this.teacherPicks(album);
+    return !!(t.cover && t.list && album.teacher_wish);
+  }
+
+  // f: { cover, list, wish, name } — меняется только то, что прислали. Фото только из папки «кл рук»
+  setTeacher(classId, f) {
+    const a = this.album(classId);
+    if (!a) return { error: 'Отбор не найден' };
+    const upd = {};
+    for (const k of ['cover', 'list']) {
+      if (!(k in f)) continue;
+      const id = String(f[k] || '');
+      if (id) {
+        const ph = this.photo(classId, id);
+        if (!ph || !this.isTeacherSection(ph.section)) return { error: 'Фото не найдено. Обновите страницу' };
+      }
+      upd['teacher_' + k] = id;
+    }
+    if ('wish' in f) upd.teacher_wish = cleanText(f.wish, TEACHER_WISH_MAX);
+    if ('name' in f) upd.teacher_name = cleanName(f.name);
+    const keys = Object.keys(upd);
+    if (!keys.length) return { ok: true };
+    this.db.prepare('UPDATE pk_albums SET ' + keys.map(k => k + ' = ?').join(', ') + ', teacher_at = ? WHERE class_id = ?')
+      .run(...keys.map(k => upd[k]), Date.now(), classId);
+    return { ok: true };
+  }
+
   // ---------- итог для раскладки по папкам ----------
   exportPlan(classId) {
     const album = this.album(classId);
@@ -534,8 +610,12 @@ class Photos {
       };
     });
     const group = this.group(classId, album).map(g => byId.get(g.photo_id)).filter(Boolean).map(p => p.path);
-    return { students: students, group: group };
+    const t = this.teacherPicks(album, byId);
+    const teacher = t.cover || t.list || album.teacher_wish
+      ? { name: album.teacher_name, wish: album.teacher_wish, cover: t.cover ? t.cover.path : '', list: t.list ? t.list.path : '' }
+      : null;
+    return { students: students, group: group, teacher: teacher };
   }
 }
 
-module.exports = { Photos, cleanPath, sectionOf, PHOTO_ID, QUOTE_MAX, WISH_MAX, RETOUCH_MAX, PIN_RE, ROLES, ROLE_NAMES };
+module.exports = { Photos, cleanPath, sectionOf, PHOTO_ID, QUOTE_MAX, WISH_MAX, RETOUCH_MAX, PIN_RE, ROLES, ROLE_NAMES, TEACHER_WISH_MAX };

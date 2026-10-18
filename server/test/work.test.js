@@ -163,7 +163,10 @@ test('этапы: галочки, переход, даты съёмки, тел�
   r = await admin.req('GET', '/admin/work');
   // на доске видна только будущая дата
   assert.match(r.text, /20 мая · групповая/);
-  assert.ok(r.text.indexOf('10 января') === -1);
+  assert.ok(r.text.indexOf('10 января, 10:00 · индивидуальная') === -1);
+  // силуэты: индивидуальная дата назначена (жёлтый), групповая тоже
+  assert.match(r.text, /wk-sh wk-sh--date" title="Индивидуальная: 10 января, 10:00"/);
+  assert.match(r.text, /wk-sh wk-sh--date" title="Групповая: 20 мая"/);
   assert.match(r.text, /дальше: <b>Утвердили<\/b>/);
   // «Утвердили» — класс переходит в работу
   r = await step('approved', true);
@@ -271,16 +274,22 @@ test('правки: добавить, класс возвращается диз
 
 test('дизайнер по ссылке: видит нужное, не видит лишнего, действует только своими кнопками', async t => {
   const { s, admin, id, st } = await setup(t);
-  // класс без отбора дизайнер не видит, архивный тоже
+  // класс без съёмки и отбора дизайнер видит сразу после записи, внизу «Съёмки ещё не было»; архивный не видит
   const empty = await createClass(admin, 'Гимназия', '11 «Б»');
+  const old = await createClass(admin, 'Школа 5', '11 «В»');
+  await admin.post('/admin/c/' + old + '/archive', { on: '1' });
   const link = await designerLink(s, admin);
   const d = client(s.base);
   let r = await d.req('GET', link);
   assert.strictEqual(r.status, 200);
   assert.match(r.text, /11 «А»/);
-  assert.ok(r.text.indexOf('11 «Б»') === -1);
+  assert.match(r.text, /Съёмки ещё не было[\s\S]*11 «Б»/);
+  assert.ok(r.text.indexOf('11 «В»') === -1);
   assert.strictEqual(r.headers.get('referrer-policy'), 'no-referrer');
   r = await d.req('GET', link + '/c/' + empty);
+  assert.strictEqual(r.status, 200);
+  assert.match(r.text, /Индивидуальная: даты нет/);
+  r = await d.req('GET', link + '/c/' + old);
   assert.strictEqual(r.status, 303);
 
   r = await d.req('GET', link + '/c/' + id);

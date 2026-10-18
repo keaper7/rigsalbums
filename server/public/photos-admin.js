@@ -279,11 +279,20 @@
           if (!s.photos.length && !s.quote) return;
           // два ученика с похожими именами не должны попасть в одну папку
           var folder = safe(s.name), base = folder, k = 2;
-          while (jobs.some(function (j) { return j.folder.toLowerCase() === folder.toLowerCase(); }) || folder.toLowerCase() === 'групповые') folder = base + ' (' + k++ + ')';
+          while (jobs.some(function (j) { return j.folder.toLowerCase() === folder.toLowerCase(); }) || folder.toLowerCase() === 'групповые' || folder.toLowerCase() === 'классный руководитель') folder = base + ' (' + k++ + ')';
           // имя файла: место, потом ученик — «обложка_Биттуев Азамат.jpg», дизайнер сразу видит, куда и чьё
           jobs.push({ folder: folder, files: s.photos, names: (s.roles || []).map(function (r) { return r ? r.toLowerCase() + '_' + safe(s.name) : ''; }), quote: s.quote });
         });
         if (plan.group.length) jobs.push({ folder: 'Групповые', files: plan.group });
+        // классный руководитель: два фото с местом и пожелание классу
+        var t = plan.teacher;
+        if (t) {
+          var who = safe(t.name || 'Кл рук');
+          var tf = [], tn = [];
+          if (t.cover) { tf.push(t.cover); tn.push('обложка_' + who); }
+          if (t.list) { tf.push(t.list); tn.push('список класса_' + who); }
+          jobs.push({ folder: 'Классный руководитель', files: tf, names: tn, text: t.wish ? ['Пожелание классу.txt', (t.name ? t.name + '\n\n' : '') + t.wish + '\n'] : null });
+        }
         var total = jobs.reduce(function (n, j) { return n + j.files.length; }, 0) || 1;
         var done = 0;
 
@@ -307,7 +316,7 @@
         return jobs.reduce(function (p, j) {
           return p.then(function () {
             return out.getDirectoryHandle(j.folder, { create: true }).then(function (dir) {
-              var q = j.quote ? writeFile(dir, 'Цитата.txt', j.quote + '\n') : Promise.resolve();
+              var q = j.quote ? writeFile(dir, 'Цитата.txt', j.quote + '\n') : j.text ? writeFile(dir, j.text[0], j.text[1]) : Promise.resolve();
               return q.then(function () { return copyAll(dir, j.files, j.names); });
             });
           });

@@ -434,12 +434,41 @@
   document.addEventListener('submit', function (e) {
     if (!e.defaultPrevented) dirty = dirty.filter(function (f) { return f !== e.target; });
   });
+  // форма сохранилась без перезагрузки (правка с фото, кабинет дизайнера) — переспрашивать не нужно
+  document.addEventListener('form:saved', function (e) {
+    dirty = dirty.filter(function (f) { return f !== e.target; });
+  });
   window.addEventListener('beforeunload', function (e) {
     if (!dirty.length) return;
     e.preventDefault();
     e.returnValue = '';
     return '';
   });
+
+  // Новый класс: если классов несколько через запятую, поля одного класса прячем;
+  // школа, которая уже была, подставляет свой город
+  var titles = document.querySelector('[data-titles]');
+  if (titles) {
+    var many = function () {
+      var n = titles.value.split(/[,;\n]/).filter(function (t) { return t.trim(); }).length;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-one]'), function (el) { el.hidden = n > 1; });
+      var note = document.querySelector('[data-many]');
+      if (note) note.hidden = n <= 1;
+    };
+    titles.addEventListener('input', many);
+    many();
+  }
+  var schoolIn = document.querySelector('[data-school-city]');
+  if (schoolIn) {
+    schoolIn.addEventListener('change', function () {
+      var city = schoolIn.form.elements.city;
+      if (!city || city.value) return;
+      Array.prototype.some.call(document.querySelectorAll('#schools option'), function (o) {
+        if (o.value === schoolIn.value && o.getAttribute('data-city')) { city.value = o.getAttribute('data-city'); return true; }
+        return false;
+      });
+    });
+  }
 
   // Ссылка с #блоком ведёт к свёрнутому блоку — раскрываем его
   function openHash() {

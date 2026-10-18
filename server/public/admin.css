@@ -899,3 +899,120 @@ p.link code { display: inline-block; max-width: 100%; word-break: break-all; tex
 }
 .st-prev { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-2); opacity: .8; }
 .st-bhead { display: flex; justify-content: space-between; margin: 12px 0 2px; font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
+
+/* ---------- правки 18.10 ---------- */
+/* школа: цветная точка и жирный шрифт, чтобы классы одной школы узнавались сразу */
+.wk-school { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0 6px; font-weight: 700; color: var(--ink); }
+.wk-school i { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--sc); }
+.wk-school small { font-weight: 600; font-size: .86em; color: var(--ink-2); }
+.wk-card__t .wk-school { display: flex; margin-top: 3px; font-size: 14.5px; }
+.wk-ph__t .wk-school { display: flex; margin-top: 2px; font-size: 14px; }
+.wk-table .wk-school { display: flex; margin-top: 2px; font-size: 13px; }
+.wk-chead__s { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; }
+.wk-tname { font-weight: 800; font-size: 15px; color: var(--ink); text-decoration: none; }
+.wk-tname:hover { text-decoration: underline; }
+
+/* силуэты съёмок: красный — нет даты, жёлтый — дата есть, зелёный — отсняли */
+.wk-shoots { display: inline-flex; align-items: center; gap: 4px; }
+.wk-sh { display: inline-grid; place-items: center; height: 26px; min-width: 28px; padding: 0 4px; border-radius: 8px; }
+.wk-sh svg { fill: currentColor; }
+.wk-sh--none { background: #FBE3E0; color: var(--live); }
+.wk-sh--date { background: #FBF0C9; color: #A07800; }
+.wk-sh--done { background: var(--ok-bg); color: var(--ok); }
+.wk-shootline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 14px; }
+
+/* без предоплаты */
+.wk-noprepay { display: inline-block; padding: 2px 8px; border-radius: 99px; background: #FBE3E0; color: var(--live); font-size: 12px; font-weight: 800; }
+.wk-table tr.is-noprepay td:first-child { box-shadow: inset 3px 0 0 var(--live); }
+.wk-table .wk-noprepay { margin-top: 4px; }
+
+/* позвонить и WhatsApp */
+.wk-calls { display: inline-flex; gap: 6px; flex: 0 0 auto; }
+.wk-call--wa { background: #25A55F; }
+.wk-pn { display: inline-flex; align-items: stretch; gap: 6px; }
+.wk-pn__wa { display: grid; place-items: center; width: 48px; border-radius: 14px; background: #DDF3E5; color: #1E8A4E; }
+
+/* шапка доски, переход к этапам, фильтры */
+.wk-headrow { align-items: center; }
+.wk-headrow .h1 { margin: 0; }
+.wk-tabs--4 a { padding-left: 4px; padding-right: 4px; font-size: 14.5px; }
+@media (max-width: 380px) { .wk-tabs--4 a { font-size: 13px; } }
+.wk-jump { position: -webkit-sticky; position: sticky; top: 62px; z-index: 10; display: flex; gap: 6px; margin: 0 -16px 12px; padding: 8px 16px; overflow-x: auto; scrollbar-width: none; background: rgba(244, 239, 231, .94); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.wk-jump::-webkit-scrollbar { display: none; }
+.wk-jump a { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 99px; background: var(--stage-bg); color: var(--stage); font-weight: 800; font-size: 13.5px; text-decoration: none; }
+.wk-jump a b { font-variant-numeric: tabular-nums; }
+.wk-stage { scroll-margin-top: 120px; }
+.wk-find { margin-bottom: 14px; }
+.wk-find .search { margin-bottom: 8px; }
+.wk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wk-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 99px; border: 1.5px solid var(--line); background: #fff; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; }
+.wk-chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--sc); }
+.wk-chip b { color: var(--ink-2); font-weight: 800; }
+.wk-chip[aria-pressed=true] { border-color: var(--ink); background: var(--ink); color: #fff; }
+.wk-chip[aria-pressed=true] b { color: rgba(255, 255, 255, .75); }
+.wk-chip--warn { color: var(--live); border-color: #F2C4BE; }
+.wk-chip--warn[aria-pressed=true] { background: var(--live); border-color: var(--live); }
+.wk-card[hidden], .wk-stage[hidden] { display: none; }
+
+/* изменить название на странице работы */
+.wk-rename { margin-top: 6px; }
+.wk-rename summary { cursor: pointer; font-size: 13.5px; font-weight: 700; color: var(--wine); }
+.wk-rename .form { margin-top: 10px; }
+
+/* готовое сообщение у пункта этапа */
+.wk-msg { margin: 2px 0 10px 34px; }
+.wk-msg summary { cursor: pointer; font-size: 13.5px; font-weight: 800; color: var(--wine); padding: 4px 0; }
+.wk-msg textarea { display: block; width: 100%; margin: 6px 0 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font-size: 14px; line-height: 1.45; resize: vertical; }
+.wk-msg .muted { margin-top: 6px; }
+
+/* деньги: альбомы кл. руку, пробники */
+.wk-tch select { max-width: 120px; }
+.wk-tch small { display: block; margin-top: 4px; }
+.wk-probe { display: flex; gap: 8px; align-items: flex-end; }
+.wk-probe .field { flex: 1 1 auto; margin: 0; }
+
+/* новый класс: поля для работы */
+.newwork { margin: 6px 0 4px; padding: 12px 0 0; border: 0; border-top: 1px dashed var(--line); }
+.newwork legend { padding: 0 8px 0 0; font: 700 13px/1.2 var(--disp); letter-spacing: .04em; text-transform: uppercase; color: var(--wine); }
+.newwork legend small { font-family: var(--sans); text-transform: none; letter-spacing: 0; font-weight: 600; }
+[data-one][hidden], [data-many][hidden] { display: none; }
+
+/* страница класса: ссылки на работу и отбор сразу под ссылкой класса */
+.cls-links { display: grid; gap: 10px; margin-bottom: 14px; }
+.cls-links .card { margin: 0; }
+@media (min-width: 640px) { .cls-links { grid-template-columns: 1fr 1fr; } }
+
+/* лиды */
+.wk-leads { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.wk-lead { padding: 14px 14px 12px 16px; border-radius: var(--r); background: var(--card); box-shadow: 0 1px 2px rgba(58, 35, 33, .06), 0 14px 30px -26px rgba(58, 35, 33, .6); }
+.wk-lead--new { box-shadow: inset 4px 0 0 var(--wine), 0 1px 2px rgba(58, 35, 33, .06), 0 14px 30px -26px rgba(58, 35, 33, .6); }
+.wk-lead--talk { box-shadow: inset 4px 0 0 #A07800, 0 1px 2px rgba(58, 35, 33, .06), 0 14px 30px -26px rgba(58, 35, 33, .6); }
+.wk-lead__top { display: flex; align-items: flex-start; gap: 10px; }
+.wk-lead__main { flex: 1 1 auto; min-width: 0; }
+.wk-lead__main b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+.wk-lead__main span { display: block; font-weight: 700; font-size: 14px; }
+.wk-lead__main small { display: block; font-size: 12.5px; }
+.wk-lead__note { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--paper); font-size: 14px; }
+.wk-lead__btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.wk-lead__btns .inline { display: inline; }
+.wk-lead[hidden] { display: none; }
+.wk-soon a .wk-school { font-weight: 600; font-size: 13.5px; margin-left: 2px; }
+.wk-soon__more { margin-top: 4px; border-top: 1px solid var(--line); }
+.wk-soon__more summary { cursor: pointer; padding: 10px 0 2px; font-size: 14px; font-weight: 800; color: var(--wine); }
+.wk-soon__more ul { margin-top: 6px; }
+.wk-soon__more li:first-child { border-top: 1px solid var(--line); padding-top: 8px; }
+.wk-soon li { grid-template-columns: 9.6em 1fr; } .wk-soon__d { min-width: 0; }
+.wk-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; margin-left: 2px; padding: 0 5px; border-radius: 99px; background: var(--live); color: #fff; font: 800 11px/1 var(--sans); font-style: normal; vertical-align: 1px; }
+/* по этапам / по школам */
+.wk-view { display: inline-flex; gap: 4px; margin: 0 0 12px; padding: 3px; border-radius: 12px; background: var(--paper-2); }
+.wk-view a { padding: 7px 14px; border-radius: 9px; font-size: 13.5px; font-weight: 800; color: var(--ink-2); text-decoration: none; }
+.wk-view a[aria-current] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(58, 35, 33, .12); }
+.wk-byschool .group__h { text-transform: none; letter-spacing: 0; font: 800 16px/1.2 var(--sans); }
+.wk-byschool .group__h .wk-school i { width: 11px; height: 11px; }
+/* название этапа на карточке видно только в виде «по школам» — в виде по этапам его и так видно по заголовку */
+.wk-stagename { display: none; margin-top: 8px; padding: 3px 9px; border-radius: 99px; background: var(--stage-bg); color: var(--stage); font-size: 12px; font-weight: 800; }
+.wk-byschool .wk-stagename { display: inline-block; }
+.wk-byschool .wk-stagename + .wk-prog { margin-top: 6px; }
+.wk-byschool .group__h > .wk-school { min-width: 0; height: auto; padding: 0; border-radius: 0; background: none; font: 800 17px/1.2 var(--sans); color: var(--ink); gap: 8px; }
+.wk-byschool .group__h > .wk-school i { width: 12px; height: 12px; }
+.wk-byschool + .wk-byschool { margin-top: 6px; }

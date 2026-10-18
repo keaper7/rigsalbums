@@ -15,7 +15,7 @@ const klassView = require('./views/klass');
 const A = require('./views/admin');
 const PV = require('./views/photos');
 const { Photos, PHOTO_ID, PIN_RE, ROLES } = require('./lib/photos');
-const { Work, half, stageOf, STATUS_NAMES, DESIGNER_STATUSES, PART_NAMES, HALF_NAMES } = require('./lib/work');
+const { Work, half, stageOf, readFile, FILE_MAX, STATUS_NAMES, DESIGNER_STATUSES, PART_NAMES, HALF_NAMES } = require('./lib/work');
 const WV = require('./views/work');
 const { Stats, day: statDay, SITE_PAGES } = require('./lib/stats');
 const SV = require('./views/stats');
@@ -110,7 +110,7 @@ function createApp(cfg) {
   const media = new Media(store, cfg.mediaDir || path.join(cfg.dataDir, 'media'));
   const site = new Site(siteRoot, store);
   const photos = new Photos(store, cfg.photosDir || path.join(cfg.dataDir, 'photos'));
-  const work = new Work(store);
+  const work = new Work(store, cfg.fixesDir || path.join(cfg.dataDir, 'fixes'));
   const stats = new Stats(store, auth.secret);
   // старые записи статистики — раз в сутки
   const pruneTimer = setInterval(() => { try { stats.prune(); } catch (e) { console.error(e); } }, 24 * 3600 * 1000);
@@ -176,7 +176,7 @@ function createApp(cfg) {
 
   // Раньше на домене было портфолио на wfolio (облако с фото клиентов). Незнакомые адреса
   // отправляем туда, где оно живёт теперь, чтобы старые ссылки клиентов не ломались
-  const OWN = /^\/(admin|k|d|media|assets)(\/|$)|\.(html|css|js|png|jpg|ico|txt|xml|webmanifest|woff2)$/;
+  const OWN = /^\/(admin|k|d|kr|media|assets)(\/|$)|\.(html|css|js|png|jpg|ico|txt|xml|webmanifest|woff2)$/;
   function legacy(ctx) {
     const base = String(cfg.legacyUrl || '').replace(/\/+$/, '');
     const p = ctx.url.pathname;
@@ -366,10 +366,23 @@ function createApp(cfg) {
   function newView(ctx, extra) {
     const from = parseInt(ctx.q('from') || (extra && extra.form && extra.form.from) || '', 10) || 0;
     const src = from ? store.getClass(from) : null;
+    // из лида: школа, класс и телефон уже известны
+    const lead = parseInt(ctx.q('lead') || (extra && extra.form && extra.form.lead) || '', 10) || 0;
+    const ld = lead ? work.lead(lead) : null;
+    const prefill = src ? { school: src.school, year: src.year, duration_min: src.duration_min, city: work.get(src.id).city }
+      : ld ? { school: ld.school, title: ld.title, phone: ld.phone, lead: ld.id } : null;
     return A.newClassPage(Object.assign({
       sess: ctx.sess, defaults: defaultsFor(store), classes: templates(), from: src ? src.id : 0,
-      nextTitle: src ? nextTitle(src.title) : ''
-    }, extra || {}, src && !(extra && extra.form) ? { form: { school: src.school, year: src.year, duration_min: src.duration_min } } : {}));
+      nextTitle: src ? nextTitle(src.title) : '', schools: knownSchools()
+    }, extra || {}, prefill && !(extra && extra.form) ? { form: prefill } : {}));
+  }
+
+  // Школы и города, которые уже были: подсказки при создании класса
+  function knownSchools() {
+    const all = work.all();
+    const seen = new Map();
+    store.listClasses().forEach(c => { if (!seen.has(c.school)) seen.set(c.school, (all.get(c.id) || {}).city || ''); });
+    return Array.from(seen, ([school, city]) => ({ school: school, city: city }));
   }
 
   r.get('/admin/new', ctx => {
@@ -416,6 +429,19 @@ function createApp(cfg) {
     const year = int(f.year, 2020, 2100, src ? src.year : d.year);
     const duration = int(f.duration_min, 5, 600, src ? src.duration_min : d.duration_min);
     const ids = titles.map(t => createFrom(src, school, t, year, duration));
+    // сразу для работы: город и цена — всем классам, телефон, ученики и дата съёмки — если класс один
+    const city = str(f.city, 60);
+    ids.forEach(id => {
+      if (city) work.setCity(id, city);
+      const m = {};
+      if (f.price) m.price = f.price;
+      if (ids.length === 1 && f.students) m.students = f.students;
+      if (Object.keys(m).length) work.updateMoney(id, m);
+      if (ids.length === 1 && str(f.phone, 40)) work.setContacts(id, [str(f.pname, 60)], [str(f.phone, 40)]);
+      if (ids.length === 1 && f.sd) work.addDate(id, { d: f.sd, t: f.st, kind: f.sk });
+    });
+    const ld = parseInt(f.lead, 10) ? work.lead(parseInt(f.lead, 10)) : null;
+    if (ld) work.updateLead(ld.id, { status: 'class', classId: ids[0] });
     if (ids.length === 1) return back(ctx, '/admin/c/' + ids[0], src ? 'copied' : 'created');
     back(ctx, '/admin', 'createdmany');
   });
@@ -445,7 +471,9 @@ function createApp(cfg) {
       nextTitle: nextTitle(cls.title),
       defaults: defaultsFor(store),
       pk: { photos: photos.photos(cls.id).length, students: photos.students(cls.id).length, started: photos.startedIds(cls.id).size, closed: !!(photos.album(cls.id) || {}).closed_at },
-      work: (w => STATUS_NAMES[w.status] + (work.openCounts().get(cls.id) ? ' · правок: ' + work.openCounts().get(cls.id) : ''))(work.get(cls.id))
+      // коротко, где сейчас класс: этап и что дальше
+      work: (w => { const sg = stageOf(w); return (sg.finished ? 'Готово, альбом забрали' : sg.stage.name + ' · ' + sg.done + ' из ' + sg.total + (sg.next ? ' · дальше: ' + sg.next : '')) + (work.openCounts().get(cls.id) ? ' · правок: ' + work.openCounts().get(cls.id) : ''); })(work.get(cls.id)),
+      city: work.get(cls.id).city
     }, extra || {}));
   }
 
@@ -610,6 +638,7 @@ function createApp(cfg) {
     // Если старт запланирован и конец считался по длительности, двигаем его вместе с ней (точную дату окончания не трогаем)
     if (V.opensAt(cls) && cls.ends_at === cls.opened_at + cls.duration_min * 60000) f2.ends_at = cls.opened_at + f2.duration_min * 60000;
     store.updateClass(cls.id, f2);
+    if ('city' in f) work.setCity(cls.id, f.city);
     back(ctx, '/admin/c/' + cls.id + '#info', 'saved');
   });
 
@@ -636,6 +665,7 @@ function createApp(cfg) {
   act('delete', (ctx, cls) => {
     store.deleteClass(cls.id);
     photos.removeFiles(cls.id);
+    work.removeFiles(cls.id);
     presence.delete(cls.id);
     back(ctx, '/admin', 'deleted');
   });
@@ -1022,8 +1052,13 @@ function createApp(cfg) {
     const inGroup = new Set(group.map(g => g.photo_id));
     const byId = new Map(list.map(p => [p.id, p]));
     const log = photos.log(cls.id, 60).map(l => Object.assign({}, l, { path: byId.has(l.photo_id) ? byId.get(l.photo_id).path : '', inGroup: inGroup.has(l.photo_id) }));
+    const teacher = {
+      token: photos.teacherToken(cls.id), photos: photos.teacherPhotos(cls.id),
+      picks: photos.teacherPicks(photos.album(cls.id), byId), done: photos.teacherDone(photos.album(cls.id))
+    };
     return PV.adminPage(Object.assign({
-      cls: cls, album: album, photos: list, students: students, counts: counts, groupCount: group.length, log: log,
+      cls: cls, album: photos.album(cls.id), photos: list, teacher: teacher,
+      isTeacher: s => photos.isTeacherSection(s), students: students, counts: counts, groupCount: group.length, log: log,
       disk: photos.disk(), usage: photos.usage(cls.id), picks: picks, byId: byId,
       isGroup: s => photos.isGroupSection(album, s), sess: ctx.sess, base: baseUrl(ctx), msg: ctx.q('m')
     }, extra || {}));
@@ -1193,7 +1228,7 @@ function createApp(cfg) {
       students: (started => photos.students(p.cls.id).map(s => ({ id: s.id, name: s.name, started: started.has(s.id), locked: !!s.pin })))(photos.startedIds(p.cls.id)),
       placeList: ROLES,
       klass: { school: p.cls.school, title: p.cls.title, year: p.cls.year },
-      photos: list.map(ph => [ph.id, ph.section, ph.w, ph.h, photos.isGroupSection(p.album, ph.section) ? 1 : 0, ph.ver])
+      photos: list.filter(ph => !photos.isTeacherSection(ph.section)).map(ph => [ph.id, ph.section, ph.w, ph.h, photos.isGroupSection(p.album, ph.section) ? 1 : 0, ph.ver])
     });
     H.send(ctx.res, 200, PV.pickPage({ cls: p.cls, data: data }), 'text/html; charset=utf-8', {
       'Cache-Control': 'no-store',
@@ -1272,7 +1307,7 @@ function createApp(cfg) {
   pickWrite('pick', (ctx, p, b) => {
     if (!p.me) return { error: 'Сначала выберите себя в списке', status: 403 };
     const ph = photos.photo(p.cls.id, b.photo);
-    if (!ph || photos.isGroupSection(p.album, ph.section)) return { error: 'Фото не найдено' };
+    if (!ph || photos.isGroupSection(p.album, ph.section) || photos.isTeacherSection(ph.section)) return { error: 'Фото не найдено' };
     const res = photos.setPersonal(p.album, p.me.id, ph.id, !!b.on);
     if (!res.ok) return { error: 'Уже выбрано ' + p.album.personal_max + ' фото. Чтобы выбрать это, уберите какое-то из выбранных', status: 409 };
   });
@@ -1310,6 +1345,51 @@ function createApp(cfg) {
     if (!res.ok) return { error: 'Сначала выберите это фото' };
   });
 
+  // ----- классный руководитель: /kr/:token — своя простая ссылка, без кода -----
+  // Выбирает только из папки «кл рук»: фото на обложку, фото в общий список и пишет пожелание классу
+  function teacherCtx(ctx) {
+    const album = photos.albumByTeacher(ctx.params.token);
+    const cls = album ? store.getClass(album.class_id) : null;
+    return cls ? { album: album, cls: cls } : null;
+  }
+
+  function teacherState(t) {
+    const a = photos.album(t.cls.id);
+    const picks = photos.teacherPicks(a);
+    return {
+      cover: picks.cover ? picks.cover.id : '', list: picks.list ? picks.list.id : '',
+      wish: a.teacher_wish, name: a.teacher_name, closed: !!a.closed_at, done: photos.teacherDone(a)
+    };
+  }
+
+  r.get('/kr/:token', ctx => {
+    const t = teacherCtx(ctx);
+    if (!t) return notFound(ctx);
+    const list = photos.teacherPhotos(t.cls.id);
+    H.send(ctx.res, 200, PV.teacherPage({ cls: t.cls, album: t.album, photos: list, state: teacherState(t), token: ctx.params.token }), 'text/html; charset=utf-8', {
+      'Cache-Control': 'no-store',
+      'X-Robots-Tag': 'noindex, nofollow',
+      'Referrer-Policy': 'no-referrer',
+      'Content-Security-Policy': "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    });
+  });
+
+  r.post('/kr/:token/save', ctx => {
+    const t = teacherCtx(ctx);
+    if (!t) return H.json(ctx.res, 404, { error: 'Ссылка не работает. Попросите у Артура новую' });
+    if (!pickLimit.hit('kr' + t.cls.id + ':' + ctx.ip)) return H.json(ctx.res, 429, { error: 'Слишком часто. Подождите минуту' });
+    if (t.album.closed_at) return H.json(ctx.res, 409, { error: 'Выбор уже закрыт. Если нужно что-то поменять, напишите Артуру', state: teacherState(t) });
+    const b = ctx.body || {};
+    const f = {};
+    ['cover', 'list', 'wish', 'name'].forEach(k => { if (k in b) f[k] = b[k]; });
+    const before = photos.album(t.cls.id).teacher_wish;
+    const res = photos.setTeacher(t.cls.id, f);
+    if (res.error) return H.json(ctx.res, 400, { error: res.error, state: teacherState(t) });
+    // дизайнер уже начала, а пожелание поменялось — у неё появится правка
+    if ('wish' in f && photos.album(t.cls.id).teacher_wish !== before) work.teacherWish(t.cls.id, photos.album(t.cls.id).teacher_wish);
+    H.json(ctx.res, 200, teacherState(t));
+  });
+
   // ---------- работа над альбомами ----------
   // Артур: /admin/work и /admin/c/:id/work. Дизайнер: /d/:token — личная ссылка без пароля
 
@@ -1329,8 +1409,13 @@ function createApp(cfg) {
       total: students.length,
       done: students.filter(finished).length,
       closed: !!album.closed_at,
-      retouchWait: students.filter(s => picks.get(s.id).some(x => x.retouch) && !s.retouch_done_at).length
+      retouchWait: students.filter(s => picks.get(s.id).some(x => x.retouch) && !s.retouch_done_at).length,
+      // классный руководитель: есть ли его папка и выбрал ли он всё
+      teacher: { n: teacherCount(cls.id), done: photos.teacherDone(album) }
     };
+  }
+  function teacherCount(classId) {
+    return store.db.prepare('SELECT section FROM pk_photos WHERE class_id = ? AND has_sm = 1').all(classId).filter(r => photos.isTeacherSection(r.section)).length;
   }
   // То же, плюс фото по id и групповые — для страницы класса
   function pkFull(cls) {
@@ -1339,6 +1424,9 @@ function createApp(cfg) {
     const list = photos.photos(cls.id);
     pk.byId = new Map(list.map(ph => [ph.id, ph]));
     pk.group = photos.group(cls.id, pk.album).map(g => pk.byId.get(g.photo_id)).filter(Boolean);
+    pk.teacher.picks = photos.teacherPicks(pk.album, pk.byId);
+    pk.teacher.name = pk.album.teacher_name;
+    pk.teacher.wish = pk.album.teacher_wish;
     return pk;
   }
 
@@ -1388,30 +1476,33 @@ function createApp(cfg) {
 
   r.get('/admin/work', ctx => {
     const sc = seasonCtx(ctx, workRows());
-    // в работе сверху то, что дальше по этапам; внутри этапа — ближайшая съёмка, потом по названию
+    // по дате добавления: в этом порядке Артур раздаёт даты съёмок
     const t = today();
-    const next = r => { const d = r.w.dates.find(x => x.d >= t); return d ? d.d + (d.t || '') : '9'; };
-    sc.rows.sort((a, b) => next(a).localeCompare(next(b)) || (a.c.school + a.c.title).localeCompare(b.c.school + b.c.title, 'ru'));
+    sc.rows.sort(byAdded);
     page(ctx, 200, WV.boardPage(Object.assign(sc, {
-      sess: ctx.sess, msg: ctx.q('m'), base: baseUrl(ctx), today: t, designers: work.designers()
+      sess: ctx.sess, msg: ctx.q('m'), base: baseUrl(ctx), today: t, designers: work.designers(), templates: work.templates(), newLeads: work.newLeads(), by: ctx.q('by') === 'school' ? 'school' : ''
     })));
   });
 
+  const byAdded = (a, b) => (a.c.created_at - b.c.created_at) || (a.c.id - b.c.id);
+
   r.get('/admin/work/phones', ctx => {
-    const rows = workRows().sort((a, b) => (a.c.school + ' ' + a.c.title).localeCompare(b.c.school + ' ' + b.c.title, 'ru', { numeric: true }));
-    page(ctx, 200, WV.phonesPage({ sess: ctx.sess, rows: rows }));
+    const rows = workRows().sort(byAdded);
+    page(ctx, 200, WV.phonesPage({ sess: ctx.sess, rows: rows, newLeads: work.newLeads() }));
   });
 
   // ----- деньги за сезон, осень и весну -----
   function moneyTotals(rows, deliveries) {
-    const t = { students: 0, total: 0, prepay: 0, prepaidN: 0, rest: 0, print: 0, designer: 0, proc: {}, smm: 0, costs: 0, profit: 0, notReady: [] };
+    const t = { students: 0, total: 0, prepay: 0, prepaidN: 0, paid: 0, paidUpN: 0, rest: 0, print: 0, designer: 0, proc: {}, smm: 0, costs: 0, profit: 0, notReady: [] };
     rows.forEach(r => {
       const m = r.m;
       if (m.prepaid) { t.prepay += m.prepay; t.prepaidN++; }
+      t.paid += m.paid;
       if (!m.ready) { t.notReady.push(r); return; }
+      if (m.paidUp) t.paidUpN++;
       t.students += m.students;
       t.total += m.total;
-      t.rest += m.rest;
+      t.rest += Math.max(0, m.rest);
       t.print += m.printAll;
       t.designer += m.designer;
       if (m.proc) t.proc[m.processor] = (t.proc[m.processor] || 0) + m.proc;
@@ -1426,6 +1517,7 @@ function createApp(cfg) {
 
   function moneyView(ctx, extra) {
     const sc = seasonCtx(ctx, workRows(null, true));
+    sc.rows.sort(byAdded);
     const deliveries = work.deliveries(sc.year);
     const byHalf = h => sc.inYear.filter(r => r.half === h);
     // доставка без пометки (старые записи) идёт только в итог сезона
@@ -1436,7 +1528,7 @@ function createApp(cfg) {
     };
     const p = tzParts(Date.now());
     return WV.moneyPage(Object.assign(sc, {
-      sess: ctx.sess, msg: ctx.q('m'), se: work.season(sc.year), deliveries: deliveries, totals: totals,
+      sess: ctx.sess, msg: ctx.q('m'), se: work.season(sc.year), deliveries: deliveries, totals: totals, newLeads: work.newLeads(),
       defaultHalf: p.month >= 7 ? 'autumn' : 'spring'
     }, extra || {}));
   }
@@ -1472,6 +1564,31 @@ function createApp(cfg) {
     back(ctx, '/admin/work/money?year=' + y + '#delivery', 'deliverydel');
   });
 
+  // ----- лиды -----
+  function leadsView(ctx, extra) {
+    const classes = new Map(store.listClasses().map(c => [c.id, c]));
+    return WV.leadsPage(Object.assign({ sess: ctx.sess, msg: ctx.q('m'), leads: work.leads(), classes: classes }, extra || {}));
+  }
+  r.get('/admin/work/leads', ctx => page(ctx, 200, leadsView(ctx)));
+
+  r.post('/admin/work/leads', ctx => {
+    const res = work.addLead(ctx.form);
+    if (res.error) return page(ctx, 400, leadsView(ctx, { err: res.error, form: ctx.form }));
+    back(ctx, '/admin/work/leads', 'lead');
+  });
+
+  r.post('/admin/work/leads/:id', ctx => {
+    const id = parseInt(ctx.params.id, 10) || 0;
+    if (ctx.form.delete) work.removeLead(id);
+    else work.updateLead(id, { status: String(ctx.form.status || '') });
+    back(ctx, '/admin/work/leads#lead-' + id, ctx.form.delete ? 'leaddel' : 'saved');
+  });
+
+  r.post('/admin/work/templates', ctx => {
+    work.setTemplates(ctx.form);
+    back(ctx, '/admin/work#templates', 'templates');
+  });
+
   r.post('/admin/work/designer', ctx => {
     if (!work.addDesigner(ctx.form.name)) return back(ctx, '/admin/work#designers');
     back(ctx, '/admin/work#designers', 'designer');
@@ -1488,7 +1605,8 @@ function createApp(cfg) {
     return Object.assign({
       sess: ctx.sess, msg: ctx.q('m'), cls: cls, w: w, pk: pk, half: half(cls, w), today: today(),
       m: work.money(w, cls, pk ? pk.total : 0), se: work.season(cls.year),
-      fixes: work.fixes(cls.id), notes: work.notes(cls.id)
+      fixes: work.fixes(cls.id), files: work.filesByFix(cls.id), notes: work.notes(cls.id),
+      templates: work.templates(), base: baseUrl(ctx)
     }, extra || {});
   }
   const workView = (ctx, cls, extra) => WV.classPage(workData(ctx, cls, extra));
@@ -1592,6 +1710,75 @@ function createApp(cfg) {
     wback(ctx, cls, 'fixdel', 'fixes');
   });
 
+  // Название класса, школа и город — прямо со страницы работы
+  wact('rename', (ctx, cls) => {
+    const school = str(ctx.form.school, 60), title = str(ctx.form.title, 40);
+    if (!school || !title) return page(ctx, 400, workView(ctx, cls, { err: 'Заполните школу и класс' }));
+    store.updateClass(cls.id, { school: school, title: title });
+    work.setCity(cls.id, ctx.form.city);
+    wback(ctx, cls, 'saved');
+  });
+
+  wact('probe', (ctx, cls) => {
+    const res = work.addProbe(cls.id, ctx.form.name);
+    if (res.error) return page(ctx, 400, WV.classMoneyPage(workData(ctx, cls, { err: res.error })));
+    back(ctx, '/admin/c/' + cls.id + '/work/money#probes', 'probe');
+  });
+
+  wact('probedel', (ctx, cls) => {
+    work.removeProbe(cls.id, parseInt(ctx.form.i, 10));
+    back(ctx, '/admin/c/' + cls.id + '/work/money#probes', 'probedel');
+  });
+
+  // Оплата после предоплаты: сумма или пусто — весь остаток
+  wact('pay', (ctx, cls) => {
+    const w = work.get(cls.id);
+    const m = work.money(w, cls, 0);
+    const res = work.addPayment(cls.id, ctx.form.sum, ctx.form.note, m.rest);
+    if (res.error) return page(ctx, 400, WV.classMoneyPage(workData(ctx, cls, { err: res.error })));
+    back(ctx, '/admin/c/' + cls.id + '/work/money#pay', 'pay');
+  });
+
+  wact('paydel', (ctx, cls) => {
+    work.removePayment(cls.id, parseInt(ctx.form.i, 10));
+    back(ctx, '/admin/c/' + cls.id + '/work/money#pay', 'paydel');
+  });
+
+  // Правка с фото: сначала сама правка (JSON), потом фото по одному
+  r.post('/admin/api/c/:id/work/fix', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return H.json(ctx.res, 404, { error: 'Класс не найден' });
+    const b = ctx.body || {};
+    const sid = parseInt(b.student, 10) || 0;
+    const st = sid ? photos.student(cls.id, sid) : null;
+    if (sid && !st) return H.json(ctx.res, 400, { error: 'Ученик не найден. Обновите страницу' });
+    const res = work.addFix(cls.id, { studentId: st ? st.id : null, studentName: st ? st.name : '', kind: String(b.kind || ''), text: b.text, who: 'Артур', files: +b.files || 0 });
+    if (res.error) return H.json(ctx.res, 400, { error: res.error });
+    H.json(ctx.res, 200, { ok: true, id: res.id });
+  });
+
+  // Под /admin/api/media/…: для этого пути nginx разрешает большие файлы
+  r.post('/admin/api/media/fix/:id/:fid', async ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) { ctx.req.resume(); return H.json(ctx.res, 404, { error: 'Класс не найден' }); }
+    const buf = await readFile(ctx.req, FILE_MAX);
+    const res = work.saveFixFile(cls.id, parseInt(ctx.params.fid, 10) || 0, String(ctx.q('label') || ''), buf);
+    if (res.error) return H.json(ctx.res, 400, { error: res.error });
+    H.json(ctx.res, 200, res);
+  }, { raw: true });
+
+  function sendFixFile(ctx, cls) {
+    const m = /^([a-z0-9]{16})\.jpg$/.exec(String(ctx.params.file || ''));
+    const f = m ? work.fixFile(cls.id, m[1]) : null;
+    if (!f || !H.serveStatic(work.fileDir(cls.id), ctx.req, ctx.res, '/' + f.id + '.jpg', [], { cache: 'private, max-age=604800' })) notFound(ctx);
+  }
+
+  r.get('/admin/c/:id/work/file/:file', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return notFound(ctx);
+    sendFixFile(ctx, cls);
+  });
+
   wact('note', (ctx, cls) => {
     work.addNote(cls.id, 'Артур', ctx.form.text);
     wback(ctx, cls, 'note', 'notes');
@@ -1606,8 +1793,8 @@ function createApp(cfg) {
   }
 
   // ----- кабинет дизайнера -----
-  // Видит классы, где начат отбор фото или уже идёт работа. Архив не видит
-  const forDesigner = row => !!(row.pk && row.pk.total) || row.w.status !== 'todo';
+  // Видит все классы сразу после записи: по фотоаппарату видно, была ли съёмка. Архив не видит
+  const forDesigner = () => true;
 
   function dpage(ctx, body) {
     H.send(ctx.res, 200, body, 'text/html; charset=utf-8', {
@@ -1648,7 +1835,7 @@ function createApp(cfg) {
     if (!d) return;
     const cls = designerClass(ctx);
     if (!cls) return H.redirect(ctx.res, '/d/' + d.token);
-    dpage(ctx, WV.designerClass({ designer: d, cls: cls, w: work.get(cls.id), pk: pkFull(cls), fixes: work.fixes(cls.id), notes: work.notes(cls.id), today: today() }));
+    dpage(ctx, WV.designerClass({ designer: d, cls: cls, w: work.get(cls.id), pk: pkFull(cls), fixes: work.fixes(cls.id), files: work.filesByFix(cls.id), notes: work.notes(cls.id, 80, true), today: today() }));
   });
 
   r.get('/d/:token/c/:id/quotes.csv', ctx => {
@@ -1657,6 +1844,14 @@ function createApp(cfg) {
     const cls = designerClass(ctx);
     if (!cls) return notFound(ctx);
     sendQuotes(ctx, cls);
+  });
+
+  r.get('/d/:token/c/:id/file/:file', ctx => {
+    const d = designerCtx(ctx);
+    if (!d) return;
+    const cls = designerClass(ctx);
+    if (!cls) return notFound(ctx);
+    sendFixFile(ctx, cls);
   });
 
   const designerLimit = new Limiter(300, 10 * 60 * 1000);

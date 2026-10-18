@@ -2270,3 +2270,9 @@ html.bk-lock { overflow: hidden; }
 .bk { --bk-p: 6000px; }
 @media (max-width: 599px) { .bk { --bk-p: 4400px; } }
 .bk__leaf.is-buried .bk__pg { visibility: hidden; }
+/* Шов посередине. Края двух страниц сходятся ровно на одной линии, и на iPhone сквозь их сглаженные края
+   просвечивал светлый фон сайта — белая нитка по стыку. Листы заходят друг на друга на 1px, а под стыком
+   лежит тёмная полоса корешка, так что просвечивать нечему */
+.bk__face { left: -1px; width: calc(100% + 1px); }
+.bk__book:before { content: ''; position: absolute; top: 0; bottom: 0; left: calc(50% - 4px); width: 8px; z-index: 0; background: #2A1D17; pointer-events: none; }
+.bk__book.is-closed:before, .bk__book.is-end:before { display: none; }

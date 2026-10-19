@@ -119,6 +119,8 @@ class Store {
     // новые поля класса — только добавляем, со значением по умолчанию
     const cols = this.db.prepare('PRAGMA table_info(classes)').all().map(r => r.name);
     if (cols.indexOf('revote') === -1) this.db.exec("ALTER TABLE classes ADD COLUMN revote TEXT NOT NULL DEFAULT '[]'");
+    // когда Артур последний раз открывал класс в админке — для сортировки «недавно открытые»
+    if (cols.indexOf('viewed_at') === -1) this.db.exec('ALTER TABLE classes ADD COLUMN viewed_at INTEGER NOT NULL DEFAULT 0');
     this.db.exec('PRAGMA user_version = 2');
     if (!this.db.prepare('SELECT COUNT(*) n FROM options').get().n) this.seedCatalog();
     else this.seedNewSteps();
@@ -293,6 +295,12 @@ class Store {
     const vals = keys.map(k => (k === 'picks' || k === 'hidden' || k === 'revote') ? JSON.stringify(f[k]) : f[k]);
     this.db.prepare('UPDATE classes SET ' + keys.map(k => k + ' = ?').join(', ') + ', updated_at = ? WHERE id = ?')
       .run(...vals, Date.now(), id);
+  }
+
+  // Отметка «открывали в админке». updated_at не трогаем: по нему страница класса у ребят понимает,
+  // что что-то поменялось
+  touchClass(id) {
+    this.db.prepare('UPDATE classes SET viewed_at = ? WHERE id = ?').run(Date.now(), id);
   }
 
   deleteClass(id) {

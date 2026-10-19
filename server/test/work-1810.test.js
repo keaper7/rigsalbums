@@ -384,3 +384,35 @@ test('шпаргалка: дата индивидуальной съёмки б�
   r = await admin.req('GET', '/admin/c/' + id);
   assert.match(r.text, /В «Работе» стоит индивидуальная съёмка: Суббота, 16 мая, 11:00/);
 });
+
+test('классы: недавно открытые сверху, сортировка по дате бронирования запоминается', async t => {
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const a = await createClass(admin, 'Школа 1', '11А');
+  const b = await createClass(admin, 'Школа 2', '11Б');
+  const c = await createClass(admin, 'Школа 3', '11В');
+  const order = text => ['11А', '11Б', '11В'].map(x => [x, text.indexOf('<b>' + x + '</b>')]).sort((p, q) => p[1] - q[1]).map(p => p[0]).join(',');
+  // открыли первый класс — он сверху
+  await admin.req('GET', '/admin/c/' + a);
+  let r = await admin.req('GET', '/admin');
+  assert.strictEqual(order(r.text).split(',')[0], '11А');
+  // опрос итогов не считается открытием
+  await admin.req('GET', '/admin/c/' + c + '/results');
+  r = await admin.req('GET', '/admin');
+  assert.strictEqual(order(r.text).split(',')[0], '11А');
+  await admin.req('GET', '/admin/c/' + b + '/work');
+  r = await admin.req('GET', '/admin');
+  assert.strictEqual(order(r.text).split(',')[0], '11Б');
+  // открытие в админке не меняет rev страницы класса у ребят
+  const before = s.app.store.getClass(+a).updated_at;
+  await admin.req('GET', '/admin/c/' + a);
+  assert.strictEqual(s.app.store.getClass(+a).updated_at, before);
+  // по дате бронирования: как добавляли, выбор запоминается
+  r = await admin.req('GET', '/admin?sort=added');
+  assert.strictEqual(order(r.text), '11А,11Б,11В');
+  assert.match(r.text, /бронь /);
+  r = await admin.req('GET', '/admin');
+  assert.strictEqual(order(r.text), '11А,11Б,11В');
+  assert.match(r.text, /href="\/admin\?sort=added" aria-current/);
+});

@@ -1039,3 +1039,7 @@ p.link code { display: inline-block; max-width: 100%; word-break: break-all; tex
 .wk-tgf { display: flex; gap: 8px; margin-top: 6px; }
 .wk-tgf input { flex: 1 1 auto; min-width: 0; }
 .wk-ph__tg { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: #E3F4FD; color: #1A86C0; font-weight: 700; font-size: 14px; text-decoration: none; }
+/* сортировка списка классов */
+.csort { display: inline-flex; padding: 3px; margin: 0 0 14px; border-radius: 99px; background: var(--paper-2); }
+.csort a { padding: 7px 14px; border-radius: 99px; font-weight: 800; font-size: 14px; color: var(--ink-2); text-decoration: none; }
+.csort a[aria-current] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(58, 35, 33, .12); }

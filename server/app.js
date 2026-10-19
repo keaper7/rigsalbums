@@ -357,8 +357,15 @@ function createApp(cfg) {
     });
   }
 
+  // Сортировка списка: недавно открытые (по умолчанию) или по дате бронирования. Выбор запоминается
   r.get('/admin', ctx => {
-    page(ctx, 200, A.classesPage({ sess: ctx.sess, msg: ctx.q('m'), classes: withPending(store.listClasses()), base: baseUrl(ctx) }));
+    let sort = ctx.q('sort');
+    if (sort === 'added' || sort === 'recent') H.setCookie(ctx.res, 'csort', sort, cookieOpts(ctx, YEAR));
+    else sort = ctx.cookies.csort === 'added' ? 'added' : 'recent';
+    const list = withPending(store.listClasses());
+    if (sort === 'added') list.sort((a, b) => (a.created_at - b.created_at) || (a.id - b.id));
+    else list.sort((a, b) => ((b.viewed_at || 0) - (a.viewed_at || 0)) || (b.created_at - a.created_at) || (b.id - a.id));
+    page(ctx, 200, A.classesPage({ sess: ctx.sess, msg: ctx.q('m'), classes: list, sort: sort, base: baseUrl(ctx) }));
   });
 
   // Классы, с которых можно взять настройки: свежие сверху, архив не нужен
@@ -2082,6 +2089,12 @@ function createApp(cfg) {
         if (req.method === 'GET') return H.redirect(res, '/admin/login', 302);
         if (isApi) return H.json(res, 403, { error: 'Нужно заново войти в админку' });
         return H.send(res, 403, 'Нужно войти', 'text/plain; charset=utf-8');
+      }
+
+      // открыли класс в админке: он поднимется в «недавно открытых». Опрос итогов раз в несколько секунд не считаем
+      if (isAdmin && ctx.sess && req.method === 'GET') {
+        const vm = /^\/admin\/c\/(\d+)(?:\/(?!results)|$)/.exec(p);
+        if (vm) store.touchClass(+vm[1]);
       }
 
       if (req.method === 'POST') {

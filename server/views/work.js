@@ -179,10 +179,12 @@ function seasonNav(o, base) {
 
 // ---------- вкладка «Работа»: /admin/work ----------
 const WA_ICON = raw('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2.2a9.7 9.7 0 0 0-8.4 14.6L2.3 21.8l5.1-1.3A9.7 9.7 0 1 0 12 2.2zm0 17.7a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 19.9zm4.4-6c-.2-.1-1.4-.7-1.7-.8-.2-.1-.4-.1-.5.1l-.8.9c-.1.2-.3.2-.5.1a6.6 6.6 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.5-.4h-.5a.9.9 0 0 0-.7.3 2.8 2.8 0 0 0-.9 2.1 4.9 4.9 0 0 0 1 2.6 11.2 11.2 0 0 0 4.3 3.8c1.6.7 2.2.7 3 .6a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .2-1.2c-.1-.1-.2-.2-.5-.3z"/></svg>');
-function callButton(contacts) {
+const TG_ICON = raw('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21.4 3.6 2.9 10.8c-1.3.5-1.2 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.4.8.8.8s.6-.2.9-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.1-14.7c.3-1.3-.5-1.9-1.4-1.4zM9.4 14.1l8.5-7.7c.4-.3-.1-.5-.6-.2L6.9 13.2"/></svg>');
+// Кнопки связи на карточке: группа в Telegram, WhatsApp и звонок по первому телефону
+function callButton(contacts, tgLink) {
   const c = (contacts || [])[0];
-  if (!c) return '';
-  return html`<span class="wk-calls"><a class="wk-call wk-call--wa" href="${wa(c.phone)}" target="_blank" rel="noopener" aria-label="WhatsApp${c.name ? ': ' + c.name : ''}" title="WhatsApp · ${c.phone}">${WA_ICON}</a><a class="wk-call" href="${tel(c.phone)}" aria-label="Позвонить${c.name ? ': ' + c.name : ''}" title="${c.name ? c.name + ' · ' : ''}${c.phone}">${PHONE_ICON}</a></span>`;
+  if (!c && !tgLink) return '';
+  return html`<span class="wk-calls">${tgLink ? html`<a class="wk-call wk-call--tg" href="${tgLink}" target="_blank" rel="noopener" aria-label="Группа класса в Telegram" title="Группа в Telegram">${TG_ICON}</a>` : ''}${c ? html`<a class="wk-call wk-call--wa" href="${wa(c.phone)}" target="_blank" rel="noopener" aria-label="WhatsApp${c.name ? ': ' + c.name : ''}" title="WhatsApp · ${c.phone}">${WA_ICON}</a><a class="wk-call" href="${tel(c.phone)}" aria-label="Позвонить${c.name ? ': ' + c.name : ''}" title="${c.name ? c.name + ' · ' : ''}${c.phone}">${PHONE_ICON}</a>` : ''}</span>`;
 }
 // Номер с двумя кнопками: позвонить и WhatsApp
 function phoneLine(x) {
@@ -205,7 +207,7 @@ function classCard(r, today) {
   return html`<div class="wk-card ${stageClass(sg)}${noPrepay ? ' is-noprepay' : ''}" data-find="${r.c.title} ${r.c.school} ${r.w.city} ${phones} ${phones.replace(/[^\d]/g, '')}" data-school="${r.c.school}" data-noprepay="${noPrepay ? 1 : 0}">
     <div class="wk-card__top">
       <a class="wk-card__t" href="/admin/c/${r.c.id}/work"><b>${r.c.title}</b>${schoolTag(r.c.school, r.w.city)}</a>
-      ${callButton(r.w.contacts)}
+      ${callButton(r.w.contacts, r.w.tg)}
     </div>
     ${sg.finished ? html`<p class="wk-ok small">Альбом забрали, класс готов</p>` : html`<p class="wk-stagename">${sg.stage.name}</p>${progress(sg)}`}
     <div class="wk-meta">
@@ -332,6 +334,7 @@ ${sectionTabs('phones', '', o.newLeads)}
       <a class="wk-ph__t" href="/admin/c/${r.c.id}/work#contacts"><b>${r.c.title}</b>${schoolTag(r.c.school, r.w.city)}</a>
       ${r.w.contacts.length ? html`<div class="wk-ph__list">${r.w.contacts.map(phoneLine)}</div>`
         : html`<a class="wk-ph__add" href="/admin/c/${r.c.id}/work#contacts">+ добавить телефон</a>`}
+      ${r.w.tg ? html`<a class="wk-ph__tg" href="${r.w.tg}" target="_blank" rel="noopener">${TG_ICON}<span>Группа в Telegram</span></a>` : ''}
     </div>`;
   })}</div>
 </section>`;
@@ -469,6 +472,21 @@ function stepHint(o, key) {
   return '';
 }
 
+// Группа класса в Telegram: кнопка перехода, а если ссылки нет — поле, куда её вставить
+function tgBlock(o) {
+  const c = o.cls, w = o.w;
+  const form = html`<form class="form wk-tgf" method="post" action="/admin/c/${c.id}/work/tg">
+        ${csrf(o.sess)}
+        <input name="tg" value="${w.tg}" maxlength="220" placeholder="t.me/… или @имя группы" autocomplete="off" inputmode="url" aria-label="Ссылка на группу в Telegram">
+        <button class="b b--sm" type="submit">Сохранить</button>
+      </form>`;
+  if (!w.tg) return html`<div class="wk-tg" id="group"><p class="muted small">Ссылка на группу класса в Telegram, чтобы открывать её в одно нажатие:</p>${form}</div>`;
+  return html`<div class="wk-tg" id="group">
+    <a class="b b--sm wk-tg__go" href="${w.tg}" target="_blank" rel="noopener">${TG_ICON}<span>Открыть группу в Telegram</span></a>
+    <details class="wk-tg__edit"><summary>изменить</summary>${form}<p class="muted small">Чтобы убрать ссылку, сотрите её и сохраните.</p></details>
+  </div>`;
+}
+
 function datesBlock(o) {
   const c = o.cls, w = o.w;
   return html`<div class="wk-dates" id="dates">
@@ -503,6 +521,7 @@ function stagesBlock(o) {
       return html`<li class="${last ? 'is-last' : ''}${on ? ' is-on' : ''}">
       <label class="wk-step"><input type="checkbox" data-step="${x[0]}" data-url="/admin/api/c/${c.id}/work/step"${on ? raw(' checked') : ''}${x[2] === 'auto' && x[0] === 'dates' ? raw(' disabled') : ''}><span><b>${x[1]}</b>${last ? html`<small class="muted">${i === STAGES.length - 1 ? 'класс готов' : 'переход: ' + STAGES[i + 1].name.toLowerCase()}</small>` : ''}${stepHint(o, x[0])}</span></label>
       ${x[0] === 'dates' ? datesBlock(o) : ''}
+      ${x[0] === 'group' ? tgBlock(o) : ''}
       ${stepMessage(o, x[0])}
     </li>`;
     })}</ul>

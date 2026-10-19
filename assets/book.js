@@ -67,6 +67,8 @@
         if (lf.loaded === s || lf.loaded === '') continue;
         lf.imgs[0].src = base + lf.names[0] + s + '.jpg';
         lf.imgs[1].src = base + lf.names[1] + s + '.jpg';
+        // раскладываем картинку заранее, а не в момент, когда лист покажется
+        if (lf.imgs[0].decode) { lf.imgs[0].decode().catch(function () {}); lf.imgs[1].decode().catch(function () {}); }
         lf.loaded = s;
       }
     }
@@ -90,7 +92,11 @@
         // у закрытого альбома вторая обложка под ним не нужна: она просвечивала в скруглённом углу
         var gone = !moving && ((i === n && cur === 0 && !leaves[0].el.classList.contains('is-moving')) ||
           (i === 0 && cur === n + 1 && !leaves[n].el.classList.contains('is-moving')));
-        lf.el.classList.toggle('is-far', (hidden && !edge) || gone);
+        // Соседние листы только прячем: картинки на них уже разложены, и при появлении лист
+        // не мигает пустым. Дальние убираем совсем, чтобы не держать их в памяти
+        var near = i >= lo - 2 && i <= hi + 2;
+        lf.el.classList.toggle('is-far', ((hidden && !edge) || gone) && !near);
+        lf.el.classList.toggle('is-hid', ((hidden && !edge) || gone) && near);
         lf.el.classList.toggle('is-buried', hidden && edge && !gone);
       });
       // Тень, торец и корешок половины появляются, только когда на неё легла обложка.
@@ -121,7 +127,7 @@
       if (i < 0 || i > n) return false;
       speed = speed || 900;
       var lf = leaves[i];
-      lf.el.classList.remove('is-far', 'is-buried');
+      lf.el.classList.remove('is-far', 'is-hid', 'is-buried');
       // если лист был убран, даём браузеру сначала поставить его на место, иначе поворот не анимируется
       void lf.el.offsetWidth;
       bend(lf, speed);
@@ -132,7 +138,7 @@
       cur += dir;
       // следующий лист должен быть виден под переворачиваемым
       var under = leaves[dir > 0 ? i + 1 : i - 1];
-      if (under) under.el.classList.remove('is-far', 'is-buried');
+      if (under) under.el.classList.remove('is-far', 'is-hid', 'is-buried');
       paint();
       var done = false;
       var g = gen;

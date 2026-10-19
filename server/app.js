@@ -15,7 +15,7 @@ const klassView = require('./views/klass');
 const A = require('./views/admin');
 const PV = require('./views/photos');
 const { Photos, PHOTO_ID, PIN_RE, ROLES } = require('./lib/photos');
-const { Work, half, stageOf, readFile, FILE_MAX, STATUS_NAMES, DESIGNER_STATUSES, PART_NAMES, HALF_NAMES } = require('./lib/work');
+const { Work, half, shootText, stageOf, readFile, FILE_MAX, STATUS_NAMES, DESIGNER_STATUSES, PART_NAMES, HALF_NAMES } = require('./lib/work');
 const WV = require('./views/work');
 const { Stats, day: statDay, SITE_PAGES } = require('./lib/stats');
 const SV = require('./views/stats');
@@ -237,7 +237,7 @@ function createApp(cfg) {
     const nonce = crypto.randomBytes(12).toString('base64');
     const url = baseUrl(ctx) + '/k/' + cls.slug;
     const body = klassView.classPage({
-      cls: withCommon(cls, defaultsFor(store)), opts: opts, status: st, state: state, result: result, base: '/', demo: false, nonce: nonce,
+      cls: withCommon(cls, cheatDefaults(cls)), opts: opts, status: st, state: state, result: result, base: '/', demo: false, nonce: nonce,
       meta: {
         title: cls.title + ' · Выбор альбома · RIGSARTHUR',
         ogTitle: 'Выбор альбома · ' + cls.title + ', ' + cls.school,
@@ -465,6 +465,14 @@ function createApp(cfg) {
     };
   }
 
+  // Шпаргалка класса: своё значение у класса, иначе дата индивидуальной съёмки из «Работы», иначе общее
+  function cheatDefaults(cls) {
+    const d = defaultsFor(store);
+    const t = shootText(work.get(cls.id), today());
+    if (t) d.shoot = t;
+    return d;
+  }
+
   function classView(ctx, cls, extra) {
     syncShoots();
     return A.classPage(Object.assign(resultsData(ctx, cls), {
@@ -472,6 +480,7 @@ function createApp(cfg) {
       url: baseUrl(ctx) + '/k/' + cls.slug,
       nextTitle: nextTitle(cls.title),
       defaults: defaultsFor(store),
+      workShoot: shootText(work.get(cls.id), today()),
       pk: { photos: photos.photos(cls.id).length, students: photos.students(cls.id).length, started: photos.startedIds(cls.id).size, closed: !!(photos.album(cls.id) || {}).closed_at },
       // коротко, где сейчас класс: этап и что дальше
       work: (w => { const sg = stageOf(w); return (sg.finished ? 'Готово, альбом забрали' : sg.stage.name + ' · ' + sg.done + ' из ' + sg.total + (sg.next ? ' · дальше: ' + sg.next : '')) + (work.openCounts().get(cls.id) ? ' · правок: ' + work.openCounts().get(cls.id) : ''); })(work.get(cls.id)),
@@ -1678,6 +1687,11 @@ function createApp(cfg) {
   wact('money', (ctx, cls) => {
     work.updateMoney(cls.id, ctx.form);
     back(ctx, '/admin/c/' + cls.id + '/work/money#money', 'saved');
+  });
+
+  wact('tg', (ctx, cls) => {
+    if (!work.setTg(cls.id, ctx.form.tg)) return page(ctx, 400, workView(ctx, cls, { err: 'Нужна ссылка на группу в Telegram: t.me/… или @имя группы' }));
+    back(ctx, '/admin/c/' + cls.id + '/work#group', 'saved');
   });
 
   wact('half', (ctx, cls) => {

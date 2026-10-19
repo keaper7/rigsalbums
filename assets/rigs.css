@@ -2355,3 +2355,5 @@ html.bk-lock { overflow: hidden; }
 .bk__leaf.is-last .bk__face--front { background: linear-gradient(90deg, var(--bk-spine, #2A1D17), var(--bk-board, #3B2A22) 3%); box-shadow: inset 0 0 0 1px rgba(40, 24, 20, .1); }
 .bk__book:before { background: var(--bk-spine, #2A1D17); }
 .bk__leaf.is-cover .bk__face--front .bk__pg, .bk__leaf.is-last .bk__face--back .bk__pg { background: var(--bk-board, #3B2A22); }
+/* соседний лист спрятан, но не убран: при появлении не мигает */
+.bk__leaf.is-hid { visibility: hidden; }

@@ -472,7 +472,9 @@ ${resultsBlock(o)}
   ${csrf(o.sess)}
   <div class="card__h"><h2 class="h">Шпаргалка</h2></div>
   <p class="muted small">Класс увидит это после голосования. Шпаргалка общая для всех классов, её пишут один раз в <a href="/admin/settings">настройках</a>. Серым показан общий текст. Поле здесь заполняйте, только если этому классу нужно другое.</p>
-  <label class="field"><span>Дата и время съёмки${c.shoot || !o.defaults.shoot ? '' : html` <small class="muted">общая</small>`}</span><input name="shoot" value="${c.shoot}" placeholder="${o.defaults.shoot || 'Суббота, 12 октября, 15:00'}" maxlength="120"></label>
+  <label class="field"><span>Дата и время съёмки${c.shoot ? '' : o.workShoot ? html` <small class="muted">из этапа «Даты съёмки»</small>` : o.defaults.shoot ? html` <small class="muted">общая</small>` : ''}</span><input name="shoot" value="${c.shoot}" placeholder="${o.workShoot || o.defaults.shoot || 'Суббота, 12 октября, 15:00'}" maxlength="120"></label>
+  ${o.workShoot && !c.shoot ? html`<p class="muted small">Берётся сама из даты индивидуальной съёмки во вкладке «Работа» и меняется вместе с ней. Впишите сюда, только если классу нужно написать по-другому.</p>` : ''}
+  ${o.workShoot && c.shoot && c.shoot !== o.workShoot ? html`<p class="wk-warn small">В «Работе» стоит индивидуальная съёмка: ${o.workShoot}. Классу показывается то, что вписано здесь. Сотрите поле, чтобы дата бралась из «Работы».</p>` : ''}
   <label class="field"><span>Адрес студии${c.address ? '' : html` <small class="muted">общий</small>`}</span><input name="address" value="${c.address}" placeholder="${o.defaults.address || 'Сообщу в чате класса'}" maxlength="160"></label>
   <label class="field"><span>Что взять с собой${c.bring ? '' : html` <small class="muted">общий</small>`}</span><textarea name="bring" rows="3" maxlength="600" placeholder="${o.defaults.bring || 'Сообщу в чате класса'}">${c.bring}</textarea></label>
   <label class="field"><span>Ещё (по желанию)${c.note || !o.defaults.note ? '' : html` <small class="muted">общее</small>`}</span><textarea name="note" rows="2" maxlength="600" placeholder="${o.defaults.note || ''}">${c.note}</textarea></label>

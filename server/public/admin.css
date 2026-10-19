@@ -1030,3 +1030,12 @@ p.link code { display: inline-block; max-width: 100%; word-break: break-all; tex
 .wk-halfsw--pick span { display: block; border-radius: 99px; padding: 8px 18px; font-weight: 800; font-size: 14px; color: var(--ink-2); }
 .wk-halfsw--pick input:checked + span { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(58, 35, 33, .12); }
 .wk-halfsw--pick input:focus-visible + span { outline: 2px solid var(--wine); outline-offset: 2px; }
+/* группа класса в Telegram */
+.wk-call--tg { background: #2AABEE; }
+.wk-tg { padding: 0 0 12px 36px; }
+.wk-tg__go { display: inline-flex; align-items: center; gap: 8px; background: #E3F4FD; color: #1A86C0; border-color: transparent; }
+.wk-tg__edit { margin-top: 6px; }
+.wk-tg__edit summary { cursor: pointer; font-size: 13px; color: var(--ink-2); }
+.wk-tgf { display: flex; gap: 8px; margin-top: 6px; }
+.wk-tgf input { flex: 1 1 auto; min-width: 0; }
+.wk-ph__tg { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: #E3F4FD; color: #1A86C0; font-weight: 700; font-size: 14px; text-decoration: none; }

@@ -334,3 +334,53 @@ test('осень или весна при создании класса — вс
   const id = +/\/admin\/c\/(\d+)/.exec(r.headers.get('location'))[1];
   assert.strictEqual(s.app.work.get(id).half, '');
 });
+
+test('группа в Telegram: только ссылки t.me, кнопка на карточке, пункт «Группа» отмечается сам', async t => {
+  const { tgUrl } = require('../lib/work');
+  assert.strictEqual(tgUrl('https://t.me/+AbC_d-1'), 'https://t.me/+AbC_d-1');
+  assert.strictEqual(tgUrl('@rigs_11a'), 'https://t.me/rigs_11a');
+  assert.strictEqual(tgUrl('telegram.me/joinchat/XYZ'), 'https://t.me/joinchat/XYZ');
+  assert.strictEqual(tgUrl('javascript:alert(1)'), '');
+  assert.strictEqual(tgUrl('https://evil.com/t.me/x'), '');
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const id = await createClass(admin, 'Лицей 2', '11 «А»');
+  let r = await admin.req('GET', '/admin/c/' + id + '/work');
+  assert.match(r.text, /action="\/admin\/c\/\d+\/work\/tg"/);
+  r = await admin.post('/admin/c/' + id + '/work/tg', { tg: 'https://evil.com/x' });
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual(s.app.work.get(id).tg, '');
+  r = await admin.post('/admin/c/' + id + '/work/tg', { tg: 't.me/+Grp11a' });
+  assert.strictEqual(r.status, 303);
+  const w = s.app.work.get(id);
+  assert.strictEqual(w.tg, 'https://t.me/+Grp11a');
+  assert.ok(w.steps.group, 'пункт «Группа» отмечен');
+  r = await admin.req('GET', '/admin/c/' + id + '/work');
+  assert.match(r.text, /href="https:\/\/t\.me\/\+Grp11a"[^>]*>.*Открыть группу в Telegram/);
+  r = await admin.req('GET', '/admin/work');
+  assert.match(r.text, /wk-call--tg" href="https:\/\/t\.me\/\+Grp11a"/);
+  // убрать ссылку
+  r = await admin.post('/admin/c/' + id + '/work/tg', { tg: '' });
+  assert.strictEqual(s.app.work.get(id).tg, '');
+});
+
+test('шпаргалка: дата индивидуальной съёмки берётся из «Работы»', async t => {
+  const { shootText } = require('../lib/work');
+  const dates = [{ d: '2026-10-10', t: '', kind: 'ind' }, { d: '2026-10-24', t: '15:00', kind: 'ind' }, { d: '2026-10-20', t: '', kind: 'group' }];
+  assert.strictEqual(shootText({ dates }, '2026-10-19'), 'Суббота, 24 октября, 15:00');
+  assert.strictEqual(shootText({ dates }, '2026-11-01'), 'Суббота, 24 октября, 15:00');
+  assert.strictEqual(shootText({ dates: [{ d: '2026-10-20', kind: 'group' }] }, '2026-10-19'), '');
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const id = await createClass(admin, 'Лицей 2', '11 «А»');
+  await admin.post('/admin/c/' + id + '/work/date', { d: '2099-05-16', t: '11:00', kind: 'ind' });
+  let r = await admin.req('GET', '/admin/c/' + id);
+  assert.match(r.text, /из этапа «Даты съёмки»/);
+  assert.match(r.text, /placeholder="Суббота, 16 мая, 11:00"/);
+  // своё значение у класса важнее, и видно, что в «Работе» другая дата
+  await admin.post('/admin/c/' + id + '/cheat', { shoot: 'Воскресенье, в 12', address: '', bring: '', note: '' });
+  r = await admin.req('GET', '/admin/c/' + id);
+  assert.match(r.text, /В «Работе» стоит индивидуальная съёмка: Суббота, 16 мая, 11:00/);
+});

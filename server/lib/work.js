@@ -99,6 +99,8 @@ const COLUMNS = [
   // город и пробники (альбомы «для себя» в расход): [{ name, at }]
   ['wk_classes', 'city', "TEXT NOT NULL DEFAULT ''"],
   ['wk_classes', 'probes', "TEXT NOT NULL DEFAULT '[]'"],
+  // ссылка на группу класса в Telegram
+  ['wk_classes', 'tg', "TEXT NOT NULL DEFAULT ''"],
   ['wk_delivery', 'half', "TEXT NOT NULL DEFAULT ''"]
 ];
 
@@ -274,6 +276,28 @@ function half(cls, w) {
   return month >= 7 ? 'autumn' : 'spring';
 }
 
+// Ссылка на группу в Telegram: t.me/… , telegram.me/… или @имя. Другие адреса не принимаем,
+// чтобы в кнопку не попало что-то постороннее
+function tgUrl(v) {
+  const s = String(v || '').trim();
+  const at = /^@([A-Za-z0-9_]{4,64})$/.exec(s);
+  if (at) return 'https://t.me/' + at[1];
+  const m = /^(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me)\/([A-Za-z0-9_+\-\/=?&.]{2,200})$/i.exec(s);
+  return m ? 'https://t.me/' + m[1] : '';
+}
+
+// Дата индивидуальной съёмки словами для шпаргалки: «Суббота, 12 октября, 15:00».
+// Берём ближайшую ещё не прошедшую, а если все прошли — последнюю
+const WEEKDAYS = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+function shootText(w, today) {
+  const ind = (w.dates || []).filter(d => d && d.kind === 'ind' && DATE_RE.test(d.d));
+  if (!ind.length) return '';
+  const d = ind.find(x => x.d >= today) || ind[ind.length - 1];
+  const day = new Date(d.d + 'T12:00:00Z').getUTCDay();
+  return WEEKDAYS[day] + ', ' + (+d.d.slice(8, 10)) + ' ' + MONTHS_GEN[+d.d.slice(5, 7) - 1] + (d.t ? ', ' + d.t : '');
+}
+
 // Отмечен ли пункт этапа. Предоплата — та же галочка, что в деньгах; даты — когда есть хоть одна
 function stepOn(w, key) {
   if (key === 'prepay') return !!(w.money && w.money.prepaid);
@@ -398,7 +422,7 @@ class Work {
   parse(row, classId) {
     const r = row ? Object.assign({}, row) : {
       class_id: classId, status: 'todo', status_at: null, shot: 0, shoot_date: '', shoot_place: '',
-      processor: '', phone: '', note: '', done: '{}', money: '{}', steps: '{}', dates: '[]', contacts: '[]', half: '', paid: '[]', city: '', probes: '[]',
+      processor: '', phone: '', note: '', done: '{}', money: '{}', steps: '{}', dates: '[]', contacts: '[]', half: '', paid: '[]', city: '', probes: '[]', tg: '',
       created_at: 0, updated_at: 0
     };
     r.done = parseJson(r.done, {});
@@ -575,6 +599,16 @@ class Work {
 
   setCity(classId, city) {
     this.save(classId, 'city', line(city, 60));
+  }
+
+  // Группа класса в Telegram. Пустая строка — убрать. Ссылка появилась — пункт «Группа» отмечается сам
+  setTg(classId, v) {
+    const raw = String(v || '').trim();
+    const url = raw ? tgUrl(raw) : '';
+    if (raw && !url) return false;
+    this.save(classId, 'tg', url);
+    if (url) this.setStep(classId, 'group', true, 'Артур');
+    return true;
   }
 
   // Пробник: альбом для себя, подписан фамилией, чтобы знать, чей
@@ -893,4 +927,4 @@ class Work {
   }
 }
 
-module.exports = { Work, FILE_LABELS, FILE_MAX, readFile, LEAD_STATUSES, LEAD_STATUS, TEMPLATES, TEMPLATE_STEP, fill, calc, half, stepOn, stageOf, upcoming, STAGES, STEP_NAMES, HALVES, HALF_NAMES, DATE_KINDS, DATE_KIND_NAMES, amount, parsePrint, parseProcessors, normSeason, SELF, SEASON_DEFAULT, SEASON_FIELDS, STATUSES, STATUS_NAMES, DESIGNER_STATUSES, PARTS, PART_NAMES, FIXES, FIX_NAMES };
+module.exports = { Work, tgUrl, shootText, FILE_LABELS, FILE_MAX, readFile, LEAD_STATUSES, LEAD_STATUS, TEMPLATES, TEMPLATE_STEP, fill, calc, half, stepOn, stageOf, upcoming, STAGES, STEP_NAMES, HALVES, HALF_NAMES, DATE_KINDS, DATE_KIND_NAMES, amount, parsePrint, parseProcessors, normSeason, SELF, SEASON_DEFAULT, SEASON_FIELDS, STATUSES, STATUS_NAMES, DESIGNER_STATUSES, PARTS, PART_NAMES, FIXES, FIX_NAMES };

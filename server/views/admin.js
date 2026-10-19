@@ -178,10 +178,10 @@ function chip(c, now) {
   return html`<span class="chip chip--done">Закрыто</span>`;
 }
 
-function classRow(c, now, base, sort) {
+function classRow(c, now, base) {
   return html`<div class="row row--class" data-find="${(c.title + ' ' + c.school).toLowerCase()}">
       <a class="row__link" href="/admin/c/${c.id}">
-        <span class="row__main"><b>${c.title}</b><small>${c.school}${sort === 'added' ? ' · бронь ' + fmtDate(c.created_at).split(',')[0] : ''}</small></span>
+        <span class="row__main"><b>${c.title}</b><small>${c.school}</small></span>
         <span class="row__side">${chip(c, now)}<small>${c.voters ? 'проголосовали ' + people(c.voters) : 'пока без голосов'}</small></span>
       </a>
       <button class="row__copy" type="button" data-copy="${base}/k/${c.slug}" title="Скопировать ссылку на страницу класса"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L11.6 6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.6-1.6"/></svg><span>ссылка</span></button>
@@ -210,19 +210,15 @@ ${o.classes.length ? '' : html`<div class="card empty">
   <p class="muted">Создайте страницу класса, отправьте ссылку в чат и запустите голосование, когда все будут на месте.</p>
   <a class="b b--main" href="/admin/new">Создать первый класс</a>
 </div>`}
-${o.classes.length > 1 ? html`<nav class="csort" aria-label="Сортировка">
-  <a href="/admin?sort=recent"${o.sort !== 'added' ? raw(' aria-current="true"') : ''}>Недавно открытые</a>
-  <a href="/admin?sort=added"${o.sort === 'added' ? raw(' aria-current="true"') : ''}>По дате бронирования</a>
-</nav>
-` : ''}${o.classes.length > 5 ? html`<label class="search"><span class="sr">Поиск</span><input type="search" placeholder="Найти класс или школу" data-search autocomplete="off"></label>
+${o.classes.length > 5 ? html`<label class="search"><span class="sr">Поиск</span><input type="search" placeholder="Найти класс или школу" data-search autocomplete="off"></label>
 <p class="muted small search__none" hidden>Ничего не нашлось</p>
 ` : ''}${groups.filter(g => g[1].length).map(g => html`<section class="group" data-group>
   <h2 class="group__h">${g[0]} <span>${g[1].length}</span></h2>
-  <div class="rows">${g[1].map(c => classRow(c, now, o.base, o.sort))}</div>
+  <div class="rows">${g[1].map(c => classRow(c, now, o.base))}</div>
 </section>
 `)}${archived.length ? html`<details class="group group--archive" data-group>
   <summary class="group__h">Архив <span>${archived.length}</span></summary>
-  <div class="rows">${archived.map(c => classRow(c, now, o.base, o.sort))}</div>
+  <div class="rows">${archived.map(c => classRow(c, now, o.base))}</div>
 </details>` : ''}`
   });
 }

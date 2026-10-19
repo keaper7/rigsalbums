@@ -385,7 +385,7 @@ test('шпаргалка: дата индивидуальной съёмки б�
   assert.match(r.text, /В «Работе» стоит индивидуальная съёмка: Суббота, 16 мая, 11:00/);
 });
 
-test('классы: недавно открытые сверху, сортировка по дате бронирования запоминается', async t => {
+test('работа: недавно открытые классы сверху, сортировка по дате бронирования запоминается', async t => {
   const s = await start();
   t.after(() => s.stop());
   const admin = await adminLogin(s.base);
@@ -395,24 +395,27 @@ test('классы: недавно открытые сверху, сортиро
   const order = text => ['11А', '11Б', '11В'].map(x => [x, text.indexOf('<b>' + x + '</b>')]).sort((p, q) => p[1] - q[1]).map(p => p[0]).join(',');
   // открыли первый класс — он сверху
   await admin.req('GET', '/admin/c/' + a);
-  let r = await admin.req('GET', '/admin');
+  let r = await admin.req('GET', '/admin/work');
   assert.strictEqual(order(r.text).split(',')[0], '11А');
+  assert.match(r.text, /sort=recent" aria-current/);
   // опрос итогов не считается открытием
   await admin.req('GET', '/admin/c/' + c + '/results');
-  r = await admin.req('GET', '/admin');
+  r = await admin.req('GET', '/admin/work');
   assert.strictEqual(order(r.text).split(',')[0], '11А');
   await admin.req('GET', '/admin/c/' + b + '/work');
-  r = await admin.req('GET', '/admin');
+  r = await admin.req('GET', '/admin/work');
   assert.strictEqual(order(r.text).split(',')[0], '11Б');
   // открытие в админке не меняет rev страницы класса у ребят
   const before = s.app.store.getClass(+a).updated_at;
   await admin.req('GET', '/admin/c/' + a);
   assert.strictEqual(s.app.store.getClass(+a).updated_at, before);
   // по дате бронирования: как добавляли, выбор запоминается
-  r = await admin.req('GET', '/admin?sort=added');
+  r = await admin.req('GET', '/admin/work?sort=added');
   assert.strictEqual(order(r.text), '11А,11Б,11В');
-  assert.match(r.text, /бронь /);
+  r = await admin.req('GET', '/admin/work');
+  assert.strictEqual(order(r.text), '11А,11Б,11В');
+  assert.match(r.text, /sort=added" aria-current/);
+  // во вкладке «Классы» сортировки нет
   r = await admin.req('GET', '/admin');
-  assert.strictEqual(order(r.text), '11А,11Б,11В');
-  assert.match(r.text, /href="\/admin\?sort=added" aria-current/);
+  assert.doesNotMatch(r.text, /По дате бронирования/);
 });

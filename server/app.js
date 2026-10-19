@@ -357,15 +357,8 @@ function createApp(cfg) {
     });
   }
 
-  // Сортировка списка: недавно открытые (по умолчанию) или по дате бронирования. Выбор запоминается
   r.get('/admin', ctx => {
-    let sort = ctx.q('sort');
-    if (sort === 'added' || sort === 'recent') H.setCookie(ctx.res, 'csort', sort, cookieOpts(ctx, YEAR));
-    else sort = ctx.cookies.csort === 'added' ? 'added' : 'recent';
-    const list = withPending(store.listClasses());
-    if (sort === 'added') list.sort((a, b) => (a.created_at - b.created_at) || (a.id - b.id));
-    else list.sort((a, b) => ((b.viewed_at || 0) - (a.viewed_at || 0)) || (b.created_at - a.created_at) || (b.id - a.id));
-    page(ctx, 200, A.classesPage({ sess: ctx.sess, msg: ctx.q('m'), classes: list, sort: sort, base: baseUrl(ctx) }));
+    page(ctx, 200, A.classesPage({ sess: ctx.sess, msg: ctx.q('m'), classes: withPending(store.listClasses()), base: baseUrl(ctx) }));
   });
 
   // Классы, с которых можно взять настройки: свежие сверху, архив не нужен
@@ -1519,15 +1512,21 @@ function createApp(cfg) {
 
   r.get('/admin/work', ctx => {
     const sc = seasonCtx(ctx, workRows());
-    // по дате добавления: в этом порядке Артур раздаёт даты съёмок
+    // Сортировка: недавно открытые (по умолчанию) или по дате бронирования — в этом порядке Артур
+    // раздаёт даты съёмок. Выбор запоминается
+    let sort = ctx.q('sort');
+    if (sort === 'added' || sort === 'recent') H.setCookie(ctx.res, 'wsort', sort, cookieOpts(ctx, YEAR));
+    else sort = ctx.cookies.wsort === 'added' ? 'added' : 'recent';
     const t = today();
-    sc.rows.sort(byAdded);
+    sc.rows.sort(sort === 'added' ? byAdded : byViewed);
     page(ctx, 200, WV.boardPage(Object.assign(sc, {
-      sess: ctx.sess, msg: ctx.q('m'), base: baseUrl(ctx), today: t, designers: work.designers(), templates: work.templates(), newLeads: work.newLeads(), by: ctx.q('by') === 'school' ? 'school' : ''
+      sess: ctx.sess, msg: ctx.q('m'), base: baseUrl(ctx), today: t, designers: work.designers(), templates: work.templates(), newLeads: work.newLeads(), by: ctx.q('by') === 'school' ? 'school' : '', sort: sort
     })));
   });
 
   const byAdded = (a, b) => (a.c.created_at - b.c.created_at) || (a.c.id - b.c.id);
+  // недавно открытые в админке сверху, ни разу не открытые — по дате бронирования
+  const byViewed = (a, b) => ((b.c.viewed_at || 0) - (a.c.viewed_at || 0)) || byAdded(a, b);
 
   r.get('/admin/work/phones', ctx => {
     const rows = workRows(null, false, true).sort(byAdded);

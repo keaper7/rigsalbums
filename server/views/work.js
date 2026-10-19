@@ -253,10 +253,14 @@ ${soon.length ? html`<section class="card wk-soon">
   <ul>${soon.slice(0, SOON_SHOWN).map(x => soonItem(x, o.today))}</ul>
   ${soon.length > SOON_SHOWN ? html`<details class="wk-soon__more"><summary>Все съёмки по порядку · ещё ${soon.length - SOON_SHOWN}</summary><ul>${soon.slice(SOON_SHOWN).map(x => soonItem(x, o.today))}</ul></details>` : ''}
 </section>` : ''}
-${rows.length ? html`<nav class="wk-view" aria-label="Как показать">
+${rows.length ? html`<div class="wk-views"><nav class="wk-view" aria-label="Как показать">
   <a href="/admin/work${q}"${o.by !== 'school' ? raw(' aria-current="page"') : ''}>По этапам</a>
   <a href="/admin/work${q}&by=school"${o.by === 'school' ? raw(' aria-current="page"') : ''}>По школам</a>
-</nav>` : ''}
+</nav>
+<nav class="wk-view" aria-label="Сортировка">
+  <a href="/admin/work${q}${o.by === 'school' ? '&by=school' : ''}&sort=recent"${o.sort !== 'added' ? raw(' aria-current="true"') : ''}>Недавно открытые</a>
+  <a href="/admin/work${q}${o.by === 'school' ? '&by=school' : ''}&sort=added"${o.sort === 'added' ? raw(' aria-current="true"') : ''}>По дате бронирования</a>
+</nav></div>` : ''}
 ${o.by !== 'school' && jump.length > 1 ? html`<nav class="wk-jump" aria-label="Этапы">${jump.map(x => html`<a class="wk-c${x[3]}" href="#stage-${x[0]}"><i class="wk-dot"></i>${x[1]} <b>${x[2]}</b></a>`)}</nav>` : ''}
 ${rows.length > 3 ? html`<div class="wk-find" data-wkfilter>
   <label class="search"><span class="sr">Поиск</span><input type="search" placeholder="Класс, школа, город или телефон" data-wk-q autocomplete="off"></label>

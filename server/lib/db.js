@@ -87,13 +87,16 @@ CREATE TABLE IF NOT EXISTS site (
 
 // Поля класса, которые можно менять из админки
 const CLASS_FIELDS = ['slug', 'school', 'title', 'year', 'duration_min', 'opened_at', 'ends_at', 'closed_at',
-  'picks', 'hidden', 'shoot', 'address', 'bring', 'note', 'archived'];
+  'picks', 'hidden', 'shoot', 'address', 'bring', 'note', 'archived', 'revote'];
 
 function parseClass(row) {
   if (!row) return null;
   const c = Object.assign({}, row);
   try { c.picks = JSON.parse(row.picks) || {}; } catch (e) { c.picks = {}; }
   try { c.hidden = JSON.parse(row.hidden) || []; } catch (e) { c.hidden = []; }
+  // этапы, которые сейчас переголосовывают (пусто — обычное голосование)
+  try { c.revote = JSON.parse(row.revote || '[]') || []; } catch (e) { c.revote = []; }
+  if (!Array.isArray(c.revote)) c.revote = [];
   return c;
 }
 
@@ -113,6 +116,9 @@ class Store {
     this.db = new DatabaseSync(file);
     this.db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000;');
     this.db.exec(SCHEMA);
+    // новые поля класса — только добавляем, со значением по умолчанию
+    const cols = this.db.prepare('PRAGMA table_info(classes)').all().map(r => r.name);
+    if (cols.indexOf('revote') === -1) this.db.exec("ALTER TABLE classes ADD COLUMN revote TEXT NOT NULL DEFAULT '[]'");
     this.db.exec('PRAGMA user_version = 2');
     if (!this.db.prepare('SELECT COUNT(*) n FROM options').get().n) this.seedCatalog();
     else this.seedNewSteps();
@@ -284,7 +290,7 @@ class Store {
   updateClass(id, f) {
     const keys = Object.keys(f).filter(k => CLASS_FIELDS.indexOf(k) !== -1);
     if (!keys.length) return;
-    const vals = keys.map(k => (k === 'picks' || k === 'hidden') ? JSON.stringify(f[k]) : f[k]);
+    const vals = keys.map(k => (k === 'picks' || k === 'hidden' || k === 'revote') ? JSON.stringify(f[k]) : f[k]);
     this.db.prepare('UPDATE classes SET ' + keys.map(k => k + ' = ?').join(', ') + ', updated_at = ? WHERE id = ?')
       .run(...vals, Date.now(), id);
   }
@@ -313,7 +319,11 @@ class Store {
     return out;
   }
 
-  voters(classId) {
+  // Сколько человек проголосовало. steps — только в этих этапах (во время переголосования)
+  voters(classId, steps) {
+    if (steps && steps.length) {
+      return this.db.prepare('SELECT COUNT(DISTINCT voter) n FROM votes WHERE class_id = ? AND step IN (' + steps.map(() => '?').join(', ') + ')').get(classId, ...steps).n;
+    }
     return this.db.prepare('SELECT COUNT(DISTINCT voter) n FROM votes WHERE class_id = ?').get(classId).n;
   }
 

@@ -18,6 +18,7 @@ const MSG = {
   until: 'Время окончания изменено',
   stepreset: 'Голоса этапа обнулены. Ребята могут проголосовать в нём заново',
   reopened: 'Голосование открыто заново',
+  revote: 'Переголосование открыто. Ребята видят только этот этап',
   picked: 'Выбор класса сохранён',
   unpicked: 'Ручной выбор сброшен, итог снова по голосам',
   reset: 'Голоса сброшены',
@@ -340,6 +341,15 @@ function resultsBlock(o) {
     ${note}
     <ul class="bars">${shown.map(row)}</ul>
     ${rest.length ? html`<details class="more more--rest"><summary>Показать ещё ${rest.length} без голосов</summary><ul class="bars">${rest.map(row)}</ul></details>` : ''}
+    ${closed ? html`<details class="more res__revote">
+      <summary>Переголосовать этот этап</summary>
+      <form method="post" action="/admin/c/${c.id}/revote" class="ctl__row" data-confirm="Переголосовать «${STEP_NAMES[step]}»? Голоса этого этапа обнулятся, и голосование откроется заново только по нему. Остальные этапы не изменятся.">
+        ${csrf(o.sess)}<input type="hidden" name="step" value="${step}">
+        <label class="field field--inline"><span>Длится</span>${durationSelect('duration_min', c.duration_min)}</label>
+        <button class="b b--main b--sm" type="submit">Открыть переголосование</button>
+      </form>
+      <p class="muted small">Ссылка у класса та же. Страница у ребят обновится сама, и в ней будет только этот этап.</p>
+    </details>` : ''}
     ${total ? html`<form method="post" action="/admin/c/${c.id}/resetstep" class="res__reset" data-confirm="Обнулить все голоса этапа «${STEP_NAMES[step]}» (${votes(total)})? Ребята смогут проголосовать в нём заново, остальные этапы не изменятся.">${csrf(o.sess)}<input type="hidden" name="step" value="${step}"><button class="link" type="submit">Обнулить голоса этапа</button></form>` : ''}
   </div>`;
   });
@@ -400,7 +410,8 @@ function controlBlock(o) {
   }
   if (st === 'open') {
     return html`<div class="card ctl ctl--live">
-  <div class="card__h"><h2 class="h">Идёт голосование</h2><span class="chip chip--live">до ${c.ends_at - now < 20 * 60 * 60 * 1000 ? fmtTime(c.ends_at) : fmtWhen(c.ends_at, now)}</span></div>
+  <div class="card__h"><h2 class="h">${c.revote && c.revote.length ? 'Идёт переголосование' : 'Идёт голосование'}</h2><span class="chip chip--live">до ${c.ends_at - now < 20 * 60 * 60 * 1000 ? fmtTime(c.ends_at) : fmtWhen(c.ends_at, now)}</span></div>
+  ${c.revote && c.revote.length ? html`<p class="muted">Заново голосуют только в этапе ${c.revote.map(x => '«' + STEP_NAMES[x] + '»').join(', ')}. Итоги остальных этапов сохранены.</p>` : ''}
   <p class="count" data-ends="${c.ends_at}" data-now="${now}">${left(c.ends_at - now)}</p>
   <div class="ctl__btns">
     <form method="post" action="/admin/c/${c.id}/extend">${csrf(o.sess)}<input type="hidden" name="min" value="15"><button class="b" type="submit">+15 мин</button></form>

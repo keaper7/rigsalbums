@@ -56,6 +56,16 @@ function resolve(cls, opts, counts) {
   return out;
 }
 
+// Этапы, в которых сейчас можно голосовать. Во время переголосования — только переголосуемые,
+// у остальных итог уже есть и не меняется
+function votingSteps(cls, opts, now) {
+  const all = activeSteps(opts);
+  const re = (cls && cls.revote) || [];
+  if (!re.length || status(cls, now) !== 'open') return all;
+  const only = all.filter(s => re.indexOf(s) !== -1);
+  return only.length ? only : all;
+}
+
 function isPending(res) {
   return Object.keys(res).some(s => !res[s].option);
 }
@@ -113,11 +123,12 @@ function publicState(store, catalog, cls, voter) {
     opensAt: opensAt(cls, now),
     endsAt: cls.ends_at || null,
     counts: counts,
-    voters: store.voters(cls.id),
+    voters: store.voters(cls.id, st === 'open' && (cls.revote || []).length ? votingSteps(cls, opts, now) : null),
     mine: store.mine(cls.id, voter),
     pending: st === 'closed' ? isPending(resolve(cls, opts, all)) : false,
+    revote: st === 'open' ? (cls.revote || []) : [],
     rev: cls.updated_at
   };
 }
 
-module.exports = { STEP_NAMES, status, opensAt, visibleOptions, activeSteps, resolve, isPending, cheat, publicState, coverNote };
+module.exports = { STEP_NAMES, status, opensAt, visibleOptions, activeSteps, votingSteps, resolve, isPending, cheat, publicState, coverNote };

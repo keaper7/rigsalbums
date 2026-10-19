@@ -134,3 +134,72 @@ test('обнулить голоса одного этапа', async t => {
   assert.notStrictEqual(r.status, 303);
   assert.strictEqual(counts().wear.casual, 3);
 });
+
+test('переголосование одного этапа: только он открыт, остальные итоги сохраняются', async t => {
+  const { start, client, adminLogin, createClass } = require('./helpers');
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const id = await createClass(admin, 'Лицей 2', '11 «А»');
+  const slug = s.app.store.getClass(+id).slug;
+  await admin.post('/admin/c/' + id + '/open', { duration_min: '30' });
+  const kid = client(s.base);
+  await kid.req('GET', '/k/' + slug);
+  let r = await kid.req('POST', '/k/' + slug + '/vote', { json: { step: 'theme', option: 'money' } });
+  assert.strictEqual(r.status, 200);
+  r = await kid.req('POST', '/k/' + slug + '/vote', { json: { step: 'wear', option: 'oldmoney' } });
+  assert.strictEqual(r.status, 200);
+  await admin.post('/admin/c/' + id + '/close', {});
+  // кнопка есть только у закрытого голосования
+  r = await admin.req('GET', '/admin/c/' + id);
+  assert.match(r.text, /action="\/admin\/c\/\d+\/revote"/);
+  r = await admin.post('/admin/c/' + id + '/revote', { step: 'theme', duration_min: '60' });
+  assert.strictEqual(r.status, 303);
+  const cls = s.app.store.getClass(+id);
+  assert.deepStrictEqual(cls.revote, ['theme']);
+  const c = s.app.store.counts(+id);
+  assert.strictEqual(c.theme.money, undefined, 'голоса тематики обнулены');
+  assert.strictEqual(c.wear.oldmoney, 1, 'голоса одежды на месте');
+  // на странице класса только тематика
+  r = await kid.req('GET', '/k/' + slug);
+  assert.match(r.text, /Переголосование: тематика альбома/);
+  assert.match(r.text, /"steps":\["theme"\]/);
+  assert.doesNotMatch(r.text, /id="s-wear"/);
+  // за одежду голосовать нельзя, за тематику можно
+  r = await kid.req('POST', '/k/' + slug + '/vote', { json: { step: 'wear', option: 'casual' } });
+  assert.strictEqual(r.status, 409);
+  assert.strictEqual(r.data.error, 'locked');
+  r = await kid.req('POST', '/k/' + slug + '/unvote', { json: { step: 'wear' } });
+  assert.strictEqual(r.status, 409);
+  r = await kid.req('POST', '/k/' + slug + '/vote', { json: { step: 'theme', option: 'neon' } });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.data.state.revote, ['theme']);
+  // закрыли: итог по обоим этапам
+  await admin.post('/admin/c/' + id + '/close', {});
+  r = await kid.req('GET', '/k/' + slug);
+  assert.doesNotMatch(r.text, /Переголосование/);
+  // переголосовать можно только закрытое; обычное «открыть заново» снимает переголосование
+  await admin.post('/admin/c/' + id + '/open', { duration_min: '30' });
+  assert.deepStrictEqual(s.app.store.getClass(+id).revote, []);
+  r = await kid.req('GET', '/k/' + slug);
+  assert.match(r.text, /id="s-wear"/);
+});
+
+test('во время переголосования «уже проголосовали» считает только этот этап', async t => {
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const id = await createClass(admin, 'Лицей 2', '11 «Б»');
+  const slug = s.app.store.getClass(+id).slug;
+  await admin.post('/admin/c/' + id + '/open', { duration_min: '30' });
+  const kid = client(s.base);
+  await kid.req('GET', '/k/' + slug);
+  await kid.req('POST', '/k/' + slug + '/vote', { json: { step: 'wear', option: 'oldmoney' } });
+  await admin.post('/admin/c/' + id + '/close', {});
+  await admin.post('/admin/c/' + id + '/revote', { step: 'theme', duration_min: '60' });
+  let r = await kid.req('POST', '/k/' + slug + '/vote', { json: { step: 'theme', option: 'neon' } });
+  assert.strictEqual(r.data.state.voters, 1);
+  const kid2 = client(s.base);
+  r = await kid2.req('GET', '/k/' + slug);
+  assert.match(r.text, /<b id="voters">1<\/b>/);
+});

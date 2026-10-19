@@ -3,7 +3,7 @@
 // Страница класса. Из этого же шаблона собирается демо class.html (node cli.js demo)
 
 const { html, raw, plural, fmtWhen } = require('../lib/util');
-const { activeSteps, cheat } = require('../lib/voting');
+const { activeSteps, votingSteps, cheat } = require('../lib/voting');
 
 const STEP_TITLE = { theme: 'Тематика альбома', place: 'Место для групповых', wear: 'Стиль одежды', color: 'Цвет одежды' };
 const STEP_SHORT = { theme: 'Тематика', place: 'Место', wear: 'Одежда', color: 'Цвет' };
@@ -200,7 +200,9 @@ function timerText(p) {
 function classPage(p) {
   const base = p.base;
   const opts = p.opts;
-  const steps = activeSteps(opts);
+  // во время переголосования на странице только переголосуемые этапы
+  const steps = p.status === 'open' ? votingSteps(p.cls, opts) : activeSteps(opts);
+  const revote = p.status === 'open' && steps.length < activeSteps(opts).length;
   const closed = p.status === 'closed';
   const draft = p.status === 'draft';
   const planned = draft && p.state && p.state.opensAt;
@@ -273,7 +275,8 @@ ${steps.map((s, i) => html`    <a href="#s-${s}" data-step="${s}"><i>${i + 1}</i
   <p class="eyebrow">Выпускной альбом ${year}</p>
   <h1 style="--w:${longest(p.cls.school)}"><span>${p.cls.school}</span><em>${p.cls.title}</em></h1>
   <p class="hero__lead">Привет, ребят, это личная страничка вашего класса для альбомов. Тут вы выберете понравившийся вариант, а потом останется только ваш выбор и вся основная информация по альбому. Короче, ваша шпаргалка.</p>
-${draft ? html`  <p class="draft">${planned ? 'Голосование начнётся ' + fmtWhen(p.state.opensAt) + '.' : 'Голосование ещё не началось.'} Варианты уже можно посмотреть, а когда голосование откроется, страница обновится сама.</p>
+${revote ? html`  <p class="draft">Переголосование: ${steps.map(s => STEP_TITLE[s].toLowerCase()).join(', ')}. Остальное уже выбрано, итог будет на этой странице, когда голосование закроется.</p>
+` : ''}${draft ? html`  <p class="draft">${planned ? 'Голосование начнётся ' + fmtWhen(p.state.opensAt) + '.' : 'Голосование ещё не началось.'} Варианты уже можно посмотреть, а когда голосование откроется, страница обновится сама.</p>
 ` : ''}  <ol class="hero__steps">
 ${steps.map((s, i) => html`    <li><b>${i + 1}</b><span>${STEP_TITLE[s]}</span><small>${variants(opts[s].length)}</small></li>
 `)}  </ol>

@@ -246,7 +246,7 @@ function createApp(cfg) {
       },
       config: {
         api: '/k/' + encodeURIComponent(cls.slug),
-        steps: V.activeSteps(opts),
+        steps: V.votingSteps(cls, opts),
         state: state
       }
     });
@@ -279,6 +279,8 @@ function createApp(cfg) {
       return H.json(ctx.res, 400, { error: 'bad_option' });
     }
     if (V.status(cls) !== 'open') return H.json(ctx.res, 409, { error: 'closed', state: V.publicState(store, cat, cls, voter) });
+    // во время переголосования остальные этапы уже решены
+    if (V.votingSteps(cls, opts).indexOf(step) === -1) return H.json(ctx.res, 409, { error: 'locked', state: V.publicState(store, cat, cls, voter) });
     const ok = store.addVote(cls.id, voter, step, option);
     const state = V.publicState(store, cat, cls, voter);
     if (!ok) return H.json(ctx.res, 409, { error: 'already', state: state });
@@ -296,6 +298,7 @@ function createApp(cfg) {
     const step = String((ctx.body || {}).step || '');
     if (V.activeSteps(V.visibleOptions(cat, cls)).indexOf(step) === -1) return H.json(ctx.res, 400, { error: 'bad_step' });
     if (V.status(cls) !== 'open') return H.json(ctx.res, 409, { error: 'closed', state: V.publicState(store, cat, cls, voter) });
+    if (V.votingSteps(cls, V.visibleOptions(cat, cls)).indexOf(step) === -1) return H.json(ctx.res, 409, { error: 'locked', state: V.publicState(store, cat, cls, voter) });
     store.removeVote(cls.id, voter, step);
     H.json(ctx.res, 200, { ok: true, state: V.publicState(store, cat, cls, voter) });
   });
@@ -531,7 +534,7 @@ function createApp(cfg) {
     if (st === 'open') return back(ctx, '/admin/c/' + cls.id);
     const e = endFrom(ctx, now, cls.duration_min);
     if (e.err) return page(ctx, 400, classView(ctx, cls, { err: e.err }));
-    const f = { opened_at: st === 'draft' ? now : cls.opened_at, ends_at: e.ends, closed_at: null };
+    const f = { opened_at: st === 'draft' ? now : cls.opened_at, ends_at: e.ends, closed_at: null, revote: [] };
     if (st === 'draft' && e.min) f.duration_min = e.min;
     else f.picks = {};
     store.updateClass(cls.id, f);
@@ -572,6 +575,22 @@ function createApp(cfg) {
     if (until > now + UNTIL_MAX) return page(ctx, 400, classView(ctx, cls, { err: 'Голосование может длиться не больше двух месяцев' }));
     store.updateClass(cls.id, { ends_at: until });
     back(ctx, '/admin/c/' + cls.id, 'until');
+  });
+
+  // Переголосовать один этап: его голоса и ручной выбор обнуляются, голосование открывается заново
+  // на заданное время, и ребята видят только этот этап. Итоги остальных этапов не меняются
+  act('revote', (ctx, cls) => {
+    const now = Date.now();
+    const step = str(ctx.form.step, 20);
+    if (V.status(cls, now) !== 'closed') return back(ctx, '/admin/c/' + cls.id);
+    if (V.activeSteps(V.visibleOptions(catalog(), cls)).indexOf(step) === -1) return back(ctx, '/admin/c/' + cls.id);
+    const e = endFrom(ctx, now, cls.duration_min);
+    if (e.err) return page(ctx, 400, classView(ctx, cls, { err: e.err }));
+    store.resetStepVotes(cls.id, step);
+    const picks = Object.assign({}, cls.picks);
+    delete picks[step];
+    store.updateClass(cls.id, { picks: picks, ends_at: e.ends, closed_at: null, revote: [step] });
+    back(ctx, '/admin/c/' + cls.id, 'revote');
   });
 
   // Обнулить голоса одного этапа: ребята смогут проголосовать в нём заново

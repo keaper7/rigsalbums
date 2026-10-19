@@ -261,6 +261,11 @@ function newClassPage(o) {
   <datalist id="cities">${Array.from(new Set((o.schools || []).map(x => x.city).filter(Boolean))).map(c => html`<option value="${c}"></option>`)}</datalist>
   <label class="field"><span>Класс</span><input name="title" value="${f.title || ''}" placeholder="${o.nextTitle || '11 «Б»'}" required maxlength="400" autocomplete="off" data-titles></label>
   <p class="muted small">Можно сразу несколько классов одной школы через запятую: 11А, 11Б, 11В. Каждому будет своя ссылка.</p>
+  <div class="field"><span>Когда съёмка</span>
+    <div class="wk-halfsw wk-halfsw--pick" role="radiogroup" aria-label="Осень или весна">
+      ${[['autumn', 'Осень'], ['spring', 'Весна']].map(h => html`<label><input type="radio" name="half" value="${h[0]}"${(f.half || (new Date().getMonth() >= 6 ? 'autumn' : 'spring')) === h[0] ? raw(' checked') : ''}><span>${h[1]}</span></label>`)}
+    </div>
+  </div>
   <fieldset class="newwork">
     <legend>Для работы <small class="muted">можно потом</small></legend>
     <div class="two">

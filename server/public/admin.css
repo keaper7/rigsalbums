@@ -1023,3 +1023,10 @@ p.link code { display: inline-block; max-width: 100%; word-break: break-all; tex
 /* Длинные списки: карточки за экраном браузер не рисует, пока до них не долистали.
    auto запоминает настоящую высоту после первого показа, поэтому прокрутка не прыгает */
 .wk-card, .wk-lead { content-visibility: auto; contain-intrinsic-size: auto 170px; }
+/* осень или весна при создании класса: те же «таблетки», что на странице класса */
+.wk-halfsw--pick { display: inline-flex; margin: 6px 0 10px; }
+.wk-halfsw--pick label { position: relative; cursor: pointer; }
+.wk-halfsw--pick input { position: absolute; opacity: 0; pointer-events: none; }
+.wk-halfsw--pick span { display: block; border-radius: 99px; padding: 8px 18px; font-weight: 800; font-size: 14px; color: var(--ink-2); }
+.wk-halfsw--pick input:checked + span { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(58, 35, 33, .12); }
+.wk-halfsw--pick input:focus-visible + span { outline: 2px solid var(--wine); outline-offset: 2px; }

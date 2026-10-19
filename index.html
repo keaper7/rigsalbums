@@ -126,19 +126,28 @@
   <div class="wrap">
     <div class="flip__head rv">
       <p class="eyebrow">Пример работы</p>
-      <h2 class="h2">Полистайте <em>настоящий альбом</em></h2>
+      <h2 class="h2">Полистайте <em>настоящие альбомы</em></h2>
       <p class="lede">Нажмите на страницу, смахните или листайте стрелками.</p>
     </div>
-    <div class="bk" data-book data-base="assets/book/" data-spreads="23" tabindex="0" aria-label="Альбом: листайте стрелками влево и вправо">
+    <div class="bk" data-book data-base="assets/book1/" style="--bk-board: #3B2A22; --bk-spine: #2A1D17" data-spreads="12" tabindex="0" aria-label="Альбом: листайте стрелками влево и вправо">
       <div class="bk__stage">
         <div class="bk__book"></div>
-        <noscript><img class="bk__still" src="assets/book/front.jpg" alt="Обложка альбома"></noscript>
+        <noscript><img class="bk__still" src="assets/book1/front.jpg" alt="Обложка альбома"></noscript>
       </div>
       <div class="bk__bar">
         <button class="bk__btn" type="button" data-bk-prev aria-label="Назад">‹</button>
         <span class="bk__label" data-bk-label aria-live="polite">Обложка</span>
         <button class="bk__btn" type="button" data-bk-next aria-label="Вперёд">›</button>
         <button class="bk__zoom" type="button" data-bk-zoom>Крупно</button>
+      </div>
+      <div class="bk__more">
+        <p class="bk__more-t">Выберите альбом</p>
+        <div class="bk__picks">
+          <button class="bk__pick is-on" type="button" data-bk-album data-base="assets/book1/" data-board="#3B2A22" data-spine="#2A1D17" data-spreads="12" aria-pressed="true" aria-label="Альбом 1"><img src="assets/book1/front-sm.jpg" alt="" loading="lazy" draggable="false"></button>
+          <button class="bk__pick" type="button" data-bk-album data-base="assets/book2/" data-board="#8E6646" data-spine="#6E4C33" data-spreads="13" aria-pressed="false" aria-label="Альбом 2"><img src="assets/book2/front-sm.jpg" alt="" loading="lazy" draggable="false"></button>
+          <button class="bk__pick" type="button" data-bk-album data-base="assets/book3/" data-board="#CDC8C4" data-spine="#ABA5A0" data-spreads="12" aria-pressed="false" aria-label="Альбом 3"><img src="assets/book3/front-sm.jpg" alt="" loading="lazy" draggable="false"></button>
+          <button class="bk__pick" type="button" data-bk-album data-base="assets/book4/" data-board="#ECE9E6" data-spine="#CFCAC5" data-spreads="9" aria-pressed="false" aria-label="Альбом 4"><img src="assets/book4/front-sm.jpg" alt="" loading="lazy" draggable="false"></button>
+        </div>
       </div>
     </div>
   </div>

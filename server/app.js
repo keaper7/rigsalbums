@@ -433,6 +433,7 @@ function createApp(cfg) {
     const city = str(f.city, 60);
     ids.forEach(id => {
       if (city) work.setCity(id, city);
+      if (HALF_NAMES[f.half]) work.setHalf(id, f.half);
       const m = {};
       if (f.price) m.price = f.price;
       if (ids.length === 1 && f.students) m.students = f.students;

@@ -314,3 +314,23 @@ test('деньги: «осталось получить» — чистыми, п
   await admin.post('/admin/c/' + id + '/work/pay', { sum: '50000' });
   assert.strictEqual(s.app.work.money(s.app.work.get(+id), s.app.store.getClass(+id), 0).restNet, 0);
 });
+
+test('осень или весна при создании класса — всем классам сразу', async t => {
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  let r = await admin.req('GET', '/admin/new');
+  assert.match(r.text, /name="half" value="autumn"/);
+  assert.match(r.text, /name="half" value="spring"/);
+  // отмечен ровно один вариант
+  assert.strictEqual((r.text.match(/name="half" value="\w+" checked/g) || []).length, 1);
+  r = await admin.post('/admin/new', { school: 'Школа 7', title: '11А, 11Б', year: '2026', duration_min: '45', half: 'spring' });
+  assert.strictEqual(r.status, 303);
+  const cls = s.app.store.listClasses().filter(c => c.school === 'Школа 7');
+  assert.strictEqual(cls.length, 2);
+  cls.forEach(c => assert.strictEqual(s.app.work.get(c.id).half, 'spring'));
+  // мусор вместо сезона не сохраняется
+  r = await admin.post('/admin/new', { school: 'Школа 8', title: '9А', year: '2026', duration_min: '45', half: 'winter' });
+  const id = +/\/admin\/c\/(\d+)/.exec(r.headers.get('location'))[1];
+  assert.strictEqual(s.app.work.get(id).half, '');
+});

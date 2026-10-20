@@ -332,6 +332,16 @@ function createApp(cfg) {
     };
   }
 
+  // Коротко для страниц класса: загружен ли макет, сколько проверили, сколько правок
+  function layoutSummary(cls) {
+    const d = layoutData(cls);
+    if (d.noPick) return null;
+    return {
+      ver: d.lay ? d.lay.ver : 0, spreads: d.lay ? d.lay.spreads : 0, checked: d.checked, total: d.list.length,
+      fixes: Array.from(d.fixCount.values()).reduce((a, b) => a + b, 0) + (d.teacher ? d.teacher.fixes : 0)
+    };
+  }
+
   r.get('/admin/c/:id/layout', ctx => {
     const cls = loadClass(ctx);
     if (!cls) return notFound(ctx);
@@ -594,8 +604,21 @@ function createApp(cfg) {
     });
   }
 
+  // Что видно на карточке класса без захода в него: итоги голосования, съёмка, этап работы
+  function withInfo(list) {
+    const cat = catalog();
+    const all = work.all();
+    const t = today();
+    return list.map(c => {
+      const w = all.get(c.id) || work.get(c.id);
+      const res = c.voters || V.status(c) === 'closed' ? V.resolve(c, V.visibleOptions(cat, c), store.counts(c.id)) : null;
+      c.info = { res: res, shoot: shootText(w, t), stage: all.has(c.id) ? stageOf(w) : null, city: w.city };
+      return c;
+    });
+  }
+
   r.get('/admin', ctx => {
-    page(ctx, 200, A.classesPage({ sess: ctx.sess, msg: ctx.q('m'), classes: withPending(store.listClasses()), base: baseUrl(ctx) }));
+    page(ctx, 200, A.classesPage({ sess: ctx.sess, msg: ctx.q('m'), classes: withInfo(withPending(store.listClasses())), base: baseUrl(ctx) }));
   });
 
   // Классы, с которых можно взять настройки: свежие сверху, архив не нужен
@@ -1943,7 +1966,7 @@ function createApp(cfg) {
     const pk = pkFull(cls);
     return Object.assign({
       sess: ctx.sess, msg: ctx.q('m'), cls: cls, w: w, pk: pk, half: half(cls, w), today: today(),
-      lay: (d => ({ ver: d.lay ? d.lay.ver : 0, checked: d.checked, total: d.list.length, fixes: Array.from(d.fixCount.values()).reduce((a, b) => a + b, 0) }))(layoutData(cls)),
+      lay: layoutSummary(cls),
       m: work.money(w, cls, pk ? pk.total : 0), se: work.season(cls.year),
       fixes: work.fixes(cls.id), files: work.filesByFix(cls.id), notes: work.notes(cls.id),
       templates: work.templates(), base: baseUrl(ctx)
@@ -2180,7 +2203,7 @@ function createApp(cfg) {
     if (!d) return;
     const cls = designerClass(ctx);
     if (!cls) return H.redirect(ctx.res, '/d/' + d.token);
-    dpage(ctx, WV.designerClass({ designer: d, cls: cls, w: work.get(cls.id), pk: pkFull(cls), fixes: work.fixes(cls.id), files: work.filesByFix(cls.id), notes: work.notes(cls.id, 80, true), today: today() }));
+    dpage(ctx, WV.designerClass({ designer: d, cls: cls, w: work.get(cls.id), pk: pkFull(cls), lay: layoutSummary(cls), fixes: work.fixes(cls.id), files: work.filesByFix(cls.id), notes: work.notes(cls.id, 80, true), today: today() }));
   });
 
   r.get('/d/:token/c/:id/quotes.csv', ctx => {

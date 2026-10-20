@@ -20,6 +20,9 @@
 .bk__leaf.is-moving { will-change: transform; }
 .bk__face { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; background: #3B2A22; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
 .bk__face--back { -webkit-transform: rotateY(180deg); transform: rotateY(180deg); }
+/* Всё, что лежит на стороне листа (подпись, тень), остаётся внутри неё: в Safari иначе оно не пряталось
+   вместе со стороной, и подпись «Твоя страница» просвечивала зеркально на следующей странице */
+.bk__face { z-index: 0; }
 .bk__face img { width: 100%; height: 100%; -o-object-fit: cover; object-fit: cover; pointer-events: none; }
 /* корешок: страница темнеет к сгибу */
 .bk__face:after { content: ''; position: absolute; top: 0; bottom: 0; width: 9%; pointer-events: none; }
@@ -111,9 +114,10 @@ html.bk-lock { overflow: hidden; }
 .bk__book.is-closed:before, .bk__book.is-end:before { display: none; }
 /* обёртка сторон листа */
 .bk__in { position: absolute; top: 0; left: 0; width: 100%; height: 100%; -webkit-transform-style: preserve-3d; transform-style: preserve-3d; -webkit-transform-origin: left center; transform-origin: left center; }
-/* блик на поднятой странице: свет скользит у края, тень собирается к корешку */
-.bk__pg:before { background: linear-gradient(90deg, rgba(0, 0, 0, .04), rgba(0, 0, 0, .26) 55%, rgba(255, 255, 255, .2) 84%, rgba(255, 255, 255, 0) 100%); }
-.bk__face--back .bk__pg:before { background: linear-gradient(270deg, rgba(0, 0, 0, .04), rgba(0, 0, 0, .26) 55%, rgba(255, 255, 255, .2) 84%, rgba(255, 255, 255, 0) 100%); }
+/* тень на поднятой странице собирается к корешку. Светлой полосы нет: вспышка света на листе
+   при перелистывании выглядела как сбой */
+.bk__pg:before { background: linear-gradient(90deg, rgba(0, 0, 0, .03), rgba(0, 0, 0, .2) 60%, rgba(0, 0, 0, .08)); }
+.bk__face--back .bk__pg:before { background: linear-gradient(270deg, rgba(0, 0, 0, .03), rgba(0, 0, 0, .2) 60%, rgba(0, 0, 0, .08)); }
 /* у корешка, кроме тени, тонкий отсвет: страница выглядит выгнутой */
 .bk__face--front .bk__pg:after { background: linear-gradient(90deg, rgba(0, 0, 0, .3), rgba(0, 0, 0, .08) 45%, rgba(255, 255, 255, .1) 70%, rgba(255, 255, 255, 0)); }
 .bk__face--back .bk__pg:after { background: linear-gradient(270deg, rgba(0, 0, 0, .3), rgba(0, 0, 0, .08) 45%, rgba(255, 255, 255, .1) 70%, rgba(255, 255, 255, 0)); }
@@ -192,4 +196,5 @@ html.bk-lock { overflow: hidden; }
 .bk__leaf.is-hid { visibility: hidden; }
 /* Своя страница ученика на странице проверки: золотая рамка и подпись */
 .bk__face.is-mine .bk__pg { box-shadow: inset 0 0 0 3px #E2B44B, inset 0 0 0 5px rgba(255, 255, 255, .5); }
-.bk__face.is-mine:after { content: 'Твоя страница'; position: absolute; top: 4%; right: auto; bottom: auto; left: 50%; width: auto; height: auto; z-index: 3; -webkit-transform: translateX(-50%); transform: translateX(-50%); padding: 5px 12px; border-radius: 99px; background: #E2B44B; color: #2A1D17; font: 800 12px/1.2 var(--sans, Arial), Arial, sans-serif; letter-spacing: .02em; white-space: nowrap; pointer-events: none; box-shadow: 0 4px 10px -4px rgba(0, 0, 0, .4); }
+/* подпись без transform: в Safari сдвинутый так элемент получает свой слой, и его видно сквозь лист с обратной стороны */
+.bk__face.is-mine:after { content: 'Твоя страница'; position: absolute; top: 4%; right: 0; bottom: auto; left: 0; width: -webkit-max-content; width: max-content; height: auto; margin: 0 auto; z-index: 3; padding: 5px 12px; border-radius: 99px; background: #E2B44B; color: #2A1D17; font: 800 12px/1.2 var(--sans, Arial), Arial, sans-serif; letter-spacing: .02em; white-space: nowrap; pointer-events: none; box-shadow: 0 4px 10px -4px rgba(0, 0, 0, .4); }

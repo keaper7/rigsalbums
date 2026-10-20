@@ -143,7 +143,7 @@ function albumPage(o) {
   const mine = pg ? 's' + pad(pg.spread, 2) + '-' + pg.side : '';
   const open = o.fixes.filter(f => !f.done_at), done = o.fixes.filter(f => f.done_at);
   return albumShell(o, html`<p class="al-lead">${t ? 'Это альбом класса целиком, как он будет напечатан. Проверьте свою обложку: имя и фото. Остальные страницы тоже можно полистать. Нажмите «Крупно», чтобы рассмотреть страницу ближе.' : 'Листай альбом и проверь свою страницу и обложку: имя, фото, цитату. Нажми «Крупно», чтобы рассмотреть страницу ближе.'}</p>
-<div class="bk al-bk" data-book data-no-intro data-base="${o.api.files}" data-spreads="${l.spreads}" data-front="${cn ? 'c' + pad(cn, 3) : 's01-r'}" data-back="${cn ? 'b' + pad(cn, 3) : 's01-l'}" data-big="900"${mine ? html` data-mine="${mine}"` : ''} tabindex="0" aria-label="Альбом: листайте стрелками влево и вправо" style="--bk-board: #3B2A22; --bk-spine: #2A1D17">
+<div class="bk al-bk" data-book data-no-intro data-base="${o.api.files}" data-spreads="${l.spreads}" data-front="${cn ? 'c' + pad(cn, 3) : 's01-r'}" data-no-back data-big="900"${mine ? html` data-mine="${mine}"` : ''} tabindex="0" aria-label="Альбом: листайте стрелками влево и вправо" style="--bk-board: #3B2A22; --bk-spine: #2A1D17">
   <div class="bk__stage"><div class="bk__book"></div></div>
   <div class="bk__bar">
     <button class="bk__btn" type="button" data-bk-prev aria-label="Назад">‹</button>
@@ -156,7 +156,7 @@ function albumPage(o) {
   ${pg ? html`<button class="btn" type="button" data-al-goto="${pg.spread}" data-al-side="${pg.side}">Моя страница</button>` : ''}
   <button class="btn" type="button" data-al-goto="0" data-al-side="l">Моя обложка</button>
 </div>
-<p class="al-full" data-al-full hidden>Рассмотреть в полном качестве: <a href="#" target="_blank" rel="noopener" data-al-full-l>левая страница</a><a href="#" target="_blank" rel="noopener" data-al-full-r>правая страница</a></p>
+<p class="al-full" data-al-full hidden>В полном качестве: <a href="#" target="_blank" rel="noopener" data-al-full-l>левая</a><a href="#" target="_blank" rel="noopener" data-al-full-r>правая</a></p>
 ${!hasCover ? html`<p class="al-note">${t ? 'Вашей обложки в макете пока нет, сейчас показана обложка ученика. Напишите об этом в правке.' : 'Твоей обложки в макете пока нет, сейчас показана обложка одноклассника. Напиши об этом в правке.'}</p>` : ''}
 ${o.view ? html`<p class="al-note">${t ? 'Так альбом видит классный руководитель. Правки и «всё верно» отмечаются по его ссылке.' : html`Так альбом видит ${o.me ? o.me.name : 'ученик'}. Правки и «всё верно» отмечает сам ученик по своей ссылке.`}</p>` : html`<section class="al-check" data-al-check data-fix="${o.api.fix}" data-ok="${o.api.ok}">
   <h2>Всё верно?</h2>

@@ -75,9 +75,8 @@
     var st = book.bkState(), base = book.getAttribute('data-base'), pad = function (n) { return (n < 10 ? '0' : '') + n; };
     var l = full.querySelector('[data-al-full-l]'), r = full.querySelector('[data-al-full-r]');
     if (st.cur === 0) { full.hidden = false; l.hidden = true; r.hidden = false; r.textContent = 'обложка'; r.href = base + book.getAttribute('data-front') + '.jpg'; return; }
-    if (st.cur > st.n) { full.hidden = false; r.hidden = true; l.hidden = false; l.textContent = 'задник'; l.href = base + book.getAttribute('data-back') + '.jpg'; return; }
     full.hidden = false; l.hidden = false; r.hidden = false;
-    l.textContent = 'левая страница'; r.textContent = 'правая страница';
+    l.textContent = 'левая'; r.textContent = 'правая';
     l.href = base + 's' + pad(st.cur) + '-l.jpg';
     r.href = base + 's' + pad(st.cur) + '-r.jpg';
   }
@@ -95,7 +94,7 @@
   // Где ошибка — по умолчанию страница, которая сейчас открыта: своя, если она на этом развороте
   function guess() {
     var s = book.bkState ? book.bkState() : { cur: 0, n: 0 };
-    if (s.cur === 0 || s.cur > s.n) return 'cover';
+    if (s.cur === 0) return 'cover';
     if (s.single) return s.cur + '-' + s.focus;
     var m = /^s(\d{2})-([lr])$/.exec(mine);
     if (m && +m[1] === s.cur) return s.cur + '-' + m[2];

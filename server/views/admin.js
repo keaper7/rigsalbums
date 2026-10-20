@@ -178,11 +178,35 @@ function chip(c, now) {
   return html`<span class="chip chip--done">Закрыто</span>`;
 }
 
+// Короткие названия этапов для карточки класса
+const STEP_SHORT = { theme: 'Тема', place: 'Место', wear: 'Одежда', color: 'Цвет' };
+
+// Главное о классе одной-двумя строками: что выбрали, когда съёмка, на каком этапе работа
+function classFacts(c, now) {
+  const i = c.info;
+  if (!i) return '';
+  const st = status(c, now);
+  const out = [];
+  if (i.res) STEPS.forEach(step => {
+    const r = i.res[step];
+    if (!r) return;
+    if (r.option) out.push(html`<span class="fact"><i>${STEP_SHORT[step]}:</i> ${r.option.name}</span>`);
+    else if (st === 'closed') out.push(html`<span class="fact fact--warn"><i>${STEP_SHORT[step]}:</i> ${r.tie.length > 1 ? 'ничья' : 'нет голосов'}</span>`);
+  });
+  const lead = st === 'open' && out.length ? html`<span class="fact fact--now">пока лидирует</span>` : '';
+  const more = [];
+  if (i.shoot) more.push(html`<span class="fact"><i>Съёмка:</i> ${i.shoot[0].toLowerCase() + i.shoot.slice(1)}</span>`);
+  if (i.stage) more.push(html`<span class="fact"><i>Этап:</i> ${i.stage.finished ? 'альбом забрали' : i.stage.stage.name.toLowerCase() + (i.stage.next ? ', дальше ' + i.stage.next.toLowerCase() : '')}</span>`);
+  if (!out.length && !more.length) return '';
+  return html`<span class="row__more">${out.length ? html`<span class="row__facts">${lead}${out}</span>` : ''}${more.length ? html`<span class="row__facts">${more}</span>` : ''}</span>`;
+}
+
 function classRow(c, now, base) {
-  return html`<div class="row row--class" data-find="${(c.title + ' ' + c.school).toLowerCase()}">
+  return html`<div class="row row--class" data-find="${(c.title + ' ' + c.school + ' ' + ((c.info && c.info.city) || '')).toLowerCase()}">
       <a class="row__link" href="/admin/c/${c.id}">
-        <span class="row__main"><b>${c.title}</b><small>${c.school}</small></span>
+        <span class="row__main"><b>${c.title}</b><small>${c.school}${c.info && c.info.city ? ' · ' + c.info.city : ''}</small></span>
         <span class="row__side">${chip(c, now)}<small>${c.voters ? 'проголосовали ' + people(c.voters) : 'пока без голосов'}</small></span>
+        ${classFacts(c, now)}
       </a>
       <button class="row__copy" type="button" data-copy="${base}/k/${c.slug}" title="Скопировать ссылку на страницу класса"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L11.6 6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.6-1.6"/></svg><span>ссылка</span></button>
     </div>`;

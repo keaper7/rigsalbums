@@ -13,7 +13,6 @@
 .link { border: 0; padding: 0; background: none; color: var(--wine); font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
 /* альбом */
 .al-bk { margin-top: 8px; }
-.al-bk .bk__stage { touch-action: pan-y pinch-zoom; }
 .al-go { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
 /* проверка */
 .al-check { max-width: 640px; margin: 34px auto 0; padding: 20px; border-radius: 22px; background: var(--card); border: 1px solid var(--line); }
@@ -28,5 +27,10 @@
 .al-fixes li small { color: var(--warn); font-weight: 800; }
 .al-fixes li.is-done small { color: var(--ok); }
 [hidden] { display: none !important; }
-.al-full { margin-top: 12px; text-align: center; font-size: 14px; color: var(--ink-2); }
-.al-full a { display: inline-block; margin-left: 10px; color: var(--wine); font-weight: 800; white-space: nowrap; }
+/* одна строка всегда: на обложке и на развороте высота одинаковая, страница под альбомом не прыгает */
+.al-full { margin-top: 12px; text-align: center; font-size: 14px; color: var(--ink-2); white-space: nowrap; }
+.al-full a { display: inline-block; margin-left: 10px; color: var(--wine); font-weight: 800; }
+/* «Крупно» нужно и на компьютере: читать цитаты. На главной кнопка на широком экране спрятана */
+@media (min-width: 900px) { .al-bk .bk__zoom { display: inline-block; } }
+/* глянец по обложке на проверке не нужен */
+.al-bk .bk__gl { display: none; }

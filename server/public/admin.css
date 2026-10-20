@@ -1061,3 +1061,17 @@ p.link code { display: inline-block; max-width: 100%; word-break: break-all; tex
 .lay-list__name small { color: var(--ink-2); font-size: 13px; }
 .lay-list__st { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
 .lay-list li.lay-list__kr { border-top-style: dashed; }
+/* Главное о классе в списке: что выбрали, съёмка, этап */
+.row--class .row__link { flex-wrap: wrap; row-gap: 0; }
+.row__more { flex: 1 0 100%; display: grid; gap: 3px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.row__facts { display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 13px; line-height: 1.35; color: var(--ink); }
+.fact { white-space: nowrap; }
+.fact i { font-style: normal; color: var(--ink-2); }
+.fact--warn { color: var(--warn); }
+.fact--now { color: var(--live); font-weight: 700; }
+/* Макет для проверки: заметная кнопка на странице класса */
+.wk-lay { display: flex; align-items: center; justify-content: space-between; gap: 12px 18px; flex-wrap: wrap; border: 1.5px solid var(--wine); }
+.wk-lay__t { flex: 1 1 240px; min-width: 0; }
+.wk-lay__t .h { margin-bottom: 2px; }
+.wk-lay .b { flex: 0 0 auto; }
+@media (max-width: 520px) { .wk-lay .b { width: 100%; text-align: center; } }

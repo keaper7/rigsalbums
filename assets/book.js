@@ -26,6 +26,8 @@
     var big = +box.getAttribute('data-big') || 300;
     var mine = box.getAttribute('data-mine') || '';
     var noIntro = box.hasAttribute('data-no-intro');
+    // На проверке макета задник не показываем: альбом заканчивается последним разворотом
+    var noBack = box.hasAttribute('data-no-back');
     var pad = function (i) { return (i < 10 ? '0' : '') + i; };
 
     var leaves = [];
@@ -44,7 +46,7 @@
       leaves = [];
       for (var k = 0; k <= n; k++) {
         var front = k === 0 ? frontName : 's' + pad(k) + '-r';
-        var back = k === n ? backName : 's' + pad(k + 1) + '-l';
+        var back = k === n ? (noBack ? '' : backName) : 's' + pad(k + 1) + '-l';
         var leaf = document.createElement('div');
         leaf.className = 'bk__leaf' + (k === 0 ? ' is-cover' : '') + (k === n ? ' is-last' : '');
         // страница чуть меньше листа: вокруг неё видна обложка, как у настоящего альбома.
@@ -54,7 +56,7 @@
         el.appendChild(leaf);
         // своя страница ученика подсвечена
         if (mine && (front === mine || back === mine)) leaf.querySelector(front === mine ? '.bk__face--front' : '.bk__face--back').classList.add('is-mine');
-        leaves.push({ el: leaf, imgs: leaf.querySelectorAll('img'), names: [front, back], loaded: null });
+        leaves.push({ el: leaf, imgs: leaf.querySelectorAll('img'), names: [front, back], loaded: [null, null] });
       }
       // тень под альбомом и торцы страниц по краям — для объёма
       el.insertAdjacentHTML('beforeend', '<i class="bk__sh bk__sh--l"></i><i class="bk__sh bk__sh--r"></i><i class="bk__edge bk__edge--l"></i><i class="bk__edge bk__edge--r"></i>');
@@ -67,18 +69,49 @@
 
     // Крупные картинки — когда страница на экране шире 300 точек с учётом плотности экрана
     function size() { return el.offsetWidth / 2 * (window.devicePixelRatio || 1) > big ? '' : '-sm'; }
-    function load(from, to) {
+    // Крупные картинки макета тяжёлые (на проверке), поэтому крупно грузим только видимые страницы
+    // и те, что покажутся следующим переворотом. На главной картинки лёгкие, там все одного размера
+    function sizeFor(i, k) {
       var s = size();
+      if (s === '-sm' || big <= 300) return s;
+      var near = k === 0 ? i >= cur - 1 && i <= cur + 1 : i >= cur - 2 && i <= cur;
+      return near ? '' : '-sm';
+    }
+    function load(from, to) {
       for (var i = Math.max(0, from); i <= Math.min(n, to); i++) {
         var lf = leaves[i];
-        // уже есть такая же или крупная — не трогаем; маленькую меняем на крупную, если экран стал больше
-        if (lf.loaded === s || lf.loaded === '') continue;
-        lf.imgs[0].src = base + lf.names[0] + s + '.jpg';
-        lf.imgs[1].src = base + lf.names[1] + s + '.jpg';
-        // раскладываем картинку заранее, а не в момент, когда лист покажется
-        if (lf.imgs[0].decode) { lf.imgs[0].decode().catch(function () {}); lf.imgs[1].decode().catch(function () {}); }
-        lf.loaded = s;
+        for (var k = 0; k < 2; k++) {
+          if (!lf.names[k]) continue;
+          var s = sizeFor(i, k), had = lf.loaded[k];
+          // уже есть такая же или крупная — не трогаем; маленькую меняем на крупную, если экран стал больше
+          if (had === s || had === '') continue;
+          put(lf.imgs[k], base + lf.names[k] + s + '.jpg', had !== null);
+          lf.loaded[k] = s;
+        }
       }
+    }
+    // Крупные картинки на далёких листах меняем обратно на маленькие: телефону не держать в памяти весь альбом
+    function shrink() {
+      if (big <= 300) return;
+      leaves.forEach(function (lf, i) {
+        if (i >= cur - 3 && i <= cur + 3) return;
+        for (var k = 0; k < 2; k++) if (lf.loaded[k] === '' && lf.names[k]) { put(lf.imgs[k], base + lf.names[k] + '-sm.jpg', false); lf.loaded[k] = '-sm'; }
+      });
+    }
+    // Новая картинка. Если на месте уже была маленькая, крупную сначала загружаем и раскладываем отдельно
+    // и только потом подставляем: иначе страница на миг пустеет, и это видно как мигание
+    function put(img, url, swap) {
+      img.setAttribute('data-want', url);
+      if (!swap) {
+        img.src = url;
+        // раскладываем картинку заранее, а не в момент, когда лист покажется
+        if (img.decode) img.decode().catch(function () {});
+        return;
+      }
+      var pre = new Image();
+      var done = function () { if (img.getAttribute('data-want') === url) img.src = url; };
+      pre.onload = function () { if (pre.decode) pre.decode().then(done, done); else done(); };
+      pre.src = url;
     }
 
     function paint() {
@@ -120,10 +153,12 @@
       box.classList.toggle('is-f-r', single() && cur > 0 && cur <= n && focus === 'r');
       if (label) label.textContent = cur === 0 ? 'Обложка' : cur === n + 1 ? 'Задняя обложка' : 'Разворот ' + cur + ' из ' + n;
       if (prevBtn) prevBtn.disabled = cur === 0;
-      if (nextBtn) nextBtn.disabled = cur === n + 1;
+      if (nextBtn) nextBtn.disabled = cur === n + 1 || (cur >= last() && !(single() && cur > 0 && focus === 'l'));
       load(cur - 2, cur + 2);
-      // какой разворот открыт и какая страница видна — для правок на странице проверки
-      if (cur !== lastCur || focus !== lastFocus) {
+      if (!busy) shrink();
+      // какой разворот открыт и какая страница видна — для правок на странице проверки.
+      // Сообщаем, когда листы легли: страница под альбомом не меняется посреди переворота
+      if (!busy && (cur !== lastCur || focus !== lastFocus)) {
         lastCur = cur; lastFocus = focus;
         box.dispatchEvent(new CustomEvent('bk:change', { detail: { cur: cur, n: n, single: single(), focus: focus } }));
       }
@@ -138,7 +173,7 @@
     // Перевернуть один лист: вперёд (к концу) или назад. speed — длительность в мс
     function turn(dir, speed) {
       var i = dir > 0 ? cur : cur - 1;
-      if (i < 0 || i > n) return false;
+      if (i < 0 || i > n || (dir > 0 && cur >= last())) return false;
       speed = speed || 900;
       var lf = leaves[i];
       lf.el.classList.remove('is-far', 'is-hid', 'is-buried');
@@ -181,6 +216,7 @@
       if (dir > 0) {
         if (cur === n + 1) return;
         if (cur > 0 && focus === 'l') { focus = 'r'; return paint(); }
+        if (cur >= last()) return;
         focus = 'l';
         turn(1);
       } else {
@@ -191,6 +227,8 @@
       }
     }
     function single() { return box.classList.contains('is-single'); }
+    // дальше какого положения листать нельзя: задник или последний разворот
+    function last() { return noBack ? n : n + 1; }
 
     if (prevBtn) prevBtn.addEventListener('click', function () { go(-1); });
     if (nextBtn) nextBtn.addEventListener('click', function () { go(1); });
@@ -300,7 +338,7 @@
       stopIntro();
       started = true;
       touched = gen;
-      k = Math.max(0, Math.min(n + 1, k));
+      k = Math.max(0, Math.min(last(), k));
       if (side) focus = side;
       var dir = k > cur ? 1 : -1, steps = Math.abs(k - cur), t = 0;
       if (!steps) return paint();

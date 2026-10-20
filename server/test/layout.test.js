@@ -85,6 +85,8 @@ test('макет: загрузка, вход ученика, своя облож
   assert.strictEqual(r.status, 200, r.text);
   r = await kid.req('GET', '/f/' + slug + '/album');
   assert.match(r.text, /data-front="c002"/);
+  assert.match(r.text, /data-no-back/, 'задник на проверке не показываем');
+  assert.doesNotMatch(r.text, /data-back=/);
   assert.match(r.text, /data-mine="s02-r"/, 'первая личная — страница 3 (разворот 2 слева), у второго ученика — справа');
   r = await kid.req('GET', '/f/' + slug + '/lay/' + res.ver + '/c001-sm.jpg');
   assert.strictEqual(r.status, 200);
@@ -110,6 +112,7 @@ test('макет: загрузка, вход ученика, своя облож
   // у пункта «Сверка» — сколько проверили и ссылка на макет; в сообщении — ссылка на альбом
   r = await admin.req('GET', '/admin/c/' + id + '/work');
   assert.match(r.text, /проверили 1 из 3, правок 1/);
+  assert.match(r.text, /class="card wk-lay"[\s\S]*Загружен: 2 разворота · проверили 1 из 3[\s\S]*Открыть макет/, 'заметная карточка макета у Артура');
   assert.match(r.text, new RegExp('/f/' + slug + '/album'));
   // первая личная страница меняется
   await admin.post('/admin/c/' + id + '/layout/first', { spread: '1', side: 'r' });
@@ -126,7 +129,10 @@ test('макет: дизайнер загружает по своей ссылк
   const { s, admin, id, slug } = await setup(t);
   const token = s.app.work.addDesigner('Дизайнер');
   const des = client(s.base);
-  let r = await des.req('GET', '/d/' + token + '/c/' + id + '/layout');
+  // на странице класса у дизайнера — заметная кнопка загрузки макета
+  let r = await des.req('GET', '/d/' + token + '/c/' + id);
+  assert.match(r.text, new RegExp('class="card wk-lay"[\\s\\S]*href="/d/' + token + '/c/' + id + '/layout">Загрузить макет'));
+  r = await des.req('GET', '/d/' + token + '/c/' + id + '/layout');
   assert.strictEqual(r.status, 200);
   assert.match(r.text, /data-lay/);
   const res = await uploadAll(

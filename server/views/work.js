@@ -590,6 +590,7 @@ function classPage(o) {
   const body = html`${classHead(o, 'work')}
 ${contactsCard(o)}
 ${stagesBlock(o)}
+${o.lay && (o.lay.ver || stageOf(w).index >= 1) ? layoutCard(o.lay, '/admin/c/' + c.id + '/layout', false) : ''}
 
 ${early ? raw('<details class="wk-later" id="designer-fold"><summary><span><b>Дизайнер и правки</b><small>Понадобятся на этапе «Работа». Открыть, если нужно сейчас</small></span></summary>') : ''}
 <section class="card" id="designer">
@@ -908,7 +909,7 @@ function designerClass(o) {
   const allQuotes = quotes.map(s => numLabel(nums.get(s.id)) + ' ' + s.name + '\n' + s.quote).join('\n\n');
   const body = html`<a class="back" href="${home}">← Все классы</a>
 <div class="head head--class">
-  <div><h1 class="h1">${c.title}</h1><p class="muted">${c.school} · ${c.year} · <a href="${api}/layout">макет для проверки</a></p></div>
+  <div><h1 class="h1">${c.title}</h1><p class="muted">${c.school} · ${c.year}</p></div>
 </div>
 
 <section class="card wk-dhead">
@@ -924,6 +925,8 @@ function designerClass(o) {
   <p class="wk-lab">Что сделано</p>
   <div class="wk-parts">${PARTS.map(p => html`<label class="check check--sm"><input type="checkbox" data-part="${p[0]}" data-url="${api}/part"${w.done[p[0]] ? raw(' checked') : ''}><span>${p[1]}</span></label>`)}</div>
 </section>
+
+${layoutCard(o.lay, api + '/layout', true)}
 
 ${open.length ? html`<section class="card wk-open" id="fixes">
   <div class="card__h"><h2 class="h">Правки</h2><span class="chip chip--warn">${open.length}</span></div>
@@ -969,6 +972,18 @@ ${pk && pk.group.length ? html`<details class="card fold" id="group">
 
 ${done.length ? html`<details class="card fold"><summary class="fold__h"><span><b>Исправленные правки</b><small>${done.length}</small></span></summary><ul class="wk-fixes">${done.map(f => html`<li class="wk-fix is-done">${fixBody(f, o.files, api + '/file/')}</li>`)}</ul></details>` : ''}`;
   return dlayout({ title: c.title + ' · ' + c.school, designer: o.designer, home: home, body: body });
+}
+
+// Макет для проверки учениками: заметная кнопка, а не ссылка в шапке
+function layoutCard(l, href, designer) {
+  if (!l) return '';
+  const info = l.ver
+    ? html`Загружен: ${l.spreads} ${plural(l.spreads, 'разворот', 'разворота', 'разворотов')} · проверили ${l.checked} из ${l.total}${l.fixes ? html` · <span class="wk-warn">правок ${l.fixes}</span>` : ''}`
+    : designer ? 'Когда макет готов, загрузите его сюда. Ученики проверят свои страницы и обложки, правки придут вам' : 'Дизайнер загружает макет, ученики проверяют свои страницы и обложки';
+  return html`<section class="card wk-lay" id="layout">
+  <div class="wk-lay__t"><h2 class="h">Макет для проверки</h2><p class="muted small">${info}</p></div>
+  <a class="b ${l.ver ? '' : 'b--main'}" href="${href}">${l.ver ? 'Открыть макет' : 'Загрузить макет'}</a>
+</section>`;
 }
 
 // Выбор классного руководителя для дизайнера: два фото и пожелание классу

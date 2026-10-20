@@ -610,6 +610,7 @@ p.pk-slim { display: block; }
 .wk-dst { padding: 14px 0; border-top: 1px solid var(--line); }
 .wk-dst__h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 16px; }
 .wk-dst.has-fix .wk-dst__h b { color: var(--warn); }
+.wk-num { font-variant-numeric: tabular-nums; color: var(--ink-2); font-weight: 500; }
 .wk-q { margin: 10px 0 4px; padding: 10px 12px; border-left: 3px solid var(--wine); border-radius: 0 10px 10px 0; background: var(--paper); font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .wk-copy { padding: 4px 0; border: 0; background: none; color: var(--wine); font-weight: 800; font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .wk-copy.is-done { color: var(--ok); }
@@ -1042,3 +1043,21 @@ p.link code { display: inline-block; max-width: 100%; word-break: break-all; tex
 /* «По этапам / По школам» и сортировка в одну строку, на узком экране друг под другом */
 .wk-views { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 12px; }
 .wk-views .wk-view { margin: 0; }
+/* макет альбома для проверки */
+.lay-link { display: flex; gap: 8px; margin-top: 10px; }
+.lay-link input { flex: 1 1 auto; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 14px; }
+.lay-pick { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; }
+.lay-pick label { position: relative; overflow: hidden; }
+.lay-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.lay-up.is-drop { outline: 2px dashed var(--wine); outline-offset: -8px; }
+.lay-sum { display: grid; gap: 6px; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--paper-2); }
+.lay-sum .b { justify-self: start; margin-top: 6px; }
+.lay-first { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 8px; }
+.lay-first input[type=number] { width: 80px; }
+.lay-list { list-style: none; margin: 10px 0 0; padding: 0; }
+.lay-list li { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+.lay-list__n { flex: 0 0 auto; width: 40px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.lay-list__name { flex: 1 1 auto; min-width: 0; display: grid; }
+.lay-list__name small { color: var(--ink-2); font-size: 13px; }
+.lay-list__st { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; }
+.lay-list li.lay-list__kr { border-top-style: dashed; }

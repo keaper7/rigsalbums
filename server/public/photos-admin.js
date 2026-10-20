@@ -274,11 +274,14 @@
         btn.disabled = true;
         var jobs = [];
         var quotes = [];
+        // номер, как в макете: обложка ученика 003 — файл 003-00, папка «003 Имя»
+        var num = function (n) { return n ? String(n).padStart(3, '0') + ' ' : ''; };
+        plan.students.sort(function (a, b) { return (a.num || 0) - (b.num || 0); });
         plan.students.forEach(function (s) {
-          if (s.quote) quotes.push(s.name + ':\n' + s.quote + '\n');
+          if (s.quote) quotes.push(num(s.num) + s.name + ':\n' + s.quote + '\n');
           if (!s.photos.length && !s.quote) return;
           // два ученика с похожими именами не должны попасть в одну папку
-          var folder = safe(s.name), base = folder, k = 2;
+          var folder = num(s.num) + safe(s.name), base = folder, k = 2;
           while (jobs.some(function (j) { return j.folder.toLowerCase() === folder.toLowerCase(); }) || folder.toLowerCase() === 'групповые' || folder.toLowerCase() === 'классный руководитель') folder = base + ' (' + k++ + ')';
           // имя файла: место, потом ученик — «обложка_Биттуев Азамат.jpg», дизайнер сразу видит, куда и чьё
           jobs.push({ folder: folder, files: s.photos, names: (s.roles || []).map(function (r) { return r ? r.toLowerCase() + '_' + safe(s.name) : ''; }), quote: s.quote });
@@ -291,7 +294,7 @@
           var tf = [], tn = [];
           if (t.cover) { tf.push(t.cover); tn.push('обложка_' + who); }
           if (t.list) { tf.push(t.list); tn.push('список класса_' + who); }
-          jobs.push({ folder: 'Классный руководитель', files: tf, names: tn, text: t.wish ? ['Пожелание классу.txt', (t.name ? t.name + '\n\n' : '') + t.wish + '\n'] : null });
+          jobs.push({ folder: num(t.num) + 'Классный руководитель', files: tf, names: tn, text: t.wish ? ['Пожелание классу.txt', (t.name ? t.name + '\n\n' : '') + t.wish + '\n'] : null });
         }
         var total = jobs.reduce(function (n, j) { return n + j.files.length; }, 0) || 1;
         var done = 0;
@@ -325,8 +328,8 @@
         }).then(function () {
           // та же таблица для Excel: «Ученик; Цитата», дизайнеру удобно копировать из ячеек
           var cell = function (v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; };
-          var rows = plan.students.filter(function (s) { return s.quote; }).map(function (s) { return cell(s.name) + ';' + cell(s.quote); });
-          return rows.length ? writeFile(out, 'Цитаты.csv', '\ufeff' + ['Ученик;Цитата'].concat(rows).join('\r\n') + '\r\n') : null;
+          var rows = plan.students.filter(function (s) { return s.quote; }).map(function (s) { return cell(num(s.num).trim()) + ';' + cell(s.name) + ';' + cell(s.quote); });
+          return rows.length ? writeFile(out, 'Цитаты.csv', '\ufeff' + ['Номер;Ученик;Цитата'].concat(rows).join('\r\n') + '\r\n') : null;
         }).then(function () {
           var empty = plan.students.filter(function (s) { return !s.photos.length; }).map(function (s) { return s.name; });
           var msg = 'Готово: папка «' + title + '»';

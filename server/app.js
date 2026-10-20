@@ -15,6 +15,8 @@ const klassView = require('./views/klass');
 const A = require('./views/admin');
 const PV = require('./views/photos');
 const { Photos, PHOTO_ID, PIN_RE, ROLES } = require('./lib/photos');
+const { Layout, numbered, pageOf, pageLabel, FILE_MAX: LAY_FILE_MAX } = require('./lib/layout');
+const LV = require('./views/layout');
 const { Work, half, shootText, stageOf, readFile, FILE_MAX, STATUS_NAMES, DESIGNER_STATUSES, PART_NAMES, HALF_NAMES } = require('./lib/work');
 const WV = require('./views/work');
 const { Stats, day: statDay, SITE_PAGES } = require('./lib/stats');
@@ -22,6 +24,8 @@ const SV = require('./views/stats');
 
 const RESERVED = ['admin', 'assets', 'state', 'vote', 'react', 'new', 'media'];
 const VOTER_RE = /^[A-Za-z0-9_-]{16,64}$/;
+// Так подписаны правки классного руководителя у дизайнера
+const TEACHER_LABEL = 'Классный руководитель';
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 const COLORS_MAX = 7;
 const YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -111,6 +115,7 @@ function createApp(cfg) {
   const site = new Site(siteRoot, store);
   const photos = new Photos(store, cfg.photosDir || path.join(cfg.dataDir, 'photos'));
   const work = new Work(store, cfg.fixesDir || path.join(cfg.dataDir, 'fixes'));
+  const layout = new Layout(store, cfg.layoutDir || path.join(cfg.dataDir, 'layout'));
   const stats = new Stats(store, auth.secret);
   // старые записи статистики — раз в сутки
   const pruneTimer = setInterval(() => { try { stats.prune(); } catch (e) { console.error(e); } }, 24 * 3600 * 1000);
@@ -301,6 +306,238 @@ function createApp(cfg) {
     if (V.votingSteps(cls, V.visibleOptions(cat, cls)).indexOf(step) === -1) return H.json(ctx.res, 409, { error: 'locked', state: V.publicState(store, cat, cls, voter) });
     store.removeVote(cls.id, voter, step);
     H.json(ctx.res, 200, { ok: true, state: V.publicState(store, cat, cls, voter) });
+  });
+
+  // ---------- макет альбома для проверки учениками ----------
+
+  // Ученики по номерам, как у дизайнера, что загружено, кто проверил, сколько правок
+  function layoutData(cls) {
+    const album = photos.album(cls.id);
+    const list = numbered(photos.students(cls.id));
+    const lay = layout.get(cls.id);
+    const fixCount = new Map();
+    let teacherFixes = 0;
+    work.fixes(cls.id).forEach(f => {
+      if (f.kind !== 'layout' || f.done_at) return;
+      if (f.student_id) fixCount.set(f.student_id, (fixCount.get(f.student_id) || 0) + 1);
+      else if (f.student_name === TEACHER_LABEL) teacherFixes++;
+    });
+    const oks = layout.oks(cls.id);
+    return {
+      cls: cls, album: album, lay: lay, list: list, oks: oks, fixCount: fixCount,
+      checked: list.filter(s => oks.get(s.id)).length,
+      teacherCover: !!(lay && lay.covers.indexOf(list.length + 1) !== -1),
+      teacher: album ? { name: album.teacher_name, ok: !!(lay && lay.teacher_ok_at), fixes: teacherFixes } : null,
+      noPick: !album
+    };
+  }
+
+  r.get('/admin/c/:id/layout', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return notFound(ctx);
+    const d = layoutData(cls);
+    const base = '/admin/api/c/' + cls.id + '/layout';
+    page(ctx, 200, A.layout({
+      title: 'Макет · ' + cls.title, nav: 'work', sess: ctx.sess, msg: ctx.q('m'), scripts: ['/admin/static/layout.js'],
+      body: LV.layoutBody(Object.assign(d, {
+        back: '/admin/c/' + cls.id + '/work', backLabel: cls.title,
+        csrf: ctx.sess.csrf,
+        api: { start: base + '/start', file: '/admin/api/media/lay/' + cls.id, finish: base + '/finish', first: '/admin/c/' + cls.id + '/layout/first' },
+        link: d.album ? baseUrl(ctx) + '/f/' + d.album.slug + '/album' : '',
+        teacherLink: d.album ? baseUrl(ctx) + '/kr/' + photos.teacherToken(cls.id) + '/album' : '',
+        pickLink: '/admin/c/' + cls.id + '/photos',
+        preview: d.album ? s => '/f/' + d.album.slug + '/album?s=' + (s === 'kr' ? 'kr' : s.id) : null
+      }))
+    }));
+  });
+
+  r.post('/admin/api/c/:id/layout/start', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return H.json(ctx.res, 404, { error: 'Класс не найден' });
+    const res = layout.start(cls.id, ctx.body || {});
+    H.json(ctx.res, res.error ? 400 : 200, res);
+  });
+
+  r.post('/admin/api/media/lay/:id/:ver', async ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) { ctx.req.resume(); return H.json(ctx.res, 404, { error: 'Класс не найден' }); }
+    const buf = await readFile(ctx.req, LAY_FILE_MAX);
+    const res = layout.saveFile(cls.id, parseInt(ctx.params.ver, 10) || 0, String(ctx.q('name') || ''), buf);
+    H.json(ctx.res, res.error ? 400 : 200, res);
+  }, { raw: true });
+
+  r.post('/admin/api/c/:id/layout/finish', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return H.json(ctx.res, 404, { error: 'Класс не найден' });
+    const res = layout.finish(cls.id, parseInt((ctx.body || {}).ver, 10) || 0, 'Артур');
+    if (res.ok) work.event(cls.id, 'Артур', 'загружен макет для проверки');
+    H.json(ctx.res, res.error ? 400 : 200, res);
+  });
+
+  // Первая личная страница: разворот и сторона
+  function firstPageFrom(f) {
+    const spread = parseInt(f.spread, 10) || 0;
+    return spread * 2 - (f.side === 'r' ? 0 : 1);
+  }
+
+  r.post('/admin/c/:id/layout/first', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return notFound(ctx);
+    layout.setFirstPage(cls.id, firstPageFrom(ctx.form));
+    back(ctx, '/admin/c/' + cls.id + '/layout#students', 'saved');
+  });
+
+  // ----- то же для дизайнера, по его ссылке -----
+  r.get('/d/:token/c/:id/layout', ctx => {
+    const d = designerCtx(ctx);
+    if (!d) return;
+    const cls = designerClass(ctx);
+    if (!cls) return H.redirect(ctx.res, '/d/' + d.token);
+    const data = layoutData(cls);
+    const base = '/d/' + d.token + '/c/' + cls.id;
+    dpage(ctx, WV.dlayout({
+      title: 'Макет · ' + cls.title, designer: d, home: '/d/' + d.token, scripts: ['/admin/static/layout.js'],
+      body: LV.layoutBody(Object.assign(data, {
+        back: base, backLabel: cls.title,
+        api: { start: base + '/layout/start', file: '/admin/api/media/dlay/' + d.token + '/' + cls.id, finish: base + '/layout/finish', first: base + '/layout/first' },
+        link: data.album ? baseUrl(ctx) + '/f/' + data.album.slug + '/album' : '',
+        preview: s => base + '/album?s=' + (s === 'kr' ? 'kr' : s.id)
+      }))
+    }));
+  });
+
+  function designerJson(path, fn) {
+    r.post('/d/:token/c/:id/' + path, ctx => {
+      const d = work.designerByToken(ctx.params.token);
+      if (!d) return H.json(ctx.res, 403, { error: 'Ссылка больше не работает. Попросите у Артура новую' });
+      if (!designerLimit.hit('d' + d.id)) return H.json(ctx.res, 429, { error: 'Слишком часто. Подождите минуту' });
+      const cls = designerClass(ctx);
+      if (!cls) return H.json(ctx.res, 404, { error: 'Класс не найден' });
+      const res = fn(ctx.body || {}, cls, d);
+      H.json(ctx.res, res.error ? 400 : 200, res);
+    });
+  }
+  designerJson('layout/start', (b, cls) => layout.start(cls.id, b));
+  designerJson('layout/finish', (b, cls, d) => {
+    const res = layout.finish(cls.id, parseInt(b.ver, 10) || 0, d.name);
+    if (res.ok) work.event(cls.id, d.name, 'загружен макет для проверки');
+    return res;
+  });
+  designerJson('layout/first', (b, cls) => layout.setFirstPage(cls.id, firstPageFrom(b)) ? { ok: true } : { error: 'Проверьте номер разворота' });
+
+  // Файлы дизайнера: много запросов подряд, поэтому лимит щедрый
+  const layUpLimit = new Limiter(3000, 10 * 60 * 1000);
+  r.post('/admin/api/media/dlay/:token/:id/:ver', async ctx => {
+    const d = work.designerByToken(ctx.params.token);
+    if (!d || !layUpLimit.hit('d' + d.id)) { ctx.req.resume(); return H.json(ctx.res, 403, { error: 'Ссылка больше не работает' }); }
+    const cls = designerClass(ctx);
+    if (!cls) { ctx.req.resume(); return H.json(ctx.res, 404, { error: 'Класс не найден' }); }
+    const buf = await readFile(ctx.req, LAY_FILE_MAX);
+    const res = layout.saveFile(cls.id, parseInt(ctx.params.ver, 10) || 0, String(ctx.q('name') || ''), buf);
+    H.json(ctx.res, res.error ? 400 : 200, res);
+  }, { raw: true, open: true });
+
+  function sendLayFile(ctx, classId) {
+    const f = layout.file(classId, parseInt(ctx.params.ver, 10) || 0, String(ctx.params.file || '').replace(/\.jpg$/, ''));
+    if (!f || !H.serveStatic(f.dir, ctx.req, ctx.res, '/' + f.file, [], { cache: 'private, max-age=604800' })) notFound(ctx);
+  }
+
+  r.get('/d/:token/c/:id/lay/:ver/:file', ctx => {
+    const d = designerCtx(ctx);
+    if (!d) return;
+    const cls = designerClass(ctx);
+    if (!cls) return notFound(ctx);
+    sendLayFile(ctx, cls.id);
+  });
+
+  // Дизайнер смотрит альбом глазами ученика
+  r.get('/d/:token/c/:id/album', ctx => {
+    const d = designerCtx(ctx);
+    if (!d) return;
+    const cls = designerClass(ctx);
+    if (!cls) return notFound(ctx);
+    const lay = layout.ready(cls.id);
+    const list = numbered(photos.students(cls.id));
+    const me = list.find(s => s.id === +ctx.q('s')) || null;
+    const base = '/d/' + d.token + '/c/' + cls.id;
+    if (!lay) return dpage(ctx, LV.albumNotReady({ cls: cls }));
+    if (ctx.q('s') === 'kr') return dpage(ctx, teacherAlbum(cls, lay, list, { view: true, api: { files: base + '/lay/' + lay.ver + '/' } }));
+    dpage(ctx, LV.albumPage({ cls: cls, lay: lay, me: me, num: me ? me.num : 0, admin: true, view: true, fixes: [], ok: false,
+      api: { files: base + '/lay/' + lay.ver + '/' } }));
+  });
+
+  // ----- страница ученика: та же ссылка, что у отбора, с /album -----
+  const ALBUM_CSP = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+  function albumSend(ctx, body) {
+    H.send(ctx.res, 200, body, 'text/html; charset=utf-8', { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Content-Security-Policy': ALBUM_CSP });
+  }
+
+  r.get('/f/:slug/album', ctx => {
+    const p = pickCtx(ctx);
+    if (!p) return notFound(ctx);
+    const lay = layout.ready(p.cls.id);
+    const list = numbered(photos.students(p.cls.id));
+    const base = '/f/' + p.album.slug;
+    if (!lay) return albumSend(ctx, LV.albumNotReady({ cls: p.cls }));
+    // Артур из админки смотрит альбом за любого ученика
+    if (p.admin && ctx.q('s') === 'kr') return albumSend(ctx, teacherAlbum(p.cls, lay, list, { view: true, api: { files: base + '/lay/' + lay.ver + '/' } }));
+    let me = p.me ? list.find(s => s.id === p.me.id) : null;
+    const view = p.admin && ctx.q('s');
+    if (view) me = list.find(s => s.id === +ctx.q('s')) || null;
+    if (!me && !view) {
+      return albumSend(ctx, LV.albumLogin({ cls: p.cls, students: photos.students(p.cls.id).map(s => ({ id: s.id, name: s.name, locked: !!s.pin })), api: { me: base + '/me' } }));
+    }
+    const fixes = me && !view ? work.fixes(p.cls.id).filter(f => f.kind === 'layout' && f.student_id === me.id) : [];
+    albumSend(ctx, LV.albumPage({
+      cls: p.cls, lay: lay, me: me, num: me ? me.num : 0, admin: !!view, view: !!view, fixes: fixes, ok: me && !view ? !!layout.oks(p.cls.id).get(me.id) : false,
+      api: { files: base + '/lay/' + lay.ver + '/', fix: base + '/album/fix', ok: base + '/album/ok', leave: base + '/leave' }
+    }));
+  });
+
+  r.get('/f/:slug/lay/:ver/:file', ctx => {
+    const p = pickCtx(ctx);
+    if (!p || !(p.me || p.admin)) return notFound(ctx);
+    sendLayFile(ctx, p.cls.id);
+  });
+
+  function albumWrite(name, fn) {
+    r.post('/f/:slug/album/' + name, ctx => {
+      const p = pickCtx(ctx);
+      if (!p) return H.json(ctx.res, 404, { error: 'not_found' });
+      if (!p.me) return H.json(ctx.res, 403, { error: 'Войдите заново: выберите себя и введите код' });
+      if (!pickLimit.hit('a' + p.me.id + ':' + ctx.ip)) return H.json(ctx.res, 429, { error: 'Слишком часто. Подождите минуту' });
+      const lay = layout.ready(p.cls.id);
+      if (!lay) return H.json(ctx.res, 409, { error: 'Макет обновляется. Обновите страницу' });
+      const res = fn(ctx.body || {}, p, lay);
+      H.json(ctx.res, res.error ? 400 : 200, res);
+    });
+  }
+
+  // Правка из альбома уходит дизайнеру вместе со страницей, где ошибка
+  function layoutFix(b, lay) {
+    const text = String(b.text || '').trim().slice(0, 1500);
+    if (!text) return { error: 'Напишите, что исправить' };
+    const m = /^(\d{1,2})-([lr])$/.exec(String(b.where || ''));
+    let where = 'обложка';
+    if (m && +m[1] >= 1 && +m[1] <= lay.spreads) where = pageLabel(+m[1], m[2]);
+    else if (b.where !== 'cover') return { error: 'Выберите, где ошибка' };
+    return { text: where[0].toUpperCase() + where.slice(1) + ': ' + text };
+  }
+
+  albumWrite('fix', (b, p, lay) => {
+    const fx = layoutFix(b, lay);
+    if (fx.error) return fx;
+    const res = work.addFix(p.cls.id, { studentId: p.me.id, studentName: p.me.name, kind: 'layout', text: fx.text, who: p.me.name, auto: true });
+    if (res.error) return res;
+    layout.setOk(p.cls.id, p.me.id, false);
+    return { ok: true };
+  });
+
+  albumWrite('ok', (b, p) => {
+    const on = b.on !== false && b.on !== 0 && b.on !== '0';
+    layout.setOk(p.cls.id, p.me.id, on);
+    if (on) work.event(p.cls.id, p.me.name, 'проверил(а) альбом: всё верно');
+    return { ok: true };
   });
 
   // ---------- загруженные файлы ----------
@@ -696,6 +933,7 @@ function createApp(cfg) {
     store.deleteClass(cls.id);
     photos.removeFiles(cls.id);
     work.removeFiles(cls.id);
+    layout.removeFiles(cls.id);
     presence.delete(cls.id);
     back(ctx, '/admin', 'deleted');
   });
@@ -1396,7 +1634,7 @@ function createApp(cfg) {
     const t = teacherCtx(ctx);
     if (!t) return notFound(ctx);
     const list = photos.teacherPhotos(t.cls.id);
-    H.send(ctx.res, 200, PV.teacherPage({ cls: t.cls, album: t.album, photos: list, state: teacherState(t), token: ctx.params.token }), 'text/html; charset=utf-8', {
+    H.send(ctx.res, 200, PV.teacherPage({ cls: t.cls, album: t.album, photos: list, state: teacherState(t), token: ctx.params.token, layoutReady: !!layout.ready(t.cls.id) }), 'text/html; charset=utf-8', {
       'Cache-Control': 'no-store',
       'X-Robots-Tag': 'noindex, nofollow',
       'Referrer-Policy': 'no-referrer',
@@ -1418,6 +1656,63 @@ function createApp(cfg) {
     // дизайнер уже начала, а пожелание поменялось — у неё появится правка
     if ('wish' in f && photos.album(t.cls.id).teacher_wish !== before) work.teacherWish(t.cls.id, photos.album(t.cls.id).teacher_wish);
     H.json(ctx.res, 200, teacherState(t));
+  });
+
+  // Альбом классного руководителя: обложка с номером после всех учеников, правки и «всё верно».
+  // Своя ссылка, без кода, как и выбор фото
+  function teacherAlbum(cls, lay, list, o) {
+    const album = photos.album(cls.id);
+    const fixes = o.view ? [] : work.fixes(cls.id).filter(f => f.kind === 'layout' && !f.student_id && f.student_name === TEACHER_LABEL);
+    return LV.albumPage({
+      cls: cls, lay: lay, me: { name: album.teacher_name || TEACHER_LABEL }, num: list.length + 1, teacher: true,
+      admin: !!o.view, view: !!o.view, fixes: fixes, ok: !o.view && !!lay.teacher_ok_at, api: o.api
+    });
+  }
+
+  r.get('/kr/:token/album', ctx => {
+    const t = teacherCtx(ctx);
+    if (!t) return notFound(ctx);
+    const lay = layout.ready(t.cls.id);
+    if (!lay) return albumSend(ctx, LV.albumNotReady({ cls: t.cls, teacher: true }));
+    const base = '/kr/' + ctx.params.token;
+    albumSend(ctx, teacherAlbum(t.cls, lay, numbered(photos.students(t.cls.id)), {
+      api: { files: base + '/lay/' + lay.ver + '/', fix: base + '/album/fix', ok: base + '/album/ok' }
+    }));
+  });
+
+  r.get('/kr/:token/lay/:ver/:file', ctx => {
+    const t = teacherCtx(ctx);
+    if (!t) return notFound(ctx);
+    sendLayFile(ctx, t.cls.id);
+  });
+
+  function teacherAlbumWrite(name, fn) {
+    r.post('/kr/:token/album/' + name, ctx => {
+      const t = teacherCtx(ctx);
+      if (!t) return H.json(ctx.res, 404, { error: 'Ссылка не работает. Попросите у Артура новую' });
+      if (!pickLimit.hit('kra' + t.cls.id + ':' + ctx.ip)) return H.json(ctx.res, 429, { error: 'Слишком часто. Подождите минуту' });
+      const lay = layout.ready(t.cls.id);
+      if (!lay) return H.json(ctx.res, 409, { error: 'Макет обновляется. Обновите страницу' });
+      const res = fn(ctx.body || {}, t, lay);
+      H.json(ctx.res, res.error ? 400 : 200, res);
+    });
+  }
+
+  teacherAlbumWrite('fix', (b, t, lay) => {
+    const fx = layoutFix(b, lay);
+    if (fx.error) return fx;
+    const who = t.album.teacher_name || TEACHER_LABEL;
+    const res = work.addFix(t.cls.id, { studentName: TEACHER_LABEL, kind: 'layout', text: fx.text, who: who, auto: true });
+    if (res.error) return res;
+    layout.setTeacherOk(t.cls.id, false);
+    return { ok: true };
+  });
+
+  teacherAlbumWrite('ok', (b, t) => {
+    const on = b.on !== false && b.on !== 0 && b.on !== '0';
+    layout.setTeacherOk(t.cls.id, on);
+    if (on) work.event(t.cls.id, t.album.teacher_name || TEACHER_LABEL, 'проверил(а) альбом: всё верно');
+    return { ok: true };
   });
 
   // ---------- работа над альбомами ----------
@@ -1648,6 +1943,7 @@ function createApp(cfg) {
     const pk = pkFull(cls);
     return Object.assign({
       sess: ctx.sess, msg: ctx.q('m'), cls: cls, w: w, pk: pk, half: half(cls, w), today: today(),
+      lay: (d => ({ ver: d.lay ? d.lay.ver : 0, checked: d.checked, total: d.list.length, fixes: Array.from(d.fixCount.values()).reduce((a, b) => a + b, 0) }))(layoutData(cls)),
       m: work.money(w, cls, pk ? pk.total : 0), se: work.season(cls.year),
       fixes: work.fixes(cls.id), files: work.filesByFix(cls.id), notes: work.notes(cls.id),
       templates: work.templates(), base: baseUrl(ctx)
@@ -2044,7 +2340,9 @@ function createApp(cfg) {
 
   // ---------- обработчик запросов ----------
 
-  const OPEN_ADMIN = ['/admin/login', '/admin/static/'];
+  // загрузка макета дизайнером: путь под /admin/api/media/, чтобы nginx пропускал большие файлы,
+  // но вход по ссылке дизайнера, а не по паролю админки
+  const OPEN_ADMIN = ['/admin/login', '/admin/static/', '/admin/api/media/dlay/'];
 
   async function handle(req, res) {
     const url = new URL(req.url, 'http://localhost');
@@ -2105,8 +2403,9 @@ function createApp(cfg) {
           if (type.indexOf('application/json') !== 0) return H.json(res, 415, { error: 'json_only' });
           try { ctx.body = JSON.parse(raw || '{}'); } catch (e) { return H.json(res, 400, { error: 'bad_json' }); }
         } else if (route.raw) {
-          // Файл читает сам обработчик, проверяем только токен из заголовка
-          if (!auth.csrfOk(ctx.sess, header)) { req.resume(); return H.json(res, 403, { error: 'Страница устарела, обновите её' }); }
+          // Файл читает сам обработчик, проверяем только токен из заголовка.
+          // Открытые маршруты (дизайнер) проверяют свою ссылку сами
+          if (!route.open && !auth.csrfOk(ctx.sess, header)) { req.resume(); return H.json(res, 403, { error: 'Страница устарела, обновите её' }); }
         } else {
           const raw = await H.readBody(req, 64 * 1024);
           let tokenValue = header;
@@ -2141,7 +2440,7 @@ function createApp(cfg) {
     }
   }
 
-  return { handle: handle, store: store, auth: auth, media: media, site: site, photos: photos, work: work, stats: stats };
+  return { handle: handle, store: store, auth: auth, media: media, site: site, photos: photos, work: work, stats: stats, layout: layout };
 }
 
 module.exports = { createApp, nextTitle, resultText };

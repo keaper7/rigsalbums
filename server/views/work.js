@@ -5,6 +5,7 @@
 const { html, raw, plural, fmtWhen } = require('../lib/util');
 const { layout } = require('./admin');
 const { ROLES, ROLE_NAMES } = require('../lib/photos');
+const { numbered } = require('../lib/layout');
 const { LEAD_STATUSES, TEMPLATES, fill, STATUSES, STATUS_NAMES, PARTS, FIXES, FIX_NAMES, FILE_LABELS, SELF, SEASON_FIELDS, STAGES, HALVES, HALF_NAMES, DATE_KINDS, DATE_KIND_NAMES, stepOn, stageOf, upcoming } = require('../lib/work');
 
 function csrf(sess) { return html`<input type="hidden" name="_csrf" value="${sess.csrf}">`; }
@@ -134,7 +135,7 @@ function fixFiles(list, base) {
 
 // Правка одной строкой: кому, что, текст, фото, кто и когда
 function fixBody(f, files, base) {
-  return html`<p class="wk-fix__h"><b>${f.student_name || 'Весь класс'}</b> · ${FIX_NAMES[f.kind] || f.kind}${f.auto ? html` <small class="chip">${f.kind === 'teacher_wish' ? 'поменял сам' : 'ученик поменял сам'}</small>` : ''}</p>
+  return html`<p class="wk-fix__h"><b>${f.student_name || 'Весь класс'}</b> · ${FIX_NAMES[f.kind] || f.kind}${f.auto ? html` <small class="chip">${f.kind === 'teacher_wish' ? 'поменял сам' : f.kind === 'layout' ? 'из проверки альбома' : 'ученик поменял сам'}</small>` : ''}</p>
     ${f.text ? html`<p class="wk-fix__t">${f.text}</p>` : ''}
     ${files ? fixFiles(files.get(f.id), base) : ''}
     <p class="muted small">${f.done_at ? html`исправлено ${fmtWhen(f.done_at)}${f.done_by ? ' · ' + f.done_by : ''}` : html`${f.who} · ${fmtWhen(f.created_at)}`}</p>`;
@@ -317,7 +318,7 @@ function templatesFold(o) {
   <summary class="fold__h"><span><b>Шаблоны сообщений</b><small>Предоплата, загрузка, сверка, уведомить родителей</small></span></summary>
   <form class="form" method="post" action="/admin/work/templates">
     ${csrf(o.sess)}
-    <p class="muted small">Эти тексты появляются у пунктов этапов в каждом классе. Вместо {класс}, {школа}, {сумма}, {отбор} (выбор фото) и {wfolio} подставятся данные класса.</p>
+    <p class="muted small">Эти тексты появляются у пунктов этапов в каждом классе. Вместо {класс}, {школа}, {сумма}, {отбор} (выбор фото), {альбом} (проверка макета) и {wfolio} подставятся данные класса.</p>
     ${TEMPLATES.map(t => html`<label class="field"><span>${t[1]}</span><textarea name="${t[0]}" rows="6" maxlength="3000">${o.templates[t[0]]}</textarea></label>`)}
     <p class="muted small">Пустое поле вернёт стандартный текст.</p>
     <button class="b b--main" type="submit">Сохранить шаблоны</button>
@@ -445,11 +446,13 @@ function stepMessage(o, key) {
   const pk = o.pk;
   const text = fill(o.templates[key], {
     'класс': o.cls.title, 'школа': o.cls.school,
-    'отбор': pk ? o.base + '/f/' + pk.album.slug : '',
+    // в «Сверке» ссылка ведёт на альбом для проверки, даже если в старом тексте шаблона стоит {отбор}
+    'отбор': pk ? o.base + '/f/' + pk.album.slug + (key === 'check' ? '/album' : '') : '',
+    'альбом': pk ? o.base + '/f/' + pk.album.slug + '/album' : '',
     'wfolio': pk && pk.album.wfolio ? pk.album.wfolio : '',
     'сумма': o.se ? rub(o.se.prepay) : ''
   });
-  const needPick = /\{отбор\}/i.test(o.templates[key]) && !pk;
+  const needPick = /\{(отбор|альбом)\}/i.test(o.templates[key]) && !pk;
   // без ссылки на выбор фото сообщение ученикам бесполезно: сначала выборка
   if (needPick) return html`<details class="wk-msg"><summary>Сообщение ученикам</summary><p class="wk-warn small">Сначала <a href="/admin/c/${o.cls.id}/photos">создайте выборку</a>, тогда здесь будет сообщение со ссылкой.</p></details>`;
   return html`<details class="wk-msg"><summary>${key === 'prepay' ? 'Напомнить о предоплате' : 'Сообщение' + (key === 'notify' ? ' родителям' : ' ученикам')}</summary>
@@ -472,7 +475,7 @@ function stepHint(o, key) {
       : html`<small class="muted">ученики выбирают фото · <a class="wk-mk" href="/admin/c/${o.cls.id}/photos">создать выборку</a></small>`;
   }
   if (key === 'extra' && pk && pk.retouchWait) return html`<small class="wk-warn">ждут: ${pk.retouchWait} · <a href="/admin/c/${o.cls.id}/photos">отметить в отборе</a></small>`;
-  if (key === 'check') return html`<small class="muted">ученики проверяют свой макет</small>`;
+  if (key === 'check') return html`<small class="muted">ученики проверяют свой макет${o.lay ? html`: проверили ${o.lay.checked} из ${o.lay.total}${o.lay.fixes ? ', правок ' + o.lay.fixes : ''}` : ''} · <a href="/admin/c/${o.cls.id}/layout">${o.lay && o.lay.ver ? 'макет' : 'загрузить макет'}</a></small>`;
   return '';
 }
 
@@ -857,7 +860,8 @@ ${o.body}
 <p class="toast" role="status" aria-live="polite" hidden></p>
 <script src="/admin/static/admin.js"></script>
 <script src="/admin/static/work.js"></script>
-</body>
+${(o.scripts || []).map(src => html`<script src="${src}"></script>
+`)}</body>
 </html>
 `.s;
 }
@@ -897,12 +901,14 @@ function designerClass(o) {
   const open = o.fixes.filter(f => !f.done_at);
   const done = o.fixes.filter(f => f.done_at);
   const canSend = w.status === 'todo' || w.status === 'fixes';
-  const students = pk ? pk.students : [];
+  // по номерам, как в макете: обложка ученика 003 — файл 003-00
+  const nums = new Map(numbered(pk ? pk.students : []).map(s => [s.id, s.num]));
+  const students = (pk ? pk.students : []).slice().sort((a, b) => nums.get(a.id) - nums.get(b.id));
   const quotes = students.filter(s => s.quote);
-  const allQuotes = quotes.map(s => s.name + '\n' + s.quote).join('\n\n');
+  const allQuotes = quotes.map(s => numLabel(nums.get(s.id)) + ' ' + s.name + '\n' + s.quote).join('\n\n');
   const body = html`<a class="back" href="${home}">← Все классы</a>
 <div class="head head--class">
-  <div><h1 class="h1">${c.title}</h1><p class="muted">${c.school} · ${c.year}</p></div>
+  <div><h1 class="h1">${c.title}</h1><p class="muted">${c.school} · ${c.year} · <a href="${api}/layout">макет для проверки</a></p></div>
 </div>
 
 <section class="card wk-dhead">
@@ -937,7 +943,7 @@ ${open.length ? html`<section class="card wk-open" id="fixes">
   ${students.length ? students.map(st => {
     const mine = open.filter(f => f.student_id === st.id);
     return html`<div class="wk-dst${mine.length ? ' has-fix' : ''}" id="st-${st.id}">
-    <div class="wk-dst__h"><b>${st.name}</b>${mine.length ? html`<span class="wk-warn">${fixesN(mine.length)}</span>` : ''}</div>
+    <div class="wk-dst__h"><b><span class="wk-num">${numLabel(nums.get(st.id))}</span> ${st.name}</b>${mine.length ? html`<span class="wk-warn">${fixesN(mine.length)}</span>` : ''}</div>
     ${thumbs(pk, st)}
     ${retouchLine(pk, st)}
     ${st.quote ? html`<blockquote class="wk-q">${st.quote}</blockquote><button class="wk-copy" type="button" data-copy="${st.quote}">Скопировать цитату</button>` : html`<p class="muted small">Цитаты пока нет</p>`}
@@ -945,7 +951,7 @@ ${open.length ? html`<section class="card wk-open" id="fixes">
   }) : html`<p class="muted small">Список учеников появится, когда Артур начнёт отбор фото.</p>`}
 </section>
 
-${teacherBlock(pk)}
+${teacherBlock(pk, students.length + 1)}
 
 ${pk && pk.group.length ? html`<details class="card fold" id="group">
   <summary class="fold__h"><span><b>Групповые фото</b><small>Выбрано: ${pk.group.length}</small></span></summary>
@@ -966,13 +972,13 @@ ${done.length ? html`<details class="card fold"><summary class="fold__h"><span><
 }
 
 // Выбор классного руководителя для дизайнера: два фото и пожелание классу
-function teacherBlock(pk) {
+function teacherBlock(pk, num) {
   if (!pk || !pk.teacher || (!pk.teacher.n && !pk.teacher.wish)) return '';
   const t = pk.teacher;
   const ph = (x, role) => x ? html`<figure class="pk-ph"><a href="/f/${pk.album.slug}/p/${x.id}.jpg?v=${x.ver}" target="_blank" rel="noopener" title="${x.path}"><img src="/f/${pk.album.slug}/p/${x.id}-sm.jpg?v=${x.ver}" alt="${role}" loading="lazy"></a><figcaption><b>${role}</b><span class="muted wk-file">${x.path.split('/').pop()}</span></figcaption></figure>` : '';
   const chosen = t.picks.cover || t.picks.list;
   return html`<section class="card" id="teacher">
-  <div class="card__h"><h2 class="h">Классный руководитель</h2>${t.done ? html`<span class="chip chip--done">выбрал</span>` : html`<span class="chip">ещё выбирает</span>`}</div>
+  <div class="card__h"><h2 class="h">${num ? html`<span class="wk-num">${numLabel(num)}</span> ` : ''}Классный руководитель</h2>${t.done ? html`<span class="chip chip--done">выбрал</span>` : html`<span class="chip">ещё выбирает</span>`}</div>
   ${t.name ? html`<p><b>${t.name}</b></p>` : ''}
   ${chosen ? html`<div class="pk-thumbs">${ph(t.picks.cover, 'Обложка')}${ph(t.picks.list, 'Общий список')}</div>` : html`<p class="muted small">Фото ещё не выбраны</p>`}
   ${t.wish ? html`<p class="wk-lab">Пожелание классу</p><blockquote class="wk-q">${t.wish}</blockquote><button class="wk-copy" type="button" data-copy="${t.wish}">Скопировать пожелание</button>` : ''}
@@ -986,9 +992,14 @@ function designerGone() {
 }
 
 // Таблица цитат для Excel: точка с запятой и BOM — так русский Excel открывает без кракозябр
+// Номер — как в макете, по алфавиту
 function quotesCsv(students) {
   const cell = v => '"' + String(v || '').replace(/"/g, '""') + '"';
-  return '﻿' + ['Ученик;Цитата'].concat(students.map(s => cell(s.name) + ';' + cell(s.quote))).join('\r\n') + '\r\n';
+  const nums = new Map(numbered(students).map(s => [s.id, s.num]));
+  const list = students.slice().sort((a, b) => nums.get(a.id) - nums.get(b.id));
+  return '﻿' + ['Номер;Ученик;Цитата'].concat(list.map(s => cell(numLabel(nums.get(s.id))) + ';' + cell(s.name) + ';' + cell(s.quote))).join('\r\n') + '\r\n';
 }
 
-module.exports = { boardPage, phonesPage, leadsPage, classPage, classMoneyPage, moneyPage, designerHome, designerClass, designerGone, quotesCsv, MSG };
+function numLabel(n) { return String(n || '').padStart(3, '0'); }
+
+module.exports = { dlayout, boardPage, phonesPage, leadsPage, classPage, classMoneyPage, moneyPage, designerHome, designerClass, designerGone, quotesCsv, MSG };

@@ -10,6 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const { newId, jpegSize } = require('./media');
+const { numbered } = require('./layout');
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS pk_albums (
@@ -624,9 +625,12 @@ class Photos {
     const album = this.album(classId);
     const byId = new Map(this.photos(classId).map(p => [p.id, p]));
     // Фото с местом в альбоме при раскладке называются по месту: «Обложка.jpg»
+    // номер, как в макете: по алфавиту, кл. рук следующий после всех
+    const nums = new Map(numbered(this.students(classId)).map(s => [s.id, s.num]));
     const students = this.students(classId).map(s => {
       const list = this.personalInfo(s.id, album).filter(x => byId.has(x.id));
       return {
+        num: nums.get(s.id),
         name: s.name,
         quote: s.quote,
         photos: list.map(x => byId.get(x.id).path),
@@ -636,7 +640,7 @@ class Photos {
     const group = this.group(classId, album).map(g => byId.get(g.photo_id)).filter(Boolean).map(p => p.path);
     const t = this.teacherPicks(album, byId);
     const teacher = t.cover || t.list || album.teacher_wish
-      ? { name: album.teacher_name, wish: album.teacher_wish, cover: t.cover ? t.cover.path : '', list: t.list ? t.list.path : '' }
+      ? { num: nums.size + 1, name: album.teacher_name, wish: album.teacher_wish, cover: t.cover ? t.cover.path : '', list: t.list ? t.list.path : '' }
       : null;
     return { students: students, group: group, teacher: teacher };
   }

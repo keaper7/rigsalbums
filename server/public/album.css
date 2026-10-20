@@ -1,0 +1,32 @@
+/* Страница проверки альбома учеником. Основа — pick.css (шапка, кнопки, цвета), альбом — /assets/book.css */
+:root { --cream: #F6E9E4; --ease: cubic-bezier(.22, .8, .3, 1); }
+.al__main { max-width: 1040px; }
+.al-lead { max-width: 40em; margin: 0 0 22px; color: var(--ink-2); font-size: 16px; }
+.al-in { max-width: 460px; display: grid; gap: 14px; }
+.field { display: block; }
+.field > span:first-child { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.field input, .field select, .field textarea { width: 100%; min-height: 48px; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; font-size: 16px; }
+.field textarea { resize: vertical; line-height: 1.45; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--wine); outline: none; }
+.al-err { color: var(--wine); font-weight: 700; font-size: 14.5px; }
+.al-note { margin: 14px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--warn-bg); color: var(--warn); font-weight: 700; font-size: 14.5px; }
+.link { border: 0; padding: 0; background: none; color: var(--wine); font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+/* альбом */
+.al-bk { margin-top: 8px; }
+.al-bk .bk__stage { touch-action: pan-y pinch-zoom; }
+.al-go { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 18px; }
+/* проверка */
+.al-check { max-width: 640px; margin: 34px auto 0; padding: 20px; border-radius: 22px; background: var(--card); border: 1px solid var(--line); }
+.al-check h2 { font: 800 22px/1.15 var(--disp); letter-spacing: -.02em; margin-bottom: 12px; }
+.al-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.al-okd { margin-bottom: 12px; padding: 10px 14px; border-radius: 14px; background: var(--ok-bg); color: var(--ok); font-weight: 700; }
+.al-fix { display: grid; gap: 12px; margin-top: 16px; }
+.al-fixes { margin-top: 18px; }
+.al-fixes h3 { font-size: 15px; margin-bottom: 8px; }
+.al-fixes ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.al-fixes li { padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--line); display: grid; gap: 2px; font-size: 14.5px; }
+.al-fixes li small { color: var(--warn); font-weight: 800; }
+.al-fixes li.is-done small { color: var(--ok); }
+[hidden] { display: none !important; }
+.al-full { margin-top: 12px; text-align: center; font-size: 14px; color: var(--ink-2); }
+.al-full a { display: inline-block; margin-left: 10px; color: var(--wine); font-weight: 800; white-space: nowrap; }

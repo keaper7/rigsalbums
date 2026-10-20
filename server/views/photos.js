@@ -270,6 +270,7 @@ function teacherPage(o) {
 <main class="pm kr-m">
   <p class="eyebrow">Выпускной альбом ${c.year}</p>
   <h1>${c.school}<small>${c.title} · классный руководитель</small></h1>
+  ${o.layoutReady ? html`<a class="kr-album" href="/kr/${o.token}/album"><b>Макет альбома готов</b><span>Проверить свою обложку →</span></a>` : ''}
   ${st.closed ? html`<p class="kr-note">Выбор уже закрыт. Если нужно что-то поменять, напишите Артуру.</p>` : html`<p class="kr-lead">Всего три шага. Всё сохраняется само, можно вернуться позже.</p>`}
   ${o.photos.length ? html`
   <section class="kr-step" id="cover">

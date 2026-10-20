@@ -157,7 +157,7 @@ class Router {
   add(method, pattern, handler, opts) {
     const keys = [];
     const re = new RegExp('^' + pattern.replace(/\/:([a-z]+)/g, (m, k) => { keys.push(k); return '/([^/]+)'; }) + '/?$');
-    this.routes.push({ method: method, re: re, keys: keys, handler: handler, raw: !!(opts && opts.raw) });
+    this.routes.push({ method: method, re: re, keys: keys, handler: handler, raw: !!(opts && opts.raw), open: !!(opts && opts.open) });
   }
 
   get(p, h) { this.add('GET', p, h); }
@@ -174,7 +174,7 @@ class Router {
       r.keys.forEach((k, i) => {
         try { params[k] = decodeURIComponent(hit[i + 1]); } catch (e) { params[k] = hit[i + 1]; }
       });
-      return { handler: r.handler, params: params, raw: r.raw };
+      return { handler: r.handler, params: params, raw: r.raw, open: r.open };
     }
     return allowed ? { notAllowed: true } : null;
   }

@@ -325,6 +325,8 @@ button { cursor: pointer; }
 .kr-m { max-width: 760px; }
 .kr-lead, .kr-note { font-size: 17px; line-height: 1.5; color: var(--ink-2); margin-bottom: 8px; }
 .kr-note { padding: 14px 16px; border-radius: 16px; background: var(--warn-bg); color: var(--warn); font-weight: 700; }
+.kr-album { display: grid; gap: 2px; margin: 4px 0 18px; padding: 14px 16px; border-radius: 16px; background: var(--card); border: 1.5px solid var(--wine); color: var(--ink); text-decoration: none; }
+.kr-album span { color: var(--wine); font-weight: 700; }
 .kr-step { margin-top: 30px; }
 .kr-step h2 { display: flex; align-items: center; gap: 12px; font: 800 21px/1.2 var(--disp); letter-spacing: -.01em; }
 .kr-n { flex: 0 0 auto; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--wine); color: #fff; font: 800 16px/1 var(--disp); }

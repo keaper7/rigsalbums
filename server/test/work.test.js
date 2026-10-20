@@ -342,8 +342,8 @@ test('дизайнер по ссылке: видит нужное, не види
   // в начале BOM, чтобы Excel понял кодировку (fetch в text() его прячет)
   const bytes = new Uint8Array(await (await fetch(s.base + link + '/c/' + id + '/quotes.csv')).arrayBuffer());
   assert.deepStrictEqual(Array.from(bytes.slice(0, 3)), [0xef, 0xbb, 0xbf]);
-  assert.match(r.text, /^Ученик;Цитата\r\n/);
-  assert.match(r.text, /"Анна";"Мы были ""вместе""; навсегда"/);
+  assert.match(r.text, /^Номер;Ученик;Цитата\r\n/);
+  assert.match(r.text, /"001";"Анна";"Мы были ""вместе""; навсегда"/);
 
   // архив и отключённая ссылка
   await admin.post('/admin/c/' + id + '/archive', {});

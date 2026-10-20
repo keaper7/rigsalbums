@@ -222,7 +222,7 @@ test('отбор фото: загрузка, выбор учеников, гру
 
   // План раскладки — относительные пути оригиналов
   r = await admin.req('GET', '/admin/api/c/' + id + '/photos/export');
-  assert.deepStrictEqual(r.data.students[0], { name: 'Анна', quote: 'Вместе навсегда', photos: ['Парни/IMG_1.jpg', 'Девочки/IMG_1.jpg'], roles: ['', ''] });
+  assert.deepStrictEqual(r.data.students[0], { num: 1, name: 'Анна', quote: 'Вместе навсегда', photos: ['Парни/IMG_1.jpg', 'Девочки/IMG_1.jpg'], roles: ['', ''] });
   assert.deepStrictEqual(r.data.group.sort(), ['Групповые/G_2.jpg', 'Групповые/G_3.jpg']);
 
   // Голосование класса не изменилось

@@ -20,6 +20,12 @@
     var nextBtn = box.querySelector('[data-bk-next]');
     var zoomBtn = box.querySelector('[data-bk-zoom]');
     var picks = box.querySelectorAll('[data-bk-album]');
+    // Для страницы проверки макета: своя обложка ученика, порог крупных картинок, своя страница
+    var frontName = box.getAttribute('data-front') || 'front';
+    var backName = box.getAttribute('data-back') || 'back';
+    var big = +box.getAttribute('data-big') || 300;
+    var mine = box.getAttribute('data-mine') || '';
+    var noIntro = box.hasAttribute('data-no-intro');
     var pad = function (i) { return (i < 10 ? '0' : '') + i; };
 
     var leaves = [];
@@ -37,8 +43,8 @@
       el.innerHTML = '';
       leaves = [];
       for (var k = 0; k <= n; k++) {
-        var front = k === 0 ? 'front' : 's' + pad(k) + '-r';
-        var back = k === n ? 'back' : 's' + pad(k + 1) + '-l';
+        var front = k === 0 ? frontName : 's' + pad(k) + '-r';
+        var back = k === n ? backName : 's' + pad(k + 1) + '-l';
         var leaf = document.createElement('div');
         leaf.className = 'bk__leaf' + (k === 0 ? ' is-cover' : '') + (k === n ? ' is-last' : '');
         // страница чуть меньше листа: вокруг неё видна обложка, как у настоящего альбома.
@@ -46,6 +52,8 @@
         leaf.innerHTML = '<div class="bk__in"><div class="bk__face bk__face--front"><div class="bk__pg"><img alt="" draggable="false">' + (k === 0 ? '<i class="bk__gl"></i>' : '') + '</div></div>' +
           '<div class="bk__face bk__face--back"><div class="bk__pg"><img alt="" draggable="false">' + (k === n ? '<i class="bk__gl"></i>' : '') + '</div></div></div>';
         el.appendChild(leaf);
+        // своя страница ученика подсвечена
+        if (mine && (front === mine || back === mine)) leaf.querySelector(front === mine ? '.bk__face--front' : '.bk__face--back').classList.add('is-mine');
         leaves.push({ el: leaf, imgs: leaf.querySelectorAll('img'), names: [front, back], loaded: null });
       }
       // тень под альбомом и торцы страниц по краям — для объёма
@@ -58,7 +66,7 @@
     }
 
     // Крупные картинки — когда страница на экране шире 300 точек с учётом плотности экрана
-    function size() { return el.offsetWidth / 2 * (window.devicePixelRatio || 1) > 300 ? '' : '-sm'; }
+    function size() { return el.offsetWidth / 2 * (window.devicePixelRatio || 1) > big ? '' : '-sm'; }
     function load(from, to) {
       var s = size();
       for (var i = Math.max(0, from); i <= Math.min(n, to); i++) {
@@ -114,7 +122,13 @@
       if (prevBtn) prevBtn.disabled = cur === 0;
       if (nextBtn) nextBtn.disabled = cur === n + 1;
       load(cur - 2, cur + 2);
+      // какой разворот открыт и какая страница видна — для правок на странице проверки
+      if (cur !== lastCur || focus !== lastFocus) {
+        lastCur = cur; lastFocus = focus;
+        box.dispatchEvent(new CustomEvent('bk:change', { detail: { cur: cur, n: n, single: single(), focus: focus } }));
+      }
     }
+    var lastCur = -1, lastFocus = '';
 
     // тень и блик на странице идут столько же, сколько поворот
     function bend(lf, speed) {
@@ -281,12 +295,26 @@
     build();
     paint();
 
+    // Быстро пролистать к развороту k (0 — обложка), на телефоне по одной странице — к стороне side
+    function goTo(k, side) {
+      stopIntro();
+      started = true;
+      touched = gen;
+      k = Math.max(0, Math.min(n + 1, k));
+      if (side) focus = side;
+      var dir = k > cur ? 1 : -1, steps = Math.abs(k - cur), t = 0;
+      if (!steps) return paint();
+      for (var i = 0; i < steps; i++) { timers.push(setTimeout(function () { turn(dir, steps > 2 ? 420 : 800); }, t)); t += steps > 2 ? 90 : 0; }
+    }
+    box.bkGo = goTo;
+    box.bkState = function () { return { cur: cur, n: n, single: single(), focus: focus }; };
+
     // Первое появление: альбом лежит вдали, поднимается к зрителю, открывается и быстро пролистывает
     // несколько разворотов туда и обратно
     function intro() {
       if (started) return;
       started = true;
-      if (reduce) return;
+      if (reduce || noIntro) return;
       var riffle = document.documentElement.classList.contains('lite') ? 0 : Math.min(5, n - 1);
       var t = 1500;
       timers.push(setTimeout(function () { turn(1, 1000); }, t));

@@ -231,7 +231,7 @@ test('классный руководитель: своя ссылка, толь
   assert.match(r.text, /Дорогие мои!/);
   // раскладка по папкам
   r = await admin.req('GET', '/admin/api/c/' + id + '/photos/export');
-  assert.deepStrictEqual(r.data.teacher, { name: 'Фатима Руслановна', wish: 'Дорогие мои!\nЛюблю вас.', cover: 'кл рук/IMG_1.jpg', list: 'кл рук/IMG_2.jpg' });
+  assert.deepStrictEqual(r.data.teacher, { num: 2, name: 'Фатима Руслановна', wish: 'Дорогие мои!\nЛюблю вас.', cover: 'кл рук/IMG_1.jpg', list: 'кл рук/IMG_2.jpg' });
   // на этапе «Выборка» видно, что кл. рук выбрал
   r = await admin.req('GET', '/admin/c/' + id + '/work');
   assert.match(r.text, /кл\. рук: выбрал ✓/);

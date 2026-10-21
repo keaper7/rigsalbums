@@ -1544,8 +1544,6 @@
     var gal = box.nextElementSibling, tile = gal && $('.pics > .pic', gal), src = tile && $('img', tile);
     if (!fx || !src) return drop(box);
     box.classList.add('is-on');
-    // печать по времени: закреплённый участок короче, чем был под прокрутку (см. rigs.css)
-    if (box.animate) box.classList.add('is-time');
     var st = stage(box);
     var photo = $('.print__photo', box), dev = $('.print__dev', photo);
     var fly = $('.print__fly', box), flyPaper = $('.print__paper', fly);
@@ -1564,185 +1562,57 @@
         // верх камеры: 58% экрана с панелью браузера, но не ниже, чем нужно снимку над ней
         w: w, h: h, span: st.span, slot: Math.max(58 * U.svh, 60 + h + 90),
         // куда встаёт центр снимка: сдвиг от середины перехода по x и от его верха по y
-        x: tr.left + tr.width / 2 - (br.left + W / 2), y: tr.top - br.top + tr.height / 2 - h / 2, k: tr.width / w,
-        // верх галереи от верха перехода: когда он показывается снизу, камера уезжает
-        gal: gal.getBoundingClientRect().top - br.top
+        x: tr.left + tr.width / 2 - (br.left + W / 2), y: tr.top - br.top + tr.height / 2 - h / 2, k: tr.width / w
       };
       box.style.setProperty('--pw', w.toFixed(1) + 'px');
       box.style.setProperty('--ph', h.toFixed(1) + 'px');
       box.style.setProperty('--slot', g.slot.toFixed(1) + 'px');
       return !old || ['w', 'x', 'y', 'span', 'slot'].some(function (k) { return Math.abs(old[k] - g[k]) > .5; });
     };
-    // Печать идёт сама, по времени, а не за пальцем. Раньше каждый кадр считался от прокрутки, и на iPhone
-    // при медленной прокрутке закреплённый экран и пересчёт расходились: снимок выходил рывками.
-    // Теперь прокрутка только говорит «пора»: подошли к камере — она печатает, снизу показалась галерея — камера
-    // уезжает, а готовый снимок ждёт; показалась его плитка — снимок летит в неё. Движение отдаём видеочипу
-    // готовыми шагами (Web Animations)
-    var H = function () { return 100 * U.vh; };
-    var outY = function () { return H() - g.slot + 60; };
-    // готовый снимок над щелью: выполз и подпрыгнул с наклоном
-    var yTop = function () { return 12 - (g.h + 66) - 18; };
-    // Печать: t от 0 до 1. Снимок выползает из щели и проявляется, полоса заполняется, в конце он подпрыгивает
-    var atPrint = function (t) {
-      var fed = ease2(clamp01((t - .05) / .8)), pop = ease2(clamp01((t - .88) / .12));
-      var yA = 12 - (g.h + 66) * fed - pop * 18;
+    var at = function (p) {
+      // Камера стоит на нижнем краю экрана; когда снимок готов — уезжает вниз за край
+      var out = ease2(clamp01((p - .45) / .23));
+      var fed = ease2(clamp01((p - .04) / .4));
+      // Готовый снимок выскакивает с наклоном и летит в свою плитку; к p = .9 он на месте
+      var pop = ease2(clamp01((p - .44) / .06)), q = ease2(clamp01((p - .5) / .4)), a = 1 - q;
+      var yA = 12 - (g.h + 66) * fed - pop * 18, rotA = 3 * pop;
+      // Второй снимок: верх над щелью в координатах перехода = сдвиг прилипшего экрана (p · span) + щель + 11px + yA.
+      // Доля этого пути (1 − q) к концу полёта уходит в ноль, остаётся только место плитки
+      var ty = (a * (p * g.span + g.slot + 11 + yA) + q * g.y).toFixed(2) + 'px';
+      var tx = g.x * q + Math.sin(Math.PI * q) * 24;
+      var sc = 1 + (g.k - 1) * q, rot = rotA * a - Math.sin(Math.PI * q) * 2;
       return [
-        { transform: 'translate3d(0,0,0)' },
-        { transform: 'translate3d(0,' + yA.toFixed(2) + 'px,0) rotate(' + (3 * pop).toFixed(2) + 'deg)', opacity: 1 },
-        { opacity: (1 - clamp01((t - .15) / .6)).toFixed(3) },
-        { opacity: 0 },
-        { opacity: 1 },
+        { transform: 'translate3d(0,' + ((100 * U.vh - g.slot + 60) * out).toFixed(2) + 'px,0)' },
+        // Передача снимка: второй появляется чуть раньше, чем исчезает первый, — оба стоят в одном месте
+        { transform: 'translate3d(0,' + yA.toFixed(2) + 'px,0) rotate(' + rotA.toFixed(2) + 'deg)', opacity: p < .48 ? 1 : 0 },
+        { opacity: (1 - clamp01((p - .1) / .32)).toFixed(3) },
+        { transform: 'translate3d(' + tx.toFixed(2) + 'px,' + ty + ',0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')', opacity: p < .46 ? 0 : (1 - clamp01((p - .93) / .06)).toFixed(3) },
+        // Белая рамка тает в полёте: в плитку садится фото без рамки
+        { opacity: (1 - clamp01((p - .66) / .2)).toFixed(3) },
         { transform: 'scaleX(' + fed.toFixed(4) + ')' },
-        { opacity: 0 },
-        { opacity: t > 0 && fed < 1 ? 1 : 0 },
+        // Плитка под снимком появляется, когда он уже сел; потом снимок растворяется, и остаются только её скруглённые углы
+        { opacity: p < .9 ? 0 : 1 },
+        // Красный индикатор горит (и мигает), пока идёт печать; на экране камеры «ПЕЧАТЬ…», потом «ГОТОВО ✓»
+        { opacity: p > .03 && p < .44 ? 1 : 0 },
         { opacity: fed < 1 ? 1 : 0 },
         { opacity: fed < 1 ? 0 : 1 }
       ];
     };
-    // Камера уезжает вниз за край, снимок остаётся висеть на своём месте
-    var atOut = function (t) {
-      var v = atPrint(1);
-      v[0] = { transform: 'translate3d(0,' + (outY() * ease2(t)).toFixed(2) + 'px,0)' };
-      return v;
-    };
-    // Полёт: u от 0 до 1. Висящий снимок подхватывает второй, в самой странице, и ведёт в плитку.
-    // pinY — где был прилипший экран в момент старта: оттуда снимок и вылетает
-    var atFly = function (u, pinY) {
-      var q = ease2(clamp01(u / .75)), a = 1 - q;
-      var ty = a * (pinY + g.slot + 11 + yTop()) + q * g.y;
-      var tx = g.x * q + Math.sin(Math.PI * q) * 24;
-      var sc = 1 + (g.k - 1) * q, rot = 3 * a - Math.sin(Math.PI * q) * 2;
-      return [
-        { transform: 'translate3d(0,' + outY().toFixed(2) + 'px,0)' },
-        { opacity: 0 },
-        { opacity: 0 },
-        { transform: 'translate3d(' + tx.toFixed(2) + 'px,' + ty.toFixed(2) + 'px,0) rotate(' + rot.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')', opacity: (1 - clamp01((u - .82) / .12)).toFixed(3) },
-        // белая рамка тает в полёте: в плитку садится фото без рамки
-        { opacity: (1 - clamp01((q - .35) / .45)).toFixed(3) },
-        { transform: 'scaleX(1)' },
-        // плитка появляется под снимком, когда он сел, потом снимок растворяется
-        { opacity: u < .8 ? 0 : 1 },
-        { opacity: 0 },
-        { opacity: 0 },
-        { opacity: 1 }
-      ];
-    };
-    // Готово: камеры нет, снимок в галерее
-    var atEnd = function () { return atFly(1, 0); };
     measure();
-
-    // idle → printing → printed → leaving → ready → flying → done
-    var phase = 'idle', anims = [], pctLoop = 0, lastPct = -1, pct = lcd[0];
-    var wantOut = false, wantFly = false;
-    var setPct = function (v) { if (v !== lastPct) { lastPct = v; pct.textContent = 'ПЕЧАТЬ ' + v + '%'; } };
-    var stop = function () {
-      anims.forEach(function (a) { a.onfinish = null; a.cancel(); });
-      anims = [];
-      cancelAnimationFrame(pctLoop);
-    };
-    var hurry = function () { anims.forEach(function (a) { if (a.updatePlaybackRate) a.updatePlaybackRate(8); else a.playbackRate = 8; }); };
-    // Шаги движения: считаем часто, видеочип ведёт между ними прямую
-    var play = function (fn, ms, steps, done) {
-      var frames = els.map(function () { return []; });
-      for (var i = 0; i <= steps; i++) {
-        var v = fn(i / steps);
-        for (var j = 0; j < els.length; j++) {
-          var k = { offset: i / steps };
-          if (v[j].transform != null) k.transform = v[j].transform;
-          if (v[j].opacity != null) k.opacity = v[j].opacity;
-          frames[j].push(k);
-        }
-      }
-      var list = [];
-      els.forEach(function (el, j) {
-        var f = frames[j], first = JSON.stringify([f[0].transform, f[0].opacity]);
-        // то, что за эту часть не меняется, сразу ставим как есть, без анимации
-        if (f.every(function (k) { return JSON.stringify([k.transform, k.opacity]) === first; })) {
-          if (f[0].transform != null) el.style.transform = f[0].transform;
-          if (f[0].opacity != null) el.style.opacity = f[0].opacity;
-          return;
-        }
-        list.push(el.animate(f, { duration: ms, easing: 'linear', fill: 'both' }));
-      });
-      anims = list;
-      var end = fn(1);
-      var fin = function () {
-        // конечное положение остаётся в самих элементах, анимации больше не нужны
-        applyAt(els, end);
-        stop();
-        if (done) done();
-      };
-      if (list.length) list[0].onfinish = fin; else fin();
-      return list;
-    };
-    var set = function (ph, v) { stop(); phase = ph; wantOut = wantFly = false; applyAt(els, v); };
-    var idle = function () { set('idle', atPrint(0)); setPct(0); };
-    var landed = function () { set('done', atEnd()); setPct(95); };
-
-    var PRINT_MS = 2700, OUT_MS = 750, FLY_MS = 1500;
-    var print = function () {
-      phase = 'printing';
-      var list = play(atPrint, PRINT_MS, 60, function () { phase = 'printed'; setPct(95); if (wantOut || wantFly) leave(); });
-      // проценты на экране камеры — шагами по 5%, вслед за полосой
-      var a = list[0];
-      var tick = function () {
-        if (!a || phase !== 'printing') return;
-        var t = (a.currentTime || 0) / PRINT_MS;
-        setPct(Math.min(95, Math.floor(ease2(clamp01((t - .05) / .8)) * 20) * 5));
-        pctLoop = requestAnimationFrame(tick);
-      };
-      tick();
-    };
-    var leave = function () {
-      wantOut = false;
-      phase = 'leaving';
-      play(atOut, wantFly ? 400 : OUT_MS, 24, function () { phase = 'ready'; if (wantFly) fly(); });
-    };
-    var fly = function () {
-      wantFly = false;
-      phase = 'flying';
-      // прилипший экран сейчас сдвинут на столько от верха перехода: отсюда и вылетает снимок
-      var pinY = Math.min(1, Math.max(0, st.p)) * g.span;
-      play(function (u) { return atFly(u, pinY); }, FLY_MS, 80, function () { phase = 'done'; });
-    };
-    // Снизу показалась галерея — камере пора уехать, пока она не закрыла заголовок
-    var outReady = function (p) { return g.gal - p * g.span < H(); };
-    // Плитка снимка показалась снизу — снимок летит, пока страница поднимает её навстречу
-    var flyReady = function (p) { return g.y + g.h / 2 - p * g.span < H() * .95; };
-
-    if (!box.animate) landed();
-    else {
-      idle();
-      st.fns.push(function (p) {
-        if (phase === 'idle') {
-          // пришли сразу к галерее (снизу или по ссылке) — показываем готовое, без печати
-          if (p >= .98) return landed();
-          if (p > .02) print();
-        }
-        if (flyReady(p)) {
-          if (phase === 'ready') fly();
-          else if (phase === 'printed') { wantFly = true; leave(); }
-          else if (phase === 'printing' || phase === 'leaving') { wantFly = true; if (phase === 'printing') hurry(); }
-        } else if (outReady(p)) {
-          if (phase === 'printed') leave();
-          else if (phase === 'printing') { wantOut = true; hurry(); }
-        }
-      });
-    }
-    // Лампочка мигает, только пока камера рядом с экраном. Ушли выше — в следующий раз печать начнётся заново,
-    // ушли ниже — всё уже на местах
-    watch([box], function (el, vis, io, en) {
-      box.classList.toggle('is-live', vis);
-      if (vis || !box.animate) return;
-      if (en && en.boundingClientRect.top > 0) { if (phase !== 'idle') idle(); }
-      else if (phase !== 'done') landed();
-    }, { rootMargin: '100px 0px' });
-    // Раскладка могла сдвинуться (шрифты, картинки) — пересчитываем размеры и места
+    var rebuild = viewTl ? scrollKeys(st, 'print', els, at, 400) : null;
+    // Проценты печати пишет скрипт, но редко — шагами по 5%: двадцать маленьких правок за всю печать
+    var pct = lcd[0], lastPct = -1;
+    st.fns.push(function (p) {
+      var v = Math.min(95, Math.floor(ease2(clamp01((p - .04) / .4)) * 20) * 5);
+      if (v !== lastPct) { lastPct = v; pct.textContent = 'ПЕЧАТЬ ' + v + '%'; }
+    });
+    if (!viewTl) st.fns.push(function (p) { applyAt(els, at(p)); });
+    // Лампочка мигает, только пока камера рядом с экраном
+    watch([box], function (el, vis) { box.classList.toggle('is-live', vis); }, { rootMargin: '100px 0px' });
+    // Раскладка могла сдвинуться (шрифты, картинки) — пересчитываем, если плитка уехала
     var recheck = function () {
       st.measure();
-      measure();
-      if (phase === 'idle') applyAt(els, atPrint(0));
-      else if (phase === 'done') applyAt(els, atEnd());
+      if (measure() && rebuild) rebuild();
       st.p = -1;
       if (st.on) stageTick(st, window.pageYOffset);
     };

@@ -258,7 +258,7 @@ function teacherPage(o) {
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F4EFE7">
 <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="stylesheet" href="/assets/fonts/fonts.css">
+<link rel="stylesheet" href="/admin/static/fonts.css">
 <link rel="stylesheet" href="/admin/static/pick.css">
 </head>
 <body class="kr">
@@ -312,7 +312,7 @@ function pickPage(o) {
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F4EFE7">
 <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="stylesheet" href="/assets/fonts/fonts.css">
+<link rel="stylesheet" href="/admin/static/fonts.css">
 <link rel="stylesheet" href="/admin/static/pick.css">
 </head>
 <body>

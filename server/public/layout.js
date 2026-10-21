@@ -26,6 +26,15 @@
         .then(function () { location.reload(); }, function (err) { alert(err.message); });
     });
   }
+  // У дизайнера «Всё исправлено» тоже уходит как JSON
+  var done = document.querySelector('.lay-fixes');
+  if (done && box && !box.getAttribute('data-csrf')) {
+    done.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!confirm(done.getAttribute('data-confirm'))) return;
+      post(done.getAttribute('action'), {}).then(function () { location.reload(); }, function (err) { alert(err.message); });
+    });
+  }
   if (!box) return;
 
   var csrf = box.getAttribute('data-csrf') || '';

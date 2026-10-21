@@ -328,6 +328,7 @@ function createApp(cfg) {
       checked: list.filter(s => oks.get(s.id)).length,
       teacherCover: !!(lay && lay.covers.indexOf(list.length + 1) !== -1),
       teacher: album ? { name: album.teacher_name, ok: !!(lay && lay.teacher_ok_at), fixes: teacherFixes } : null,
+      openLayoutFixes: Array.from(fixCount.values()).reduce((a, b) => a + b, 0) + teacherFixes,
       noPick: !album
     };
   }
@@ -336,10 +337,7 @@ function createApp(cfg) {
   function layoutSummary(cls) {
     const d = layoutData(cls);
     if (d.noPick) return null;
-    return {
-      ver: d.lay ? d.lay.ver : 0, spreads: d.lay ? d.lay.spreads : 0, checked: d.checked, total: d.list.length,
-      fixes: Array.from(d.fixCount.values()).reduce((a, b) => a + b, 0) + (d.teacher ? d.teacher.fixes : 0)
-    };
+    return { ver: d.lay ? d.lay.ver : 0, spreads: d.lay ? d.lay.spreads : 0, checked: d.checked, total: d.list.length, fixes: d.openLayoutFixes };
   }
 
   r.get('/admin/c/:id/layout', ctx => {
@@ -352,7 +350,7 @@ function createApp(cfg) {
       body: LV.layoutBody(Object.assign(d, {
         back: '/admin/c/' + cls.id + '/work', backLabel: cls.title,
         csrf: ctx.sess.csrf,
-        api: { start: base + '/start', file: '/admin/api/media/lay/' + cls.id, finish: base + '/finish', first: '/admin/c/' + cls.id + '/layout/first' },
+        api: { start: base + '/start', file: '/admin/api/media/lay/' + cls.id, finish: base + '/finish', first: '/admin/c/' + cls.id + '/layout/first', fixesDone: '/admin/c/' + cls.id + '/layout/fixesdone' },
         link: d.album ? baseUrl(ctx) + '/f/' + d.album.slug + '/album' : '',
         teacherLink: d.album ? baseUrl(ctx) + '/kr/' + photos.teacherToken(cls.id) + '/album' : '',
         pickLink: '/admin/c/' + cls.id + '/photos',
@@ -390,6 +388,20 @@ function createApp(cfg) {
     return spread * 2 - (f.side === 'r' ? 0 : 1);
   }
 
+  // Все открытые правки из проверки — исправлены (дизайнер загрузил новую версию)
+  function layoutFixesDone(cls, who) {
+    let n = 0;
+    work.fixes(cls.id).forEach(f => { if (f.kind === 'layout' && !f.done_at && work.setFixDone(cls.id, f.id, true, who)) n++; });
+    return n;
+  }
+
+  r.post('/admin/c/:id/layout/fixesdone', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return notFound(ctx);
+    layoutFixesDone(cls, 'Артур');
+    back(ctx, '/admin/c/' + cls.id + '/layout', 'saved');
+  });
+
   r.post('/admin/c/:id/layout/first', ctx => {
     const cls = loadClass(ctx);
     if (!cls) return notFound(ctx);
@@ -409,7 +421,7 @@ function createApp(cfg) {
       title: 'Макет · ' + cls.title, designer: d, home: '/d/' + d.token, scripts: ['/admin/static/layout.js'],
       body: LV.layoutBody(Object.assign(data, {
         back: base, backLabel: cls.title,
-        api: { start: base + '/layout/start', file: '/admin/api/media/dlay/' + d.token + '/' + cls.id, finish: base + '/layout/finish', first: base + '/layout/first' },
+        api: { start: base + '/layout/start', file: '/admin/api/media/dlay/' + d.token + '/' + cls.id, finish: base + '/layout/finish', first: base + '/layout/first', fixesDone: base + '/layout/fixesdone' },
         link: data.album ? baseUrl(ctx) + '/f/' + data.album.slug + '/album' : '',
         preview: s => base + '/album?s=' + (s === 'kr' ? 'kr' : s.id)
       }))
@@ -433,6 +445,7 @@ function createApp(cfg) {
     if (res.ok) work.event(cls.id, d.name, 'загружен макет для проверки');
     return res;
   });
+  designerJson('layout/fixesdone', (b, cls, d) => ({ ok: true, n: layoutFixesDone(cls, d.name) }));
   designerJson('layout/first', (b, cls) => layout.setFirstPage(cls.id, firstPageFrom(b)) ? { ok: true } : { error: 'Проверьте номер разворота' });
 
   // Файлы дизайнера: много запросов подряд, поэтому лимит щедрый
@@ -561,8 +574,50 @@ function createApp(cfg) {
 
   // ---------- вход в админку ----------
 
+  // Файлы админки и страниц учеников с версией в адресе (?v=…) телефон хранит у себя и больше не спрашивает:
+  // на слабом мобильном интернете каждый лишний запрос — это задержка перед показом страницы.
+  // Поменялся файл — поменялась версия, и телефон сам скачает новый
+  const fontsCss = path.join(siteRoot, 'assets', 'fonts', 'fonts.css');
+  // файлы сайта, которые нужны и страницам админки и учеников: отдаём их под тем же адресом с версией
+  const SITE_FILES = { 'book.js': path.join(siteRoot, 'assets', 'book.js'), 'book.css': path.join(siteRoot, 'assets', 'book.css') };
+  const staticFile = name => name === 'fonts.css' ? fontsCss : SITE_FILES[name] || path.join(publicDir, name);
+  const versions = new Map();
+  function staticVersion(name) {
+    let st;
+    try { st = fs.statSync(staticFile(name)); } catch (e) { return ''; }
+    const key = st.size + '-' + Math.floor(st.mtimeMs);
+    const v = versions.get(name);
+    if (v && v.key === key) return v.v;
+    const h = crypto.createHash('sha1').update(fs.readFileSync(staticFile(name))).digest('hex').slice(0, 10);
+    versions.set(name, { key: key, v: h });
+    return h;
+  }
+  H.setHtmlFilter(body => body.replace(/(href|src)="\/admin\/static\/([\w.-]+)"/g, (m, attr, name) => {
+    const v = staticVersion(name);
+    return v ? attr + '="/admin/static/' + name + '?v=' + v + '"' : m;
+  }));
+  const FOREVER = 'public, max-age=31536000, immutable';
+
+  // Помощник админки в телефоне (public/sw.js): работает на всех страницах /admin, поэтому разрешаем ему весь /admin
+  r.get('/admin/sw.js', ctx => {
+    ctx.res.setHeader('Service-Worker-Allowed', '/admin');
+    if (!H.serveStatic(publicDir, ctx.req, ctx.res, '/sw.js', [], { cache: 'no-cache' })) return notFound(ctx);
+  });
+
   r.get('/admin/static/:file', ctx => {
-    if (!H.serveStatic(publicDir, ctx.req, ctx.res, '/' + ctx.params.file, [])) notFound(ctx);
+    const cache = ctx.q('v') ? FOREVER : null;
+    // шрифты сайта под адресом админки: пути к самим файлам шрифтов — от корня
+    if (ctx.params.file === 'fonts.css') {
+      let css;
+      try { css = fs.readFileSync(fontsCss, 'utf8'); } catch (e) { return notFound(ctx); }
+      return H.send(ctx.res, 200, css.replace(/url\((['"]?)(?![a-z]+:|\/)/g, 'url($1/assets/fonts/'), 'text/css; charset=utf-8', { 'Cache-Control': cache || 'no-cache' });
+    }
+    const site = SITE_FILES[ctx.params.file];
+    if (site) {
+      if (!H.serveStatic(path.dirname(site), ctx.req, ctx.res, '/' + path.basename(site), [], cache ? { cache: cache } : null)) notFound(ctx);
+      return;
+    }
+    if (!H.serveStatic(publicDir, ctx.req, ctx.res, '/' + ctx.params.file, [], cache ? { cache: cache } : null)) notFound(ctx);
   });
 
   r.get('/admin/login', ctx => {
@@ -588,6 +643,8 @@ function createApp(cfg) {
   r.post('/admin/logout', ctx => {
     auth.logout(ctx.cookies.rs);
     H.setCookie(ctx.res, 'rs', '', cookieOpts(ctx, 0));
+    // сохранённые в телефоне страницы админки стираем вместе с выходом
+    ctx.res.setHeader('Clear-Site-Data', '"cache", "storage"');
     back(ctx, '/admin/login', 'bye');
   });
 
@@ -1801,7 +1858,8 @@ function createApp(cfg) {
     return store.listClasses().filter(c => withArchive || !c.archived).map(c => {
       const w = all.get(c.id) || work.get(c.id);
       const pk = noPick ? null : pkInfo(c);
-      return { c: c, w: w, pk: pk, open: open.get(c.id) || 0, half: half(c, w), m: work.money(w, c, pk ? pk.total : 0) };
+      const lay = !noPick && pk && layout.ready(c.id) ? layoutSummary(c) : null;
+      return { c: c, w: w, pk: pk, lay: lay, open: open.get(c.id) || 0, half: half(c, w), m: work.money(w, c, pk ? pk.total : 0) };
     }).filter(filter || (() => true));
   }
 
@@ -2365,7 +2423,7 @@ function createApp(cfg) {
 
   // загрузка макета дизайнером: путь под /admin/api/media/, чтобы nginx пропускал большие файлы,
   // но вход по ссылке дизайнера, а не по паролю админки
-  const OPEN_ADMIN = ['/admin/login', '/admin/static/', '/admin/api/media/dlay/'];
+  const OPEN_ADMIN = ['/admin/login', '/admin/static/', '/admin/api/media/dlay/', '/admin/sw.js'];
 
   async function handle(req, res) {
     const url = new URL(req.url, 'http://localhost');

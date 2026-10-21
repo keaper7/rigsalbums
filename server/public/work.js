@@ -14,8 +14,17 @@
     t.tm = setTimeout(function () { t.hidden = true; }, bad ? 6000 : 2200);
   }
 
+  // Короткий запрос (галочка, сохранение поля): если сайт не отвечает 20 секунд — как будто связи нет.
+  // Иначе при «висящем» мобильном интернете кнопка оставалась нажатой без конца
+  function quick(url, opts) {
+    if (!window.AbortController) return fetch(url, opts);
+    var c = new AbortController(), t = setTimeout(function () { c.abort(); }, 20000);
+    opts.signal = c.signal;
+    return fetch(url, opts).then(function (r) { clearTimeout(t); return r; }, function (e) { clearTimeout(t); throw e; });
+  }
+
   function post(url, body) {
-    return fetch(url, {
+    return quick(url, {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -72,7 +81,7 @@
       var box = cb.closest('[data-stage]');
       var before = document.querySelector('.wk-stg.is-now');
       cb.disabled = true;
-      fetch(cb.getAttribute('data-url'), {
+      quick(cb.getAttribute('data-url'), {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfMeta ? csrfMeta.getAttribute('content') : '' },
         body: JSON.stringify({ step: cb.getAttribute('data-step'), on: cb.checked })

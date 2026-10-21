@@ -110,7 +110,7 @@ ${o.sess ? html`<meta name="csrf" content="${o.sess.csrf}">
 <link rel="manifest" href="/admin/static/manifest.webmanifest">
 <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
-<link rel="stylesheet" href="/assets/fonts/fonts.css">
+<link rel="stylesheet" href="/admin/static/fonts.css">
 <link rel="stylesheet" href="/admin/static/admin.css">
 </head>
 <body>

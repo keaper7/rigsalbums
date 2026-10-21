@@ -1075,3 +1075,9 @@ p.link code { display: inline-block; max-width: 100%; word-break: break-all; tex
 .wk-lay__t .h { margin-bottom: 2px; }
 .wk-lay .b { flex: 0 0 auto; }
 @media (max-width: 520px) { .wk-lay .b { width: 100%; text-align: center; } }
+/* Макет: кто ещё не проверил, правки из проверки */
+.lay-left { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin: 12px 0 6px; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-size: 14px; }
+.lay-all { margin: 12px 0 6px; padding: 10px 12px; border-radius: 12px; background: var(--ok-bg); color: var(--ok); font-weight: 700; font-size: 14px; }
+.lay-fixes { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; border: 1.5px solid var(--warn); }
+.lay-fixes > div { flex: 1 1 240px; }
+.wk-lay-st { color: var(--ink-2); }

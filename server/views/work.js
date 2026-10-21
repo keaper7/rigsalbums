@@ -216,7 +216,8 @@ function classCard(r, today) {
       ${halfChip(r.half)}
       ${noPrepay ? html`<span class="wk-noprepay">без предоплаты</span>` : ''}
       ${next ? html`<span class="wk-date">${when(next, today)} · ${DATE_KIND_NAMES[next.kind].toLowerCase()}</span>` : ''}
-      ${r.pk && r.pk.total && sg.index === 1 ? pkLine(r.pk) : ''}
+      ${r.pk && r.pk.total && sg.index === 1 && !r.lay ? pkLine(r.pk) : ''}
+      ${r.lay && sg.index <= 1 && !stepOn(r.w, 'checked') ? html`<span class="${r.lay.checked === r.lay.total && !r.lay.fixes ? 'wk-ok' : 'wk-lay-st'}">макет: проверили ${r.lay.checked}/${r.lay.total}</span>` : ''}
       ${r.w.status !== 'todo' ? statusChip(r.w.status) : ''}
       ${r.open ? html`<span class="wk-warn">${fixesN(r.open)}</span>` : ''}
       ${r.m.paidUp ? html`<span class="wk-paid">оплачено</span>` : sg.index >= 2 && r.m.ready && r.m.rest > 0 ? html`<span class="wk-warn">с родителей ещё ${rub(r.m.rest)}</span>` : ''}
@@ -475,7 +476,11 @@ function stepHint(o, key) {
       : html`<small class="muted">ученики выбирают фото · <a class="wk-mk" href="/admin/c/${o.cls.id}/photos">создать выборку</a></small>`;
   }
   if (key === 'extra' && pk && pk.retouchWait) return html`<small class="wk-warn">ждут: ${pk.retouchWait} · <a href="/admin/c/${o.cls.id}/photos">отметить в отборе</a></small>`;
-  if (key === 'check') return html`<small class="muted">ученики проверяют свой макет${o.lay ? html`: проверили ${o.lay.checked} из ${o.lay.total}${o.lay.fixes ? ', правок ' + o.lay.fixes : ''}` : ''} · <a href="/admin/c/${o.cls.id}/layout">${o.lay && o.lay.ver ? 'макет' : 'загрузить макет'}</a></small>`;
+  if (key === 'check' || key === 'checked') {
+    const l = o.lay;
+    if (key === 'checked') return l && l.ver && l.total && l.checked === l.total && !l.fixes && !stepOn(o.w, 'checked') ? html`<small class="wk-ok">все ученики проверили, правок нет · можно отмечать</small>` : '';
+    return html`<small class="muted">ученики проверяют свой макет${l && l.ver ? html`: проверили ${l.checked} из ${l.total}${l.fixes ? ', правок ' + l.fixes : ''}` : ''} · <a href="/admin/c/${o.cls.id}/layout">${l && l.ver ? 'макет' : 'загрузить макет'}</a></small>`;
+  }
   return '';
 }
 
@@ -845,7 +850,7 @@ function dlayout(o) {
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F4EFE7">
 <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="stylesheet" href="/assets/fonts/fonts.css">
+<link rel="stylesheet" href="/admin/static/fonts.css">
 <link rel="stylesheet" href="/admin/static/admin.css">
 </head>
 <body class="wk-d">
@@ -1001,7 +1006,7 @@ function teacherBlock(pk, num) {
 }
 
 function designerGone() {
-  return '<!doctype html>\n' + html`<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Ссылка не работает</title><link rel="stylesheet" href="/assets/fonts/fonts.css"><link rel="stylesheet" href="/admin/static/admin.css"></head>
+  return '<!doctype html>\n' + html`<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Ссылка не работает</title><link rel="stylesheet" href="/admin/static/fonts.css"><link rel="stylesheet" href="/admin/static/admin.css"></head>
 <body><main class="aw aw--narrow"><div class="card"><h1 class="h">Ссылка не работает</h1><p class="muted" style="margin-top:8px">Её отключили или в ней опечатка. Попросите у Артура новую.</p></div></main></body></html>
 `.s;
 }

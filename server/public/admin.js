@@ -478,4 +478,13 @@
   }
   openHash();
   window.addEventListener('hashchange', openHash);
+
+  // Помощник в телефоне (/admin/sw.js): файлы админки из памяти, а без связи — сохранённая страница, а не белый экран
+  if ('serviceWorker' in navigator && location.pathname.indexOf('/admin') === 0) {
+    navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin' }).catch(function () {});
+    // выход из админки — сохранённые страницы стираем и в самом телефоне
+    document.addEventListener('submit', function (e) {
+      if (/\/admin\/logout$/.test(e.target.getAttribute('action') || '') && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('clear');
+    });
+  }
 })();

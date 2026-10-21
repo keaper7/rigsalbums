@@ -47,6 +47,7 @@ function studentsCard(o) {
     <label class="field field--inline"><span>страница</span><select name="side"><option value="l"${!l || l.first_page % 2 ? raw(' selected') : ''}>левая</option><option value="r"${l && !(l.first_page % 2) ? raw(' selected') : ''}>правая</option></select></label>
     <button class="b b--sm" type="submit">Сохранить</button>
   </form>
+  ${notCheckedCopy(o)}
   <p class="muted small">Номер — как у дизайнера: по алфавиту. Обложка ученика — файл с его номером, например 003-00. Если порядок у дизайнера другой, проверьте, как написаны фамилии в отборе.</p>
   <ol class="lay-list">${o.list.map(s => {
     const pg = l && l.spreads ? pageOf(l, s.num) : null;
@@ -59,6 +60,26 @@ function studentsCard(o) {
     </li>`;
   })}${teacherRow(o)}</ol>
 </div>`;
+}
+
+// Кто ещё не проверил — готовым сообщением для чата класса (только у Артура)
+function notCheckedCopy(o) {
+  if (!o.csrf || !o.link || !o.lay || !o.lay.ver) return '';
+  const left = o.list.filter(s => !o.oks.get(s.id) && !o.fixCount.get(s.id));
+  if (!left.length) return html`<p class="lay-all">Все ученики посмотрели альбом${o.fixCount.size ? ', у кого-то есть правки' : ' и отметили, что всё верно'}.</p>`;
+  const text = 'Ещё не проверили альбом (' + left.length + '):\n' + left.map(s => s.name).join('\n') + '\n\nСсылка: ' + o.link + '\nВход тем же кодом, что на выборе фото.';
+  return html`<div class="lay-left"><span>Не отметили «всё верно» и не писали правок: <b>${left.length}</b></span><button class="b b--sm" type="button" data-copy="${text}">Скопировать напоминание</button></div>`;
+}
+
+// Правки из проверки, которые ещё открыты: после новой загрузки их можно закрыть разом
+function openFixesCard(o) {
+  const n = o.openLayoutFixes || 0;
+  if (!n || !o.lay || !o.lay.ver || !o.api.fixesDone) return '';
+  return html`<form class="card lay-fixes" method="post" action="${o.api.fixesDone}" data-confirm="Отметить исправленными все правки из проверки (${n})? Ученики увидят у своих правок «исправлено».">
+  ${o.csrf ? html`<input type="hidden" name="_csrf" value="${o.csrf}">` : ''}
+  <div><h2 class="h">Правки из проверки: ${n}</h2><p class="muted small">Если в загруженном макете они уже исправлены, отметьте все разом, чтобы не закрывать по одной.</p></div>
+  <button class="b b--main b--sm" type="submit">Всё исправлено</button>
+</form>`;
 }
 
 // Классный руководитель: номер после всех учеников, только обложка, своя ссылка без кода
@@ -77,6 +98,7 @@ function layoutBody(o) {
   return html`<a class="back" href="${o.back}">← ${o.backLabel}</a>
 <div class="head head--class"><div><h1 class="h1">Макет для проверки</h1><p class="muted">${o.cls.title} · ${o.cls.school}</p></div></div>
 ${o.noPick ? html`<div class="card"><h2 class="h">Сначала нужен отбор фото</h2><p class="muted">Ученики и их коды берутся из отбора. ${o.pickLink ? html`<a href="${o.pickLink}">Создать отбор</a>` : 'Попросите Артура создать отбор для этого класса.'}</p></div>` : html`${stateCard(o)}
+${openFixesCard(o)}
 ${uploadCard(o)}
 ${studentsCard(o)}`}`;
 }
@@ -92,9 +114,9 @@ function albumShell(o, body) {
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F4EFE7">
 <link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="stylesheet" href="/assets/fonts/fonts.css">
+<link rel="stylesheet" href="/admin/static/fonts.css">
 <link rel="stylesheet" href="/admin/static/pick.css">
-<link rel="stylesheet" href="/assets/book.css">
+<link rel="stylesheet" href="/admin/static/book.css">
 <link rel="stylesheet" href="/admin/static/album.css">
 </head>
 <body class="al">
@@ -110,7 +132,7 @@ function albumShell(o, body) {
 ${body}
 </main>
 <p class="toast" role="status" aria-live="polite" hidden></p>
-<script src="/assets/book.js"></script>
+<script src="/admin/static/book.js"></script>
 <script src="/admin/static/album.js"></script>
 </body>
 </html>

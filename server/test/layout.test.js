@@ -109,6 +109,12 @@ test('макет: загрузка, вход ученика, своя облож
   assert.ok(s.app.layout.oks(+id).get(zarina.id));
   r = await admin.req('GET', '/admin/c/' + id + '/layout');
   assert.match(r.text, /1 из 3 проверили/);
+  // напоминание в чат: только те, кто не отметил «всё верно» и не писал правок
+  assert.match(r.text, /Ещё не проверили альбом \(2\):\nАнна\nТимур\n\nСсылка: http[^"]*\/album/);
+  assert.match(r.text, /Правки из проверки: 1/);
+  // на доске работы — сколько проверили
+  r = await admin.req('GET', '/admin/work');
+  assert.match(r.text, /макет: проверили 1\/3/);
   // у пункта «Сверка» — сколько проверили и ссылка на макет; в сообщении — ссылка на альбом
   r = await admin.req('GET', '/admin/c/' + id + '/work');
   assert.match(r.text, /проверили 1 из 3, правок 1/);
@@ -118,6 +124,17 @@ test('макет: загрузка, вход ученика, своя облож
   await admin.post('/admin/c/' + id + '/layout/first', { spread: '1', side: 'r' });
   r = await kid.req('GET', '/f/' + slug + '/album');
   assert.match(r.text, /data-mine="s02-l"/);
+  // все правки из проверки закрываются разом
+  await admin.post('/admin/c/' + id + '/layout/fixesdone', {});
+  assert.ok(s.app.work.fixes(+id).filter(f => f.kind === 'layout').every(f => f.done_at));
+  r = await admin.req('GET', '/admin/c/' + id + '/layout');
+  assert.doesNotMatch(r.text, /Правки из проверки:/);
+  r = await kid.req('GET', '/f/' + slug + '/album');
+  assert.match(r.text, /исправлено/);
+  // все проверили, правок нет — у «Сверка пройдена» подсказка
+  st.forEach(x => s.app.layout.setOk(+id, x.id, true));
+  r = await admin.req('GET', '/admin/c/' + id + '/work');
+  assert.match(r.text, /все ученики проверили, правок нет/);
   // Артур смотрит альбом за ученика, без формы правок
   r = await admin.req('GET', '/f/' + slug + '/album?s=' + st.find(x => x.name === 'Анна').id);
   assert.match(r.text, /data-front="c001"/);
@@ -142,6 +159,14 @@ test('макет: дизайнер загружает по своей ссылк
     [1]);
   assert.strictEqual(res.finish.status, 200, res.finish.text);
   assert.strictEqual(s.app.layout.get(+id).uploaded_by, 'Дизайнер');
+  // дизайнер закрывает правки из проверки разом
+  s.app.work.addFix(+id, { studentName: 'Классный руководитель', kind: 'layout', text: 'Обложка: опечатка', who: 'Кл', auto: true });
+  r = await des.req('GET', '/d/' + token + '/c/' + id + '/layout');
+  assert.match(r.text, /Правки из проверки: 1/);
+  assert.doesNotMatch(r.text, /Скопировать напоминание/, 'напоминание ученикам — только у Артура');
+  r = await des.req('POST', '/d/' + token + '/c/' + id + '/layout/fixesdone', { json: {} });
+  assert.strictEqual(r.data.n, 1);
+  assert.ok(s.app.work.fixes(+id).every(f => f.done_at));
   // чужая ссылка не работает
   r = await client(s.base).req('POST', '/admin/api/media/dlay/nope/' + id + '/' + res.ver + '?name=s01-l', { raw: JPEG_WIDE, type: 'image/jpeg' });
   assert.strictEqual(r.status, 403);

@@ -80,9 +80,14 @@ function parseForm(str) {
   return out;
 }
 
+// Страницам перед отправкой: например, приписать версии к адресам файлов (см. app.js, staticVersions)
+let htmlFilter = null;
+function setHtmlFilter(fn) { htmlFilter = fn; }
+
 function send(res, status, body, type, headers) {
   if (res.headersSent) return;
   const h = Object.assign({ 'Content-Type': type || 'text/html; charset=utf-8' }, headers || {});
+  if (htmlFilter && typeof body === 'string' && /^text\/html/.test(h['Content-Type'])) body = htmlFilter(body);
   const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
   h['Content-Length'] = buf.length;
   res.writeHead(status, h);
@@ -180,4 +185,4 @@ class Router {
   }
 }
 
-module.exports = { parseCookies, setCookie, readBody, parseForm, send, json, redirect, serveStatic, Router, TYPES };
+module.exports = { parseCookies, setCookie, readBody, parseForm, send, json, redirect, serveStatic, Router, TYPES, setHtmlFilter };

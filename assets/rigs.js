@@ -340,11 +340,16 @@
   var counters = $$('[data-count]');
   if (counters.length && !reduce) {
     var plus = function (n) { return group(n, ' ') + '+'; };
-    counters.forEach(function (el) { el.textContent = plus(0); });
+    // Место под число держит невидимая копия итогового «5 000+»: пока цифры набегают, ширина не меняется,
+    // и соседние столбцы с разделителями стоят на месте
+    counters.forEach(function (el) {
+      var to = +el.getAttribute('data-count');
+      el.innerHTML = '<span class="cnt"><span class="cnt__v">' + plus(0) + '</span><span class="cnt__w" aria-hidden="true">' + plus(to) + '</span></span>';
+    });
     watch(counters, function (el, vis, io) {
       if (!vis) return;
       if (io) io.unobserve(el);
-      countUp(el, +el.getAttribute('data-count'), plus, 1400, 400);
+      countUp($('.cnt__v', el), +el.getAttribute('data-count'), plus, 1400, 400);
     }, { threshold: .6 });
   }
 
@@ -1937,8 +1942,8 @@
       });
     };
     box.classList.add('is-time');
-    // Сколько всё длится: все легли (последний — через 0,11 с × номер + 0,75 с), полежали, разлетелись
-    var LAND = cards.length * 110 + 750, HOLD = 1100, AWAY = 800 + cards.length * 40 + 300;
+    // Сколько всё длится: все легли (последний — через 0,07 с × номер + 0,65 с), на миг замерли, разлетелись
+    var LAND = cards.length * 70 + 650, HOLD = 250, AWAY = 700 + cards.length * 30 + 250;
     var phase = 'idle', t1 = 0, t2 = 0, top = 0;
     var clear = function () { clearTimeout(t1); clearTimeout(t2); };
     var reset = function () {

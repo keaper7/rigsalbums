@@ -2069,13 +2069,13 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 }
 .desk.is-time.is-land .desk__ph {
   -webkit-transform: var(--at); transform: var(--at); opacity: 1;
-  -webkit-transition: -webkit-transform .75s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .11s), opacity .35s ease calc(var(--i) * .11s);
-  transition: transform .75s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .11s), opacity .35s ease calc(var(--i) * .11s);
+  -webkit-transition: -webkit-transform .65s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .07s), opacity .3s ease calc(var(--i) * .07s);
+  transition: transform .65s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .07s), opacity .3s ease calc(var(--i) * .07s);
 }
 .desk.is-time.is-gone .desk__ph {
   -webkit-transform: var(--away); transform: var(--away); opacity: 0;
-  -webkit-transition: -webkit-transform .8s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .04s), opacity .5s ease calc(.25s + var(--i) * .04s);
-  transition: transform .8s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .04s), opacity .5s ease calc(.25s + var(--i) * .04s);
+  -webkit-transition: -webkit-transform .7s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .03s), opacity .45s ease calc(.2s + var(--i) * .03s);
+  transition: transform .7s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .03s), opacity .45s ease calc(.2s + var(--i) * .03s);
 }
 .desk.is-time .desk__bg { -webkit-transition: opacity .45s ease; transition: opacity .45s ease; }
 .desk.is-time.is-land .desk__bg { opacity: 1; }
@@ -2291,3 +2291,8 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 /* стрелка «откроется в новой вкладке»: короткая и плотная, цвет как у текста */
 .arr { display: inline-block; width: .8em; height: .8em; margin-left: .3em; vertical-align: -.02em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
 .ft__by .arr { width: 1em; height: 1em; margin-left: .15em; vertical-align: -.1em; }
+
+/* Счётчики «9+», «5 000+»: число набегает поверх невидимой копии итогового, поэтому ширина не прыгает (rigs.js) */
+.cnt { display: inline-grid; }
+.cnt > span { grid-area: 1 / 1; }
+.cnt__w { visibility: hidden; }

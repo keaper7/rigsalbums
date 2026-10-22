@@ -1033,7 +1033,7 @@ function designCard(o) {
   <form method="post" action="/admin/c/${c.id}/work/design" class="form wk-dform">
     ${csrf(o.sess)}
     <label class="check"><input type="checkbox" name="on" value="1"${w.design ? raw(' checked') : ''} data-design-on><span>Индивидуальный дизайн</span></label>
-    <label class="field" data-design-text${w.design ? '' : raw(' hidden')}><span>Что за дизайн</span><textarea name="design" rows="2" maxlength="500" placeholder="Что нужно сделать">${w.design}</textarea></label>
+    <label class="field" data-design-text${w.design ? '' : raw(' hidden')}><span>Что за дизайн</span><textarea name="design" rows="2" maxlength="500" placeholder="Например: совмещённый стиль грей и классик">${w.design}</textarea></label>
     <p class="muted small">Видят дизайнер у себя и ребята на странице класса.</p>
     <button class="b b--sm" type="submit">Сохранить</button>
   </form>

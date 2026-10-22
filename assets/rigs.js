@@ -1770,7 +1770,7 @@
     // Всё уже случилось: снимок в галерее, камера висит объективом к посетителю
     var landed = function () { set('done', atFly(1)); turned(true); setPct(95); };
 
-    var PRINT_MS = 2700, FLY_MS = 1500;
+    var PRINT_MS = 2300, FLY_MS = 1300;
     // проценты на экране камеры — шагами по 5%, вслед за полосой
     var count = function (a, ph) {
       var tick = function () {
@@ -1800,7 +1800,7 @@
       // поднимается на середину блока, но не выше шапки сайта: на телефоне к этому моменту страницу уже листают дальше
       var camTop = top + g.slot - window.pageYOffset, room = camTop - (hd ? hd.offsetHeight : 60) - .2 * H();
       lift = Math.max(0, Math.min(g.lift, room));
-      play(els3, atTurn, 1700, 110, aim);
+      play(els3, atTurn, 1500, 100, aim);
     };
     // Наводится: чуть поводит объективом, будто ищет посетителя в кадре, объектив выдвигается,
     // кольцо фокуса проворачивается, подсветка фокуса мигает дважды
@@ -1910,24 +1910,21 @@
   })();
 
   // ---------- «Фото на стол» ----------
-  // После галереи снимки из «Работ» один за другим ложатся на экран, как фотографии на стол.
-  // Потом разъезжаются в стороны, и за ними уже следующий блок
+  // После галереи снимки из «Работ» один за другим ложатся поверх экрана, как фотографии на стол,
+  // секунду лежат и сами разлетаются в стороны. Ничего не прилипает и не ждёт прокрутки: блок нулевой высоты
+  // только отмечает место, а снимки летят в слое поверх страницы, по времени, на видеочипе. Раньше стол прилипал
+  // к экрану и ждал, пока долистают, — на iPhone при медленной прокрутке снимки дребезжали
   (function () {
     var box = $('.desk');
     if (!box) return;
     // Снимки вставляет сервер: фото из «Работ», которых нет ни в галерее над переходом, ни на плёнке
-    var cards = $$('.desk__ph', box), bg = $('.desk__bg', box);
+    var cards = $$('.desk__ph', box);
     if (!fx || cards.length < 4) return drop(box);
-    box.classList.add('is-on');
-    var st = stage(box);
+    box.classList.add('is-on', 'is-fix');
     // Где снимок ложится: сдвиг от центра в долях ширины и высоты экрана и наклон
     var SPOT = [[-.2, -.2, -9], [.2, -.24, 7], [-.03, -.02, 3], [-.24, .17, -6], [.23, .12, 10], [.02, .26, -7], [.1, -.08, -3]];
-    // Снимки «бросают» на стол. Раньше каждый кадр движения считался от прокрутки, и на iPhone закреплённый
-    // экран и пересчёт по пальцу расходились на долю кадра — снимки мелко дрожали. Теперь прокрутка только
-    // говорит «пора»: снимки ложатся и разъезжаются сами, по времени, плавными переходами на видеочипе,
-    // как бы неровно ни двигался палец
     var setSpots = function () {
-      var W = window.innerWidth, H = U.vh * 100 || window.innerHeight;
+      var W = window.innerWidth, H = window.innerHeight;
       cards.forEach(function (c, i) {
         var sp = SPOT[i % SPOT.length], dir = sp[0] < 0 ? -1 : 1;
         var x = sp[0] * W, y = sp[1] * H;
@@ -1939,24 +1936,49 @@
         c.style.setProperty('--away', 'translate3d(' + (x + dir * .9 * W).toFixed(1) + 'px,' + (y - .08 * H).toFixed(1) + 'px,0) rotate(' + (sp[2] + dir * 22) + 'deg)');
       });
     };
-    setSpots();
     box.classList.add('is-time');
-    var phase = '';
-    var show = function (ph) {
-      if (ph === phase) return;
-      if (ph === 'land') setSpots();
-      phase = ph;
-      box.classList.toggle('is-land', ph === 'land');
-      box.classList.toggle('is-gone', ph === 'gone');
+    // Сколько всё длится: все легли (последний — через 0,11 с × номер + 0,75 с), полежали, разлетелись
+    var LAND = cards.length * 110 + 750, HOLD = 1100, AWAY = 800 + cards.length * 40 + 300;
+    var phase = 'idle', t1 = 0, t2 = 0, top = 0;
+    var clear = function () { clearTimeout(t1); clearTimeout(t2); };
+    var reset = function () {
+      clear();
+      phase = 'idle';
+      box.classList.remove('is-show', 'is-land', 'is-gone');
     };
-    // Небольшой запас у границ, чтобы на самой границе не мигало туда-сюда
-    st.fns.push(function (p) {
-      if (p < .04) show('');
-      else if (p < .06 && phase !== 'land') show(phase === 'gone' ? 'land' : '');
-      else if (p > .64) show('gone');
-      else if (p > .06 && p < .6) show('land');
+    var play = function () {
+      phase = 'play';
+      setSpots();
+      box.classList.add('is-show');
+      // кадр на то, чтобы снимки встали в начальное положение, потом летят
+      raf(function () { raf(function () { if (phase === 'play') box.classList.add('is-land'); }); });
+      t1 = setTimeout(function () { box.classList.add('is-gone'); box.classList.remove('is-land'); }, LAND + HOLD);
+      t2 = setTimeout(function () { phase = 'done'; box.classList.remove('is-show', 'is-gone'); }, LAND + HOLD + AWAY);
+    };
+    var measure = function () { top = box.getBoundingClientRect().top + window.pageYOffset; };
+    measure();
+    // Место отметки (между галереей и следующим блоком) поднялось до 60% экрана — снимки летят.
+    // Ушли выше отметки на экран — в следующий раз полетят снова
+    var near = false;
+    perFrame.push(function (y) {
+      if (!near) return;
+      var at = top - y, H = window.innerHeight;
+      if (phase === 'idle' && at < H * .6 && at > -H * .5) play();
+      else if (phase !== 'idle' && at > H) reset();
     });
-    onRebuild(function () { if (!phase) setSpots(); });
+    watch([box], function (el, vis) {
+      near = vis;
+      if (!vis && phase !== 'idle') {
+        var at = top - window.pageYOffset;
+        if (at > 0) reset();
+      }
+    }, { rootMargin: '100% 0px' });
+    window.addEventListener('load', measure);
+    if ('ResizeObserver' in window) {
+      var rt = 0;
+      new ResizeObserver(function () { clearTimeout(rt); rt = setTimeout(measure, 150); }).observe(document.body);
+    }
+    onRebuild(function () { measure(); if (phase === 'idle') setSpots(); });
   })();
 
   // ---------- «Приближение» ----------

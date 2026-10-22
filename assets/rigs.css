@@ -2042,6 +2042,13 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .desk.is-on { height: 250vh; }
 .desk.is-on + section { position: relative; z-index: 1; margin-top: -100vh; }
 .desk__pin { position: -webkit-sticky; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+/* Стол без прилипания: блок нулевой высоты отмечает место, снимки летят в слое поверх экрана
+   и сами разлетаются (rigs.js «Фото на стол»). Слой показан, только пока они летят */
+.desk.is-on.is-fix { height: 0; margin-top: 0; }
+.desk.is-on.is-fix + section { margin-top: 0; }
+.desk.is-fix .desk__pin { position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: auto; visibility: hidden; }
+.desk.is-fix.is-show .desk__pin { visibility: visible; }
+.desk.is-time.is-fix.is-land .desk__bg { opacity: .95; }
 /* Стол: бумага того же цвета, что страница, закрывает стык блоков, пока снимки лежат */
 .desk__bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--paper); opacity: 0; will-change: opacity; }
 .desk__ph {

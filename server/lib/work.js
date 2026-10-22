@@ -101,6 +101,12 @@ const COLUMNS = [
   ['wk_classes', 'probes', "TEXT NOT NULL DEFAULT '[]'"],
   // ссылка на группу класса в Telegram
   ['wk_classes', 'tg', "TEXT NOT NULL DEFAULT ''"],
+  // ссылка на папку с готовыми фото класса для дизайнера (wfolio, Яндекс Диск…)
+  ['wk_classes', 'folder', "TEXT NOT NULL DEFAULT ''"],
+  // индивидуальный дизайн: комментарий («совмещённый стиль грей и классик»), пусто — обычный
+  ['wk_classes', 'design', "TEXT NOT NULL DEFAULT ''"],
+  // класс на «рабочем столе» у Артура: когда положил (0 — нет)
+  ['wk_classes', 'pinned', 'INTEGER NOT NULL DEFAULT 0'],
   ['wk_delivery', 'half', "TEXT NOT NULL DEFAULT ''"]
 ];
 
@@ -424,7 +430,7 @@ class Work {
   parse(row, classId) {
     const r = row ? Object.assign({}, row) : {
       class_id: classId, status: 'todo', status_at: null, shot: 0, shoot_date: '', shoot_place: '',
-      processor: '', phone: '', note: '', done: '{}', money: '{}', steps: '{}', dates: '[]', contacts: '[]', half: '', paid: '[]', city: '', probes: '[]', tg: '',
+      processor: '', phone: '', note: '', done: '{}', money: '{}', steps: '{}', dates: '[]', contacts: '[]', half: '', paid: '[]', city: '', probes: '[]', tg: '', folder: '', design: '', pinned: 0,
       created_at: 0, updated_at: 0
     };
     r.done = parseJson(r.done, {});
@@ -611,6 +617,25 @@ class Work {
     this.save(classId, 'tg', url);
     if (url) this.setStep(classId, 'group', true, 'Артур');
     return true;
+  }
+
+  // Папка с готовыми фото класса для дизайнера: любая ссылка http(s). Пустая — убрать
+  setFolder(classId, v) {
+    const url = String(v || '').trim().slice(0, 500);
+    if (url && !/^https?:\/\/[^\s]+$/i.test(url)) return false;
+    this.save(classId, 'folder', url);
+    return true;
+  }
+
+  // Индивидуальный дизайн: комментарий для дизайнера и ребят. Пустой — обычный дизайн из голосования
+  setDesign(classId, v) {
+    this.save(classId, 'design', clean(v, 500));
+  }
+
+  // Рабочий стол: классы, с которыми сейчас больше всего работы, — сверху доски
+  setPinned(classId, on) {
+    this.ensure(classId);
+    this.db.prepare('UPDATE wk_classes SET pinned = ? WHERE class_id = ?').run(on ? Date.now() : 0, classId);
   }
 
   // Пробник: альбом для себя, подписан фамилией, чтобы знать, чей

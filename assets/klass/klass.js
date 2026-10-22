@@ -247,9 +247,68 @@
     bar.classList.remove('is-on');
     barStep = null;
     setTimeout(function () {
-      scrollToEl(next ? section(next) : document.getElementById('done'));
+      if (wiz) show(next || 'done', true);
+      else scrollToEl(next ? section(next) : document.getElementById('done'));
       if (!next) setTimeout(confetti, 350);
-    }, step === 'theme' ? 700 : 500);
+    }, wiz ? 1100 : step === 'theme' ? 700 : 500);
+  }
+
+  // ---------- Этапы по одному ----------
+  // Виден только текущий этап. Наверху вкладки этапов: любой открывается одним нажатием, проголосованные
+  // с галочкой. В конце — твой выбор по каждому этапу с кнопкой «Изменить». Без скрипта всё идёт лентой, как раньше
+  var wiz = !body.classList.contains('is-closed') && !!document.querySelector('.voting');
+  var cur = null;
+  function show(step, scroll) {
+    if (!wiz) return;
+    cur = step;
+    STEPS.forEach(function (s) { var sec = section(s); if (sec) sec.classList.toggle('is-cur', s === step); });
+    var doneEl = document.getElementById('done');
+    if (doneEl) doneEl.classList.toggle('is-cur', step === 'done');
+    $$('.steps a').forEach(function (a) { a.classList.toggle('is-open', a.getAttribute('data-step') === step); });
+    if (step === 'done') renderDone();
+    if (step !== 'done' && picks[step] && !votes[step]) showBar(step); else { bar.classList.remove('is-on'); barStep = null; }
+    if (scroll) scrollToEl(step === 'done' ? doneEl : section(step));
+  }
+  // Итог: что выбрал на каждом этапе, и как поменять
+  function renderDone() {
+    var list = document.getElementById('done-list');
+    if (!list) return;
+    list.innerHTML = '';
+    STEPS.forEach(function (s) {
+      if (!section(s)) return;
+      var li = document.createElement('li');
+      var c = votes[s] ? card(s, votes[s]) : null;
+      var t = document.createElement('span');
+      t.innerHTML = '<small></small><b></b>';
+      t.querySelector('small').textContent = section(s).querySelector('.step__head h2').textContent;
+      t.querySelector('b').textContent = c ? c.getAttribute('data-name') : 'ещё не выбрано';
+      var go = document.createElement('button');
+      go.type = 'button';
+      go.className = 'done__go';
+      go.setAttribute('data-goto', s);
+      go.textContent = c ? 'Изменить' : 'Выбрать';
+      li.appendChild(t);
+      li.appendChild(go);
+      list.appendChild(li);
+    });
+  }
+  function firstOpen() {
+    var n = null;
+    STEPS.forEach(function (s) { if (!n && section(s) && !votes[s]) n = s; });
+    return n || 'done';
+  }
+  if (wiz) {
+    body.classList.add('wiz');
+    // ссылки на этапы (вкладки сверху, «Начать выбор», «Дальше …») открывают этап, а не листают ленту
+    document.addEventListener('click', function (e) {
+      var go = closest(e.target, '[data-goto]');
+      var a = go ? null : closest(e.target, 'a[href^="#s-"], a[href="#done"]');
+      if (!go && !a) return;
+      var step = go ? go.getAttribute('data-goto') : a.getAttribute('href').replace(/^#s-/, '').replace(/^#/, '');
+      if (step !== 'done' && !section(step)) return;
+      e.preventDefault();
+      show(step, true);
+    }, true);
   }
 
   function sendVote(step, option) {
@@ -281,7 +340,7 @@
       $$('.opt', section(step)).forEach(function (x) { x.querySelector('.pick').textContent = 'Выбрать'; });
       renderStep(step);
       renderNav();
-      scrollToEl(section(step));
+      if (wiz) show(step, true); else scrollToEl(section(step));
       toast('Голос снят, выбери заново');
     };
     if (!LIVE) { done(); saveVotes(); return; }
@@ -404,7 +463,7 @@
       if (until === 0) poll();
       return;
     }
-    if (isClosed()) { timerEl.textContent = 'закрыто'; return; }
+    if (isClosed()) { timerEl.textContent = 'голосование закрыто'; return; }
     var left = Math.max(0, end - now());
     timerEl.textContent = fmtLeft(left);
     if (left === 0) {
@@ -560,6 +619,8 @@
 
   STEPS.forEach(renderStep);
   renderNav();
+  // с какого этапа начать: первый, где ещё не голосовал; ссылка с #s-… открывает свой этап
+  if (wiz) { var h = location.hash.replace(/^#s-/, ''); show(section(h) ? h : firstOpen(), false); }
   if (LIVE) {
     tick();
     schedule();

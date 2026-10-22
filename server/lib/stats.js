@@ -207,6 +207,9 @@ class Stats {
     const site = views.filter(v => v.kind === 'site');
     const visitors = new Set(views.map(v => v.visitor));
     const siteVisitors = new Set(site.map(v => v.visitor));
+    // ученики: страницы классов (голосование) и отбор фото — отдельно от сайта
+    const voteVisitors = new Set(views.filter(v => v.kind === 'class').map(v => v.visitor));
+    const pickVisitors = new Set(views.filter(v => v.kind !== 'site' && v.kind !== 'class').map(v => v.visitor));
     const fresh = new Set(views.filter(v => v.fresh).map(v => v.visitor));
     const contactViews = new Set(clicks.filter(c => CONTACT.indexOf(c.kind) !== -1 && (c.kind === 'whatsapp' || c.kind === 'phone' || c.kind === 'telegram')).map(c => c.view_id));
     const viewById = new Map(views.map(v => [v.id, v]));
@@ -274,9 +277,14 @@ class Stats {
     (blocks['designs.html'] ? Object.values(blocks['designs.html'].list) : []).forEach(x => {
       if (/^Тематика /.test(x.name)) themes[x.name.slice(9)] = { name: x.name.slice(9), reached: x.reached, ms: x.ms, timed: x.timed, opens: 0 };
     });
+    // Нажатия «design» — это и открытые фото тематики, и кнопки разделов вверху страницы «Дизайны»
+    // («В школе 35»: цифра — сколько там фото). Разделы считаем отдельно, к тематикам их не примешиваем
+    const jumps = {};
     buttons.filter(b => b.kind === 'design').forEach(b => {
-      const t = themes[b.label] || (themes[b.label] = { name: b.label, reached: 0, ms: 0, timed: 0, opens: 0 });
-      t.opens += b.n;
+      if (themes[b.label]) { themes[b.label].opens += b.n; return; }
+      const name = b.label.replace(/\s+\d+$/, '');
+      if (themes[name]) { themes[name].opens += b.n; return; }
+      jumps[name] = (jumps[name] || 0) + b.n;
     });
 
     // когда заходят: сколько людей. Один человек за день в один час считается один раз,
@@ -316,7 +324,8 @@ class Stats {
 
     return {
       prev,
-      visitors: visitors.size, siteVisitors: siteVisitors.size, views: views.length, siteViews: site.length,
+      visitors: visitors.size, siteVisitors: siteVisitors.size, voteVisitors: voteVisitors.size, pickVisitors: pickVisitors.size, views: views.length, siteViews: site.length,
+      jumps: Object.keys(jumps).map(k => ({ name: k, n: jumps[k] })).sort((x, y) => y.n - x.n),
       fresh: fresh.size, contacts: contactVisitors.size,
       byDay, byWeek, sources, pages, blocks, buttons, themes: Object.values(themes).sort((a, b) => (b.ms + b.opens * 4000) - (a.ms + a.opens * 4000)),
       hours, week,

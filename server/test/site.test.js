@@ -367,7 +367,7 @@ test('старт по расписанию', async t => {
   assert.strictEqual(r.status, 409);
 
   r = await admin.req('GET', '/admin');
-  assert.match(r.text, /Запланировано/);
+  assert.match(r.text, /голосование (сегодня|завтра|\d)/);
 
   // Время подошло
   app.store.updateClass(+id, { opened_at: Date.now() - 1000, ends_at: Date.now() + 30 * 60000 });
@@ -412,8 +412,8 @@ test('кто на странице и итог для чата', async t => {
   assert.match(r.text, /Цвет одежды: тёмно-красный, бордовый, кирпичный \+ чёрный и белый/);
   assert.match(r.text, new RegExp('/k/' + slug));
 
-  // Кнопка копирования ссылки есть прямо в списке классов
-  r = await admin.req('GET', '/admin');
+  // Кнопка копирования ссылки — на странице голосования класса
+  r = await admin.req('GET', '/admin/c/' + id);
   assert.match(r.text, new RegExp('data-copy="http://127\\.0\\.0\\.1:\\d+/k/' + slug + '"'));
 });
 

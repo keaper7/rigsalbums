@@ -2,8 +2,8 @@
 
 // Работа над альбомами. У Артура: вкладки «Работа» (классы по этапам), «Деньги» (сезон, осень, весна)
 // и «Телефоны», страница класса с этапами и деньгами. У дизайнера — кабинет по личной ссылке
-const { html, raw, plural, fmtWhen } = require('../lib/util');
-const { layout } = require('./admin');
+const { html, raw, plural, fmtWhen, fmtTime } = require('../lib/util');
+const { layout, classHub } = require('./admin');
 const { ROLES, ROLE_NAMES } = require('../lib/photos');
 const { numbered } = require('../lib/layout');
 const { LEAD_STATUSES, TEMPLATES, fill, STATUSES, STATUS_NAMES, PARTS, FIXES, FIX_NAMES, FILE_LABELS, SELF, SEASON_FIELDS, STAGES, HALVES, HALF_NAMES, DATE_KINDS, DATE_KIND_NAMES, stepOn, stageOf, upcoming } = require('../lib/work');
@@ -73,6 +73,10 @@ function shootIcons(w) {
 
 const MSG = {
   saved: 'Сохранено',
+  pinned: 'Класс на рабочем столе',
+  createdmany: 'Классы созданы с одинаковыми настройками',
+  deleted: 'Класс удалён',
+  unpinned: 'Убрано с рабочего стола',
   status: 'Статус изменён',
   fix: 'Правка добавлена. Дизайнер увидит её у себя',
   fixpart: 'Правка добавлена, но не все фото загрузились. Можно добавить их отдельной правкой',
@@ -200,20 +204,44 @@ function progress(sg) {
   return html`<span class="wk-prog"><span class="wk-prog__bar"><i style="width:${pct}%"></i></span><span class="wk-prog__t">${sg.done}/${sg.total}${sg.next ? html` · дальше: <b>${sg.next}</b>` : ''}</span></span>`;
 }
 
-function classCard(r, today) {
+// Голосование на карточке: идёт, ждёт решения или что выбрал класс
+const STEP_SHORT = { theme: 'Тема', place: 'Место', wear: 'Одежда', color: 'Цвет' };
+function voteLine(v, today) {
+  if (!v) return '';
+  if (v.st === 'open') return html`<span class="wk-vote wk-vote--live">голосуют до ${fmtTime(v.ends)}</span>`;
+  if (v.st === 'plan') return html`<span class="wk-vote">голосование ${fmtWhen(v.at)}</span>`;
+  if (v.pending) return html`<span class="wk-vote wk-vote--warn">голосование: нужно выбрать</span>`;
+  return '';
+}
+function votePicked(r) {
+  const v = r.vote;
+  if (!v || v.st !== 'closed' || !v.picked.length || stageOf(r.w).index > 1) return '';
+  return html`<p class="wk-picked">${v.picked.map(x => html`<span><i>${STEP_SHORT[x.step] || x.step}:</i> ${x.name}</span>`)}</p>`;
+}
+
+// Карточка класса на доске. Нажимается целиком, кнопки звонка и «на рабочий стол» — поверх.
+// Сверху одной строкой «школа · класс» одного размера
+function classCard(r, today, o) {
   const sg = stageOf(r.w);
   const next = upcoming(r.w, today)[0];
   const phones = r.w.contacts.map(c => c.phone + ' ' + c.name).join(' ');
   const noPrepay = !sg.finished && !r.m.prepaid;
-  return html`<div class="wk-card ${stageClass(sg)}${noPrepay ? ' is-noprepay' : ''}" data-find="${r.c.title} ${r.c.school} ${r.w.city} ${phones} ${phones.replace(/[^\d]/g, '')}" data-school="${r.c.school}" data-noprepay="${noPrepay ? 1 : 0}">
+  const pinned = !!r.w.pinned;
+  return html`<div class="wk-card ${stageClass(sg)}${noPrepay ? ' is-noprepay' : ''}${pinned ? ' is-pinned' : ''}" data-find="${r.c.title} ${r.c.school} ${r.w.city} ${phones} ${phones.replace(/[^\d]/g, '')}" data-school="${r.c.school}" data-noprepay="${noPrepay ? 1 : 0}">
     <div class="wk-card__top">
-      <a class="wk-card__t" href="/admin/c/${r.c.id}/work"><b>${r.c.title}</b>${schoolTag(r.c.school, r.w.city)}</a>
-      ${callButton(r.w.contacts, r.w.tg)}
+      <a class="wk-card__t" href="/admin/c/${r.c.id}/work"><b class="wk-card__name"><i class="wk-sdot" style="--sc:${schoolColor(r.c.school)}"></i>${r.c.school} · ${r.c.title}</b>${r.w.city ? html`<small>${r.w.city}</small>` : ''}</a>
+      <span class="wk-card__acts">
+        ${callButton(r.w.contacts, r.w.tg)}
+        ${o && o.sess ? html`<form method="post" action="/admin/c/${r.c.id}/work/pin" class="wk-pinf">${csrf(o.sess)}<input type="hidden" name="on" value="${pinned ? 0 : 1}"><input type="hidden" name="back" value="${o.self || '/admin/work'}"><button class="wk-pin${pinned ? ' is-on' : ''}" type="submit" aria-pressed="${pinned ? 'true' : 'false'}" aria-label="${pinned ? 'Убрать с рабочего стола' : 'На рабочий стол'}" title="${pinned ? 'Убрать с рабочего стола' : 'На рабочий стол'}">${pinned ? '★' : '☆'}</button></form>` : ''}
+      </span>
     </div>
     ${sg.finished ? html`<p class="wk-ok small">Альбом забрали, класс готов</p>` : html`<p class="wk-stagename">${sg.stage.name}</p>${progress(sg)}`}
+    ${votePicked(r)}
     <div class="wk-meta">
       ${shootIcons(r.w)}
       ${halfChip(r.half)}
+      ${voteLine(r.vote, today)}
+      ${r.w.design ? html`<span class="wk-design">индивидуальный дизайн</span>` : ''}
       ${noPrepay ? html`<span class="wk-noprepay">без предоплаты</span>` : ''}
       ${next ? html`<span class="wk-date">${when(next, today)} · ${DATE_KIND_NAMES[next.kind].toLowerCase()}</span>` : ''}
       ${r.pk && r.pk.total && sg.index === 1 && !r.lay ? pkLine(r.pk) : ''}
@@ -249,6 +277,14 @@ function boardPage(o) {
   const jump = groups.map((g, i) => [KEYS[i], g[0].name.split(' ')[0], g[1].length, i]).concat([['ready', 'Готово', ready.length, 3]]).filter(x => x[2]);
   const body = html`${flash(o)}<div class="head wk-headrow"><h1 class="h1 wk-h1">Работа</h1><a class="b b--main b--sm" href="/admin/new">+ Новый класс</a></div>
 ${sectionTabs('work', q, o.newLeads)}
+${o.voting && o.voting.length ? html`<section class="card wk-votes">
+  <div class="card__h"><h2 class="h">Голосования</h2></div>
+  <ul>${o.voting.map(r => html`<li><a href="/admin/c/${r.c.id}"><b>${r.c.school} · ${r.c.title}</b></a>${r.vote.st === 'open' ? html`<span class="wk-vote wk-vote--live">идёт, до ${fmtTime(r.vote.ends)}</span>` : html`<span class="wk-vote wk-vote--warn">закончилось, нужно выбрать победителя</span>`}</li>`)}</ul>
+</section>` : ''}
+${o.desk && o.desk.length ? html`<section class="group wk-stage wk-desk" id="desk" data-group>
+  <h2 class="group__h">★ Рабочий стол <span>${o.desk.length}</span></h2>
+  <div class="wk-cards">${o.desk.map(r => classCard(r, o.today, o))}</div>
+</section>` : ''}
 ${seasonNav(o, '/admin/work')}
 ${soon.length ? html`<section class="card wk-soon">
   <div class="card__h"><h2 class="h">Ближайшие съёмки</h2>${soon.length > SOON_SHOWN ? html`<span class="muted small">всего ${soon.length}</span>` : ''}</div>
@@ -275,15 +311,20 @@ ${rows.length > 3 ? html`<div class="wk-find" data-wkfilter>
 ${rows.length ? '' : html`<div class="card empty"><h2 class="h">В этом сезоне классов нет</h2><p class="muted">Классы появляются здесь сами, как только вы их создадите. Сезон это год выпуска класса.</p><a class="b b--main" href="/admin/new">Создать класс</a></div>`}
 ${o.by === 'school' ? schoolList.map(sc => html`<section class="group wk-stage wk-byschool" data-group>
   <h2 class="group__h">${schoolTag(sc, '')} <span>${schools[sc]}</span></h2>
-  <div class="wk-cards">${rows.filter(r => r.c.school === sc).map(r => classCard(r, o.today))}</div>
+  <div class="wk-cards">${rows.filter(r => r.c.school === sc).map(r => classCard(r, o.today, o))}</div>
 </section>`) : ''}
 ${o.by !== 'school' ? groups.map((g, i) => g[1].length ? html`<section class="group wk-stage wk-c${i}" id="stage-${KEYS[i]}" data-group>
   <h2 class="group__h"><i class="wk-dot"></i>${g[0].name} <span>${g[1].length}</span></h2>
-  <div class="wk-cards">${g[1].map(r => classCard(r, o.today))}</div>
+  <div class="wk-cards">${g[1].map(r => classCard(r, o.today, o))}</div>
 </section>` : '') : ''}
 ${o.by !== 'school' && ready.length ? html`<details class="group wk-stage wk-c3" id="stage-ready" data-group>
   <summary class="group__h"><i class="wk-dot"></i>Готово <span>${ready.length}</span></summary>
-  <div class="wk-cards">${ready.map(r => classCard(r, o.today))}</div>
+  <div class="wk-cards">${ready.map(r => classCard(r, o.today, o))}</div>
+</details>` : ''}
+
+${o.archived && o.archived.length ? html`<details class="card fold" id="archive">
+  <summary class="fold__h"><span><b>Архив</b><small>${o.archived.length} ${plural(o.archived.length, 'класс', 'класса', 'классов')}, убранных с доски</small></span></summary>
+  <ul class="wk-arch">${o.archived.map(c => html`<li><a href="/admin/c/${c.id}/work">${c.school} · ${c.title}</a><span class="muted small">${c.year - 1}/${String(c.year).slice(2)}</span></li>`)}</ul>
 </details>` : ''}
 
 ${templatesFold(o)}
@@ -564,9 +605,8 @@ function contactsCard(o) {
 
 function classHead(o, tab) {
   const c = o.cls;
-  return html`<a class="back" href="/admin/work?year=${c.year}">← Работа</a>
-${flash(o)}<div class="head head--class wk-chead">
-  <div><h1 class="h1">${c.title}</h1><p class="wk-chead__s">${schoolTag(c.school, o.w.city)}<span class="muted">сезон ${c.year - 1}/${String(c.year).slice(2)} · <a href="/admin/c/${c.id}">страница класса</a></span></p>
+  return html`${classHub(c, tab, html`${o.w.city ? o.w.city + ' · ' : ''}сезон ${c.year - 1}/${String(c.year).slice(2)}`)}
+${flash(o)}<div class="wk-chead">
   <details class="wk-rename"><summary>Изменить название, школу, город</summary>
     <form class="form" method="post" action="/admin/c/${c.id}/work/rename">
       ${csrf(o.sess)}
@@ -577,13 +617,12 @@ ${flash(o)}<div class="head head--class wk-chead">
       </div>
       <button class="b b--sm b--main" type="submit">Сохранить</button>
     </form>
-  </details></div>
+  </details>
   <form method="post" action="/admin/c/${c.id}/work/half" class="wk-halfsw" aria-label="Осень или весна">
     ${csrf(o.sess)}<input type="hidden" name="back" value="${tab}">
     ${HALVES.map(h => html`<button type="submit" name="half" value="${h[0]}" class="${o.half === h[0] ? 'is-on' : ''}"${o.half === h[0] ? raw(' aria-pressed="true"') : ''}>${h[1]}</button>`)}
   </form>
-</div>
-<nav class="wk-tabs" aria-label="Класс"><a href="/admin/c/${c.id}/work"${tab === 'work' ? raw(' aria-current="page"') : ''}>Работа</a><a href="/admin/c/${c.id}/work/money"${tab === 'money' ? raw(' aria-current="page"') : ''}>Деньги</a></nav>`;
+</div>`;
 }
 
 function classPage(o) {
@@ -595,6 +634,7 @@ function classPage(o) {
   const body = html`${classHead(o, 'work')}
 ${contactsCard(o)}
 ${stagesBlock(o)}
+${designCard(o)}
 ${o.lay && (o.lay.ver || stageOf(w).index >= 1) ? layoutCard(o.lay, '/admin/c/' + c.id + '/layout', false) : ''}
 
 ${early ? raw('<details class="wk-later" id="designer-fold"><summary><span><b>Дизайнер и правки</b><small>Понадобятся на этапе «Работа». Открыть, если нужно сейчас</small></span></summary>') : ''}
@@ -658,7 +698,7 @@ ${early ? raw('</details>') : ''}
   <label class="field"><span>Заметка для себя</span><textarea name="note" rows="3" maxlength="2000" placeholder="Дизайнер это не видит">${w.note}</textarea></label>
   <button class="b b--main" type="submit">Сохранить</button>
 </form>`;
-  return layout({ title: 'Работа · ' + c.title, sess: o.sess, nav: 'work', body: body, scripts: ['/admin/static/work.js'] });
+  return layout({ title: 'Работа · ' + c.school + ' · ' + c.title, sess: o.sess, nav: 'work', tone: 'work', body: body, scripts: ['/admin/static/work.js'] });
 }
 
 function moneyCalc(m) {
@@ -751,7 +791,7 @@ function classMoneyPage(o) {
 ${payCard(o)}
 ${probeCard(o)}
 <p class="muted small">Обработчик выбирается во вкладке «Работа». Дизайнер, СММ, прайс типографии и ставки обработчиков меняются в <a href="/admin/work/money?year=${c.year}#prices">ценах сезона</a>.</p>`;
-  return layout({ title: 'Деньги · ' + c.title, sess: o.sess, nav: 'work', body: body, scripts: ['/admin/static/work.js'] });
+  return layout({ title: 'Деньги · ' + c.school + ' · ' + c.title, sess: o.sess, nav: 'work', tone: 'money', body: body, scripts: ['/admin/static/work.js'] });
 }
 
 // ---------- вкладка «Деньги»: /admin/work/money ----------
@@ -932,6 +972,11 @@ function designerClass(o) {
 </section>
 
 ${layoutCard(o.lay, api + '/layout', true)}
+${w.folder ? html`<section class="card wk-folder">
+  <div class="wk-lay__t"><h2 class="h">Фото класса</h2><p class="muted small">Готовые фото после ретуши, все в одной папке</p></div>
+  <a class="b b--main" href="${w.folder}" target="_blank" rel="noopener">Скачать фото класса</a>
+</section>` : ''}
+${w.design ? html`<section class="card wk-dnote"><h2 class="h">Индивидуальный дизайн</h2><p>${w.design}</p></section>` : ''}
 
 ${open.length ? html`<section class="card wk-open" id="fixes">
   <div class="card__h"><h2 class="h">Правки</h2><span class="chip chip--warn">${open.length}</span></div>
@@ -977,6 +1022,28 @@ ${pk && pk.group.length ? html`<details class="card fold" id="group">
 
 ${done.length ? html`<details class="card fold"><summary class="fold__h"><span><b>Исправленные правки</b><small>${done.length}</small></span></summary><ul class="wk-fixes">${done.map(f => html`<li class="wk-fix is-done">${fixBody(f, o.files, api + '/file/')}</li>`)}</ul></details>` : ''}`;
   return dlayout({ title: c.title + ' · ' + c.school, designer: o.designer, home: home, body: body });
+}
+
+// Дизайн класса и фото для дизайнера: индивидуальный дизайн с комментарием (видят дизайнер и ребята)
+// и ссылка на папку с готовыми фото класса (дизайнер скачивает одной кнопкой)
+function designCard(o) {
+  const c = o.cls, w = o.w;
+  return html`<section class="card wk-dcard" id="design">
+  <div class="card__h"><h2 class="h">Дизайн и фото для дизайнера</h2>${w.design ? html`<span class="chip wk-design">индивидуальный</span>` : ''}</div>
+  <form method="post" action="/admin/c/${c.id}/work/design" class="form wk-dform">
+    ${csrf(o.sess)}
+    <label class="check"><input type="checkbox" name="on" value="1"${w.design ? raw(' checked') : ''} data-design-on><span>Индивидуальный дизайн</span></label>
+    <label class="field" data-design-text${w.design ? '' : raw(' hidden')}><span>Что за дизайн</span><textarea name="design" rows="2" maxlength="500" placeholder="Например: совмещённый стиль грей и классик">${w.design}</textarea></label>
+    <p class="muted small">Видят дизайнер у себя и ребята на странице класса.</p>
+    <button class="b b--sm" type="submit">Сохранить</button>
+  </form>
+  <form method="post" action="/admin/c/${c.id}/work/folder" class="form wk-dform" id="folder">
+    ${csrf(o.sess)}
+    <label class="field"><span>Папка с готовыми фото класса</span><input name="folder" type="url" value="${w.folder}" placeholder="Ссылка на wfolio, Яндекс Диск или облако" maxlength="500" autocomplete="off"></label>
+    <p class="muted small">Когда фото после доп. ретуши готовы, загрузите папку в облако и вставьте ссылку. У дизайнера появится кнопка «Скачать фото класса».${w.folder ? html` <a href="${w.folder}" target="_blank" rel="noopener">Открыть папку</a>` : ''}</p>
+    <button class="b b--sm" type="submit">Сохранить ссылку</button>
+  </form>
+</section>`;
 }
 
 // Макет для проверки учениками: заметная кнопка, а не ссылка в шапке

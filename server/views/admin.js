@@ -95,7 +95,7 @@ function u(p) { return p ? '/' + String(p).replace(/^\/+/, '') : ''; }
 function csrf(sess) { return html`<input type="hidden" name="_csrf" value="${sess.csrf}">`; }
 
 function layout(o) {
-  const nav = [['classes', '/admin', 'Классы'], ['work', '/admin/work', 'Работа']].concat(SHOW_STATS ? [['stats', '/admin/stats', 'Статистика']] : [], [['site', '/admin/site', 'Сайт'], ['catalog', '/admin/catalog', 'Варианты'], ['settings', '/admin/settings', 'Настройки']]);
+  const nav = [['work', '/admin/work', 'Работа']].concat(SHOW_STATS ? [['stats', '/admin/stats', 'Статистика']] : [], [['site', '/admin/site', 'Сайт'], ['catalog', '/admin/catalog', 'Варианты'], ['settings', '/admin/settings', 'Настройки']]);
   const err = o.err || (o.errCode && ERR[o.errCode]) || '';
   return '<!doctype html>\n' + html`<html lang="ru">
 <head>
@@ -121,7 +121,7 @@ ${o.sess ? html`<header class="ah">
     <nav class="ah__nav">${nav.map(n => html`<a href="${n[1]}"${o.nav === n[0] ? raw(' aria-current="page"') : ''}>${n[2]}</a>`)}</nav>
   </div>
 </header>
-` : ''}<main class="aw${o.narrow ? ' aw--narrow' : ''}">
+` : ''}<main class="aw${o.narrow ? ' aw--narrow' : ''}${o.tone ? ' tone-' + o.tone : ''}">
 ${o.msg && MSG[o.msg] ? html`<p class="flash" role="status">${MSG[o.msg]}</p>
 ` : ''}${err ? html`<p class="flash flash--err" role="alert">${err}</p>
 ` : ''}${o.body}
@@ -164,88 +164,20 @@ function loginPage(o) {
   });
 }
 
+// ---------- шапка класса ----------
+// У класса одна шапка на всех его страницах: «школа · класс» и разделы. У каждого раздела свой цвет,
+// переход между ними одним нажатием
+const CLASS_TABS = [['work', 'Работа', '/work'], ['vote', 'Голосование', ''], ['photos', 'Отбор фото', '/photos'], ['layout', 'Макет', '/layout'], ['money', 'Деньги', '/work/money']];
+function classHub(c, tab, sub) {
+  return html`<a class="back" href="/admin/work?year=${c.year}">← Работа</a>
+<div class="cls-hub">
+  <h1 class="h1 cls-hub__t">${c.school} · ${c.title}</h1>
+  ${sub ? html`<p class="cls-hub__s">${sub}</p>` : ''}
+  <nav class="cls-tabs" aria-label="Разделы класса">${CLASS_TABS.map(t => html`<a class="cls-tab cls-tab--${t[0]}" href="/admin/c/${c.id}${t[2]}"${tab === t[0] ? raw(' aria-current="page"') : ''}>${t[1]}</a>`)}</nav>
+</div>`;
+}
+
 // ---------- список классов ----------
-
-function chip(c, now) {
-  const st = status(c, now);
-  if (c.archived) return html`<span class="chip chip--muted">Архив</span>`;
-  if (st === 'open') return html`<span class="chip chip--live" data-ends="${c.ends_at}">Идёт · <b>${left(c.ends_at - now)}</b></span>`;
-  if (st === 'draft') {
-    const at = opensAt(c, now);
-    return at ? html`<span class="chip chip--plan">Старт ${startShort(at, now)}</span>` : html`<span class="chip chip--draft">Не начато</span>`;
-  }
-  if (c.pending) return html`<span class="chip chip--warn">Нужно решение</span>`;
-  return html`<span class="chip chip--done">Закрыто</span>`;
-}
-
-// Короткие названия этапов для карточки класса
-const STEP_SHORT = { theme: 'Тема', place: 'Место', wear: 'Одежда', color: 'Цвет' };
-
-// Главное о классе одной-двумя строками: что выбрали, когда съёмка, на каком этапе работа
-function classFacts(c, now) {
-  const i = c.info;
-  if (!i) return '';
-  const st = status(c, now);
-  const out = [];
-  if (i.res) STEPS.forEach(step => {
-    const r = i.res[step];
-    if (!r) return;
-    if (r.option) out.push(html`<span class="fact"><i>${STEP_SHORT[step]}:</i> ${r.option.name}</span>`);
-    else if (st === 'closed') out.push(html`<span class="fact fact--warn"><i>${STEP_SHORT[step]}:</i> ${r.tie.length > 1 ? 'ничья' : 'нет голосов'}</span>`);
-  });
-  const lead = st === 'open' && out.length ? html`<span class="fact fact--now">пока лидирует</span>` : '';
-  const more = [];
-  if (i.shoot) more.push(html`<span class="fact"><i>Съёмка:</i> ${i.shoot[0].toLowerCase() + i.shoot.slice(1)}</span>`);
-  if (i.stage) more.push(html`<span class="fact"><i>Этап:</i> ${i.stage.finished ? 'альбом забрали' : i.stage.stage.name.toLowerCase() + (i.stage.next ? ', дальше ' + i.stage.next.toLowerCase() : '')}</span>`);
-  if (!out.length && !more.length) return '';
-  return html`<span class="row__more">${out.length ? html`<span class="row__facts">${lead}${out}</span>` : ''}${more.length ? html`<span class="row__facts">${more}</span>` : ''}</span>`;
-}
-
-function classRow(c, now, base) {
-  return html`<div class="row row--class" data-find="${(c.title + ' ' + c.school + ' ' + ((c.info && c.info.city) || '')).toLowerCase()}">
-      <a class="row__link" href="/admin/c/${c.id}">
-        <span class="row__main"><b>${c.title}</b><small>${c.school}${c.info && c.info.city ? ' · ' + c.info.city : ''}</small></span>
-        <span class="row__side">${chip(c, now)}<small>${c.voters ? 'проголосовали ' + people(c.voters) : 'пока без голосов'}</small></span>
-        ${classFacts(c, now)}
-      </a>
-      <button class="row__copy" type="button" data-copy="${base}/k/${c.slug}" title="Скопировать ссылку на страницу класса"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L11.6 6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.6-1.6"/></svg><span>ссылка</span></button>
-    </div>`;
-}
-
-function classesPage(o) {
-  const now = Date.now();
-  const live = o.classes.filter(c => !c.archived);
-  const groups = [
-    ['Сейчас голосуют', live.filter(c => status(c, now) === 'open')],
-    ['Нужно выбрать победителя', live.filter(c => status(c, now) === 'closed' && c.pending)],
-    ['Запланировано', live.filter(c => status(c, now) === 'draft' && opensAt(c, now))],
-    ['Не начато', live.filter(c => status(c, now) === 'draft' && !opensAt(c, now))],
-    ['Закрыто', live.filter(c => status(c, now) === 'closed' && !c.pending)]
-  ];
-  const archived = o.classes.filter(c => c.archived);
-  return layout({
-    title: 'Классы', nav: 'classes', sess: o.sess, msg: o.msg,
-    body: html`<div class="head">
-  <h1 class="h1">Классы</h1>
-  <a class="b b--main" href="/admin/new">+ Новый класс</a>
-</div>
-${o.classes.length ? '' : html`<div class="card empty">
-  <h2 class="h">Пока нет ни одного класса</h2>
-  <p class="muted">Создайте страницу класса, отправьте ссылку в чат и запустите голосование, когда все будут на месте.</p>
-  <a class="b b--main" href="/admin/new">Создать первый класс</a>
-</div>`}
-${o.classes.length > 5 ? html`<label class="search"><span class="sr">Поиск</span><input type="search" placeholder="Найти класс или школу" data-search autocomplete="off"></label>
-<p class="muted small search__none" hidden>Ничего не нашлось</p>
-` : ''}${groups.filter(g => g[1].length).map(g => html`<section class="group" data-group>
-  <h2 class="group__h">${g[0]} <span>${g[1].length}</span></h2>
-  <div class="rows">${g[1].map(c => classRow(c, now, o.base))}</div>
-</section>
-`)}${archived.length ? html`<details class="group group--archive" data-group>
-  <summary class="group__h">Архив <span>${archived.length}</span></summary>
-  <div class="rows">${archived.map(c => classRow(c, now, o.base))}</div>
-</details>` : ''}`
-  });
-}
 
 // «Или до» — точная дата окончания вместо длительности
 function untilField(now, label) {
@@ -272,8 +204,8 @@ function newClassPage(o) {
   </select></label>
   <p class="muted small">Скопируются скрытые варианты, дата съёмки, адрес, что взять с собой и заметка. Голоса не копируются.</p>` : '';
   return layout({
-    title: 'Новый класс', nav: 'classes', sess: o.sess, err: o.err,
-    body: html`<a class="back" href="/admin">← Классы</a>
+    title: 'Новый класс', nav: 'work', sess: o.sess, err: o.err,
+    body: html`<a class="back" href="/admin/work">← Работа</a>
 <h1 class="h1">Новый класс</h1>
 <form class="card form" method="post" action="/admin/new">
   ${csrf(o.sess)}${pick}
@@ -377,6 +309,26 @@ function resultsBlock(o) {
     ${total ? html`<form method="post" action="/admin/c/${c.id}/resetstep" class="res__reset" data-confirm="Обнулить все голоса этапа «${STEP_NAMES[step]}» (${votes(total)})? Ребята смогут проголосовать в нём заново, остальные этапы не изменятся.">${csrf(o.sess)}<input type="hidden" name="step" value="${step}"><button class="link" type="submit">Обнулить голоса этапа</button></form>` : ''}
   </div>`;
   });
+  // Голосование закончилось и всё решено — голоса свёрнуты, сверху итог одной строкой: страница класса
+  // не растягивается, а подробности открываются нажатием
+  const decided = closed && Object.keys(res).length && Object.keys(res).every(k => res[k].option);
+  if (decided) {
+    return html`<details class="card fold res-fold" id="results">
+  <summary class="fold__h"><span><b>Голоса: выбор класса</b><small>${activeSteps(opts).map(k => STEP_NAMES[k] + ': ' + res[k].option.name).join(' · ')}</small></span></summary>
+  <div class="fold__in">
+  <p class="muted small">${people(o.voters)} проголосовали</p>
+  ${steps}
+  ${o.summary ? html`<div class="sum">
+    <p class="sum__h">Итог одним сообщением для чата</p>
+    <pre class="sum__text">${o.summary}</pre>
+    <div class="sum__btns">
+      <button class="b b--main b--sm" type="button" data-copy="${o.summary}">Скопировать итог</button>
+      <a class="b b--sm" href="https://wa.me/?text=${encodeURIComponent(o.summary)}" data-share data-share-text="${o.summary}" target="_blank" rel="noopener">Отправить</a>
+    </div>
+  </div>` : ''}
+  </div>
+</details>`;
+  }
   return html`<div class="card" id="results"${st === 'open' ? html` data-refresh="/admin/c/${c.id}/results"` : ''}>
   <div class="card__h"><h2 class="h">Голоса</h2><span class="muted">${people(o.voters)}</span></div>
   ${st === 'open' ? html`<p class="online"><i></i>Сейчас на странице: <b>${o.online}</b></p>` : ''}
@@ -479,11 +431,8 @@ function classPage(o) {
     return vis.length && vis.every(x => c.hidden.indexOf(step + ':' + x.key) !== -1);
   });
   return layout({
-    title: c.title + ' · ' + c.school, nav: 'classes', sess: o.sess, msg: o.msg, err: o.err,
-    body: html`<a class="back" href="/admin">← Классы</a>
-<div class="head head--class">
-  <div><h1 class="h1">${c.title}</h1><p class="muted">${c.school}${o.city ? ' · ' + o.city : ''} · ${c.year}${c.archived ? ' · в архиве' : ''} · <a href="#info">изменить</a></p></div>
-</div>
+    title: 'Голосование · ' + c.school + ' · ' + c.title, nav: 'work', tone: 'vote', sess: o.sess, msg: o.msg, err: o.err,
+    body: html`${classHub(c, 'vote', html`${o.city ? o.city + ' · ' : ''}${c.year}${c.archived ? ' · в архиве' : ''} · <a href="#info">изменить</a>`)}
 
 <div class="card share">
   <p class="share__url">${url}</p>
@@ -492,12 +441,6 @@ function classPage(o) {
     <a class="b" href="https://wa.me/?text=${encodeURIComponent(share)}" data-share data-share-text="${share}" target="_blank" rel="noopener">Отправить</a>
     <a class="b" href="${url}" target="_blank" rel="noopener">Открыть</a>
   </div>
-</div>
-
-<div class="cls-links">
-<a class="card fold__link" href="/admin/c/${c.id}/work"><b>Работа над альбомом</b><small>${o.work ? o.work : 'Статус для дизайнера, правки, съёмка и деньги'}</small></a>
-
-<a class="card fold__link" href="/admin/c/${c.id}/photos"><b>Отбор фото</b><small>${o.pk && (o.pk.photos || o.pk.students) ? (o.pk.closed ? 'Отбор закрыт · ' : '') + o.pk.photos + ' фото · начали выбирать ' + o.pk.started + ' из ' + o.pk.students : 'Личные фото, общие групповые, цитаты и раскладка по папкам'}</small></a>
 </div>
 
 ${controlBlock(o)}
@@ -612,8 +555,9 @@ function sitePage(o) {
 </div>
 <p class="muted intro">Здесь меняются фото, видео и цены на сайте. Всё видно на сайте сразу после сохранения. Фото с телефона сами уменьшаются перед загрузкой, ничего готовить не нужно.</p>
 <nav class="toc">
-  <a href="#prices">Цены</a><a href="#home.video">Видео</a><a href="#galleries">Работы</a><a href="#photos">Другие фото</a>
+  <a href="#prices">Цены</a><a href="#home.video">Видео</a><a href="#galleries">Работы</a><a href="#photos">Другие фото</a><a href="/admin/books">Альбомы на «Работах»</a>
 </nav>
+<a class="card fold__link" href="/admin/books"><b>Листающиеся альбомы на странице «Работы»</b><small>Добавить новый альбом теми же файлами, что для типографии, поменять порядок или убрать</small></a>
 
 <form class="card form" method="post" action="/admin/site/texts" id="prices">
   ${csrf(o.sess)}
@@ -887,10 +831,10 @@ function settingsPage(o) {
 }
 
 function notFoundPage(o) {
-  return layout({ title: 'Не найдено', nav: '', sess: o.sess, body: html`<h1 class="h1">Не найдено</h1><p><a class="back" href="/admin">← Классы</a></p>` });
+  return layout({ title: 'Не найдено', nav: '', sess: o.sess, body: html`<h1 class="h1">Не найдено</h1><p><a class="back" href="/admin/work">← Работа</a></p>` });
 }
 
 module.exports = {
-  layout, loginPage, classesPage, newClassPage, classPage, resultsBlock, sitePage, galleryPage,
+  layout, classHub, loginPage, newClassPage, classPage, resultsBlock, sitePage, galleryPage,
   catalogPage, optionPage, settingsPage, notFoundPage, fmtDate
 };

@@ -84,6 +84,8 @@ test('просмотр, блоки, кнопки, онлайн, отчёт; Ар
   const v3 = await b.view('/designs.html');
   await b.req('POST', '/s/u', { json: { id: v3.id, k: v3.k, d: 60000, dp: 50, s: { 'Тематика CLASSIC': 20000 }, r: ['Тематика CLASSIC'] } });
   await b.req('POST', '/s/c', { json: { id: v3.id, k: v3.k, kind: 'design', label: 'CLASSIC' } });
+  // кнопка раздела вверху «Дизайнов» («В школе 35») — не тематика
+  await b.req('POST', '/s/c', { json: { id: v3.id, k: v3.k, kind: 'design', label: 'В школе 35' } });
 
   // голосование класса тоже видно онлайн
   const cid = await createClass(admin, 'Лицей', '11 «А»');
@@ -103,6 +105,9 @@ test('просмотр, блоки, кнопки, онлайн, отчёт; Ар
   const rep = s.app.stats.report('2000-01-01', '2100-01-01');
   assert.strictEqual(rep.visitors, 3);
   assert.strictEqual(rep.siteVisitors, 2);
+  assert.strictEqual(rep.voteVisitors, 1, 'ученики на голосовании отдельно от сайта');
+  assert.deepStrictEqual(rep.themes.map(t => t.name), ['CLASSIC']);
+  assert.deepStrictEqual(rep.jumps, [{ name: 'В школе', n: 1 }]);
   assert.strictEqual(rep.contacts, 1);
   assert.deepStrictEqual(rep.sources.map(x => x.key).sort(), ['direct', 'instagram'].sort());
   // источник считается по людям: из инсты один, напрямую двое (с компьютера и на голосование)

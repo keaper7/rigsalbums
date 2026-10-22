@@ -38,6 +38,9 @@
   if (!box) return;
 
   var csrf = box.getAttribute('data-csrf') || '';
+  // альбом для сайта («Альбомы на сайте»): одна обложка 001-00 и название, номера учеников не нужны
+  var bookMode = box.getAttribute('data-mode') === 'book';
+  var titleIn = box.querySelector('[data-lay-title]');
   var students = +box.getAttribute('data-students') || 0;
   var sum = box.querySelector('[data-lay-sum]');
   var state = box.querySelector('[data-lay-state]');
@@ -79,6 +82,18 @@
     var rows = [];
     rows.push('<p><b>Развороты: ' + sNums.length + '</b>' + (sNums.length ? ' (000-' + pad(sNums[0], 2) + ' … 000-' + pad(sNums[sNums.length - 1], 2) + ')' : '') + '</p>');
     if (gaps.length) rows.push('<p class="muted small">Нет ' + esc(gaps.join(', ')) + '. Если их убрали специально, всё в порядке: развороты пойдут по порядку.</p>');
+    if (bookMode) {
+      rows.push(cNums.length ? '<p><b>Обложка: есть</b> (' + pad(cNums[0], 3) + '-00)</p>' : '<p class="wk-warn">Нет обложки 001-00. Без неё альбом не загрузить.</p>');
+      if (cNums.length > 1) rows.push('<p class="muted small">Обложек несколько, возьмём ' + pad(cNums[0], 3) + '-00.</p>');
+      plan.covers = plan.covers.slice(0, 1);
+      if (skipped.length) rows.push('<p class="muted small">Пропущены (не похожи на 000-NN или PPP-00): ' + esc(skipped.slice(0, 10).join(', ')) + (skipped.length > 10 ? '…' : '') + '</p>');
+      rows.push(sNums.length && cNums.length ? '<button class="b b--main" type="button" data-lay-go>Загрузить альбом</button>' : '');
+      sum.innerHTML = rows.join('');
+      sum.hidden = false;
+      var bgo = sum.querySelector('[data-lay-go]');
+      if (bgo) bgo.addEventListener('click', function () { upload(plan); });
+      return;
+    }
     rows.push('<p><b>Обложки: ' + cNums.length + '</b>' + (students ? ' из ' + students + ' учеников' + (covers[students + 1] ? ' и кл. руку' : '') : '') + '</p>');
     if (noCover.length && students) rows.push('<p class="wk-warn small">Нет обложек: ' + esc(noCover.slice(0, 30).join(', ')) + (noCover.length > 30 ? '…' : '') + '. Этим ученикам покажется чужая обложка.</p>');
     if (extra.length) rows.push('<p class="wk-warn small">Номера больше, чем учеников в отборе: ' + esc(extra.map(function (n) { return pad(n, 3) + '-00'; }).join(', ')) + '. Проверьте список учеников.</p>');
@@ -138,7 +153,7 @@
     busy = true;
     sum.querySelector('[data-lay-go]').disabled = true;
     var total = (plan.spreads.length * 2 + plan.covers.length * 2) * 2, done = 0;
-    var pageW = 0, pageH = 0, ver = 0;
+    var pageW = 0, pageH = 0, ver = 0, bookId = 0;
     var queue = [], running = 0, failed = null, finishWait = null;
     window.onbeforeunload = function () { return 'Макет ещё загружается'; };
     // отправляем по три файла параллельно, пока режутся следующие
@@ -153,7 +168,7 @@
       while (running < 3 && queue.length) {
         var t = queue.shift();
         running++;
-        send(box.getAttribute('data-file') + '/' + ver + '?name=' + t.name, t.blob).then(function () {
+        send(box.getAttribute('data-file') + (bookId ? '/' + bookId : '') + '/' + ver + '?name=' + t.name, t.blob).then(function () {
           done++;
           setState(done, total, 'Загружено ' + done + ' из ' + total + '. Не закрывайте страницу');
         }, function (err) { failed = failed || err; }).then(function () {
@@ -178,8 +193,11 @@
     }
 
     setState(0, total, 'Готовимся…');
-    post(box.getAttribute('data-start'), { spreads: plan.spreads.length, covers: plan.covers.map(function (c) { return c.num; }) }, csrf).then(function (r) {
+    var startBody = { spreads: plan.spreads.length, covers: plan.covers.map(function (c) { return c.num; }) };
+    if (titleIn) startBody.title = titleIn.value;
+    post(box.getAttribute('data-start'), startBody, csrf).then(function (r) {
       ver = r.ver;
+      bookId = r.id || 0;
       var chain = Promise.resolve();
       plan.spreads.forEach(function (sp, i) {
         chain = chain.then(room).then(function () {
@@ -216,10 +234,10 @@
     }).then(drained).then(function () {
       if (failed) throw failed;
       setState(total, total, 'Проверяем, что всё дошло…');
-      return post(box.getAttribute('data-finish'), { ver: ver }, csrf);
+      return post(box.getAttribute('data-finish'), bookId ? { ver: ver, id: bookId } : { ver: ver }, csrf);
     }).then(function () {
       window.onbeforeunload = null;
-      setState(total, total, 'Готово, макет загружен');
+      setState(total, total, bookMode ? 'Готово, альбом на сайте' : 'Готово, макет загружен');
       setTimeout(function () { location.reload(); }, 600);
     }).catch(function (err) {
       window.onbeforeunload = null;

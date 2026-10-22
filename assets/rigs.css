@@ -259,6 +259,7 @@ ol, ul { padding: 0; list-style: none; }
 .live .eyebrow { color: var(--champ); }
 .live .h2 em { color: var(--champ); }
 .live__lede { margin-top: 16px; font-size: 16px; color: rgba(246, 233, 228, .78); max-width: 30em; }
+.live__note { margin-top: 10px; font-size: 13.5px; color: rgba(246, 233, 228, .55); }
 .reel {
   display: flex; gap: 12px; margin-top: 32px;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -1796,6 +1797,11 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
   position: absolute; left: 0; top: 0; margin: 0; text-align: center; font: 800 34vw/.86 var(--disp); letter-spacing: -.06em; color: var(--wine-2);
   white-space: nowrap; -webkit-transform-origin: 0 0; transform-origin: 0 0; -webkit-transform: scale(.5); transform: scale(.5); will-change: transform;
 }
+/* Блок обычный, едет вместе со страницей: высоту в пикселях ставит rigs.js («Приближение») */
+.zoom.is-on.is-flow { height: auto; }
+.zoom.is-flow .zoom__pin { position: relative; height: 100vh; height: var(--zoom-h, 100vh); }
+.zoom.is-on.is-flow + .end { margin-top: 0; padding-top: 76px; background-color: var(--wine-2); background-image: radial-gradient(ellipse at 90% 10%, rgba(232, 201, 168, .18), rgba(232, 201, 168, 0) 55%); }
+.zoom.is-flow .zoom__glow { display: none; }
 .zoom__sub { margin-top: 22px; font: 700 12px/1 var(--sans); letter-spacing: .3em; text-transform: uppercase; color: var(--ink-2); }
 .zoom.is-on + .end {
   position: relative; z-index: 1; margin-top: -100vh; padding-top: 10vh;
@@ -1815,6 +1821,11 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
    --slot (верх принтера), --pw и --ph (размер снимка) считает скрипт под размер экрана */
 .print { display: none; }
 .print.is-on { display: block; position: relative; z-index: 2; height: 300vh; pointer-events: none; }
+/* Камера — обычный блок страницы, без прилипания: высоту в пикселях ставит rigs.js («Фото из принтера»),
+   галерея идёт сразу за ним, без наезда */
+.print.is-on.is-flow { height: auto; }
+.print.is-flow .print__pin { position: relative; height: 640px; height: var(--pin-h, 640px); }
+.print.is-on.is-flow + .gallery { margin-top: 0; }
 .print.is-on + .gallery { position: relative; z-index: 1; margin-top: -100vh; }
 .print.is-on + .gallery .pics.rv { opacity: 1; -webkit-transform: none; transform: none; -webkit-transition: none; transition: none; }
 .print.is-on + .gallery .pics > :first-child, .print.is-on + .gallery .pics > :first-child img { opacity: 1; -webkit-animation: none; animation: none; }
@@ -1852,7 +1863,7 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .print__osd b { font: 700 8px/1 ui-monospace, Menlo, monospace; color: #fff; letter-spacing: .04em; }
 .print__ui { position: absolute; left: 0; right: 0; bottom: 0; display: grid; gap: 5px; padding: 12px 8px 7px; background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, .75)); }
 .print__lcd { position: relative; display: block; height: 10px; font: 700 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .05em; color: #fff; white-space: nowrap; }
-/* «ПЕЧАТЬ…» сменяется на «ГОТОВО ✓» прозрачностью, которую ведёт прокрутка */
+/* «ПЕЧАТЬ…» сменяется на «ГОТОВО ✓» прозрачностью (ведёт rigs.js, «Фото из принтера») */
 .print__lcd span { position: absolute; top: 0; left: 0; will-change: opacity; }
 .print__lcd span + span { opacity: 0; }
 .print__bar { display: block; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .25); overflow: hidden; }
@@ -1876,8 +1887,7 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .print__row { display: flex; gap: 8px; }
 .print__lamp { display: grid; place-items: center; }
 /* Индикатор записи на карту: красный, мигает, пока идёт печать */
-/* Тусклый индикатор, а над ним красный: его показывает прокрутка (пока идёт печать), а мигает он сам по себе.
-   Скрипт во время прокрутки ничего не трогает */
+/* Тусклый индикатор, а над ним красный: его показывает скрипт, пока идёт печать, а мигает он сам по себе */
 .print__led { position: relative; display: block; width: 7px; height: 4px; border-radius: 2px; background: #3E1412; }
 .print__led i { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; opacity: 0; will-change: opacity; }
 .print__led i:after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; background: #FF3B30; box-shadow: 0 0 8px #FF3B30; will-change: opacity; -webkit-animation: print-led .8s linear infinite; animation: print-led .8s linear infinite; }
@@ -1893,7 +1903,7 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
   -webkit-transform-origin: 50% 50%; transform-origin: 50% 50%; will-change: transform, opacity;
 }
 /* Второй снимок — в самом переходе, а не на прилипшем экране: в одной прокрутке с галереей.
-   Скрипт ведёт его от места над щелью камеры к плитке */
+   Скрипт ведёт его от места над щелью камеры к плитке, поэтому садится он ровно, даже если в полёте листают */
 .print__fly { top: 0; z-index: 3; opacity: 0; }
 /* Белая рамка снимка — отдельный слой вокруг фото: в полёте она тает, и фото садится в плитку галереи без рамки */
 .print__paper {
@@ -1924,6 +1934,11 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .desk.is-on { height: 250vh; }
 .desk.is-on + section { position: relative; z-index: 1; margin-top: -100vh; }
 .desk__pin { position: -webkit-sticky; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+/* Стол — обычный блок, едет вместе со страницей: высоту в пикселях ставит rigs.js («Фото на стол») */
+.desk.is-on.is-flow { margin-top: 0; height: 100vh; height: var(--desk-h, 100vh); }
+.desk.is-flow .desk__pin { position: relative; height: 100%; }
+.desk.is-on.is-flow + section { margin-top: 0; }
+.desk.is-flow .desk__bg { display: none; }
 /* Стол: бумага того же цвета, что страница, закрывает стык блоков, пока снимки лежат */
 .desk__bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--paper); opacity: 0; will-change: opacity; }
 .desk__ph {

@@ -95,8 +95,9 @@ function teacherRow(o) {
 }
 
 function layoutBody(o) {
-  return html`<a class="back" href="${o.back}">← ${o.backLabel}</a>
-<div class="head head--class"><div><h1 class="h1">Макет для проверки</h1><p class="muted">${o.cls.title} · ${o.cls.school}</p></div></div>
+  // у Артура общая шапка класса с разделами, у дизайнера — ссылка назад на класс
+  return html`${o.hub ? o.hub : html`<a class="back" href="${o.back}">← ${o.backLabel}</a>
+<div class="head head--class"><div><h1 class="h1">Макет для проверки</h1><p class="muted">${o.cls.title} · ${o.cls.school}</p></div></div>`}
 ${o.noPick ? html`<div class="card"><h2 class="h">Сначала нужен отбор фото</h2><p class="muted">Ученики и их коды берутся из отбора. ${o.pickLink ? html`<a href="${o.pickLink}">Создать отбор</a>` : 'Попросите Артура создать отбор для этого класса.'}</p></div>` : html`${stateCard(o)}
 ${openFixesCard(o)}
 ${uploadCard(o)}

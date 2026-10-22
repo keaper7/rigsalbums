@@ -10,6 +10,7 @@
 //   <!--@count works-->65 фото<!--@end-->               число фото в галерее
 //   <!--@film works home.works-->...ленты...<!--@end-->  плёнка на главной: фото из works без тех, что уже в home.works
 //   <!--@catalog themes-->...<!--@end-->                тематики из раздела «Варианты»
+//   <!--@books works--><!--@end-->                       листающиеся альбомы на «Работах» (lib/books.js)
 //   <div data-show="price.group">                        блок, который можно скрыть
 // Внутри комментариев лежит вариант по умолчанию. Сервер подставляет
 // вместо него то, что сохранено в админке.
@@ -27,7 +28,7 @@ const THEMES = [
 
 // shape: как показать превью в админке (cover, circle, wide, square, tall)
 const SLOTS = {
-  'home.video': { type: 'video', label: 'Видео «Как это выглядит вживую»', where: 'Главная, сразу после первого экрана', hint: 'Квадратное 1:1 (вертикальное обрежется по центру), до 15 МБ, от 20 секунд до полутора минут. На сайте играет без звука.' },
+  'home.video': { type: 'video', label: 'Видео «Как это выглядит в реальности»', where: 'Главная, сразу после первого экрана', hint: 'Квадратное 1:1 (вертикальное обрежется по центру), до 15 МБ, от 20 секунд до полутора минут. На сайте играет без звука.' },
   'arthur': { type: 'image', label: 'Личная', where: 'Главная (в конце) и «Контакты»', shape: 'circle', hint: 'Лицо по центру: фото обрежется в круг.' },
   'album': { type: 'image', label: 'Фото альбома', where: '«Альбомы и цены», самый верх', shape: 'wide', hint: 'Лучше на белом фоне: белый растворится в странице.' },
   'studio.main': { type: 'image', label: 'Студия общим планом', where: '«Студия», самый верх', shape: 'wide', hint: 'Горизонтальное, лучше с ребятами в кадре.' }
@@ -85,7 +86,7 @@ const TOGGLES = {
   'price.early': { label: 'Показывать скидку: обычную цену, плашку и счётчик дней' }
 };
 
-const MARK = /<!--@(media|gallery|text|count|catalog|film|pile|retouch) ([a-z0-9.]+)(?: (sm|lg|[a-z0-9.]+))?-->([\s\S]*?)<!--@end-->/g;
+const MARK = /<!--@(media|gallery|text|count|catalog|film|pile|retouch|books) ([a-z0-9.]+)(?: (sm|lg|[a-z0-9.]+))?-->([\s\S]*?)<!--@end-->/g;
 const SHOW = /<([a-z]+)([^>]*?) data-show="([a-z0-9.]+)"([^>]*)>/g;
 // Блок, который виден, только пока в галерее есть фото
 const NEED = /<([a-z]+)([^>]*?) data-need="([a-z0-9.]+)"([^>]*?)( hidden)?>/g;
@@ -389,6 +390,8 @@ class Site {
         const part = ({ film: filmHtml, pile: pileHtml, retouch: retouchHtml })[type](list(key), variant ? list(variant) : []);
         return part === null ? inner : part;
       }
+      // листающиеся альбомы на «Работах» (lib/books.js)
+      if (type === 'books') return this.books ? this.books.html() : inner;
       if (type === 'count') {
         if (!Array.isArray(vals[key])) return inner;
         return vals[key].length + ' фото';

@@ -61,11 +61,12 @@ test('новый класс сразу с городом, ценой, учени
     assert.strictEqual(x.money.students, undefined);
     assert.strictEqual(x.contacts.length, 0);
   });
-  // ссылки на работу и отбор сразу под ссылкой класса, город в заголовке
+  // общая шапка класса: «школа · класс», город, разделы одним нажатием
   r = await admin.req('GET', '/admin/c/' + id);
-  assert.ok(r.text.indexOf('cls-links') < r.text.indexOf('Шпаргалка'));
-  assert.match(r.text, /Лицей 2 · Нальчик/);
-  assert.match(r.text, /Запись и подготовка · 1 из 5/);
+  assert.ok(r.text.indexOf('cls-tabs') < r.text.indexOf('Шпаргалка'));
+  assert.match(r.text, /<h1 class="h1 cls-hub__t">Лицей 2 · /);
+  assert.match(r.text, /Нальчик · 20\d\d/);
+  ['/work', '/photos', '/layout', '/work/money'].forEach(t => assert.match(r.text, new RegExp('href="/admin/c/' + id + t + '"')));
 });
 
 test('переименование и город со страницы работы', async t => {
@@ -392,7 +393,7 @@ test('работа: недавно открытые классы сверху, �
   const a = await createClass(admin, 'Школа 1', '11А');
   const b = await createClass(admin, 'Школа 2', '11Б');
   const c = await createClass(admin, 'Школа 3', '11В');
-  const order = text => ['11А', '11Б', '11В'].map(x => [x, text.indexOf('<b>' + x + '</b>')]).sort((p, q) => p[1] - q[1]).map(p => p[0]).join(',');
+  const order = text => ['11А', '11Б', '11В'].map(x => [x, text.indexOf('· ' + x + '</b>')]).sort((p, q) => p[1] - q[1]).map(p => p[0]).join(',');
   // открыли первый класс — он сверху
   await admin.req('GET', '/admin/c/' + a);
   let r = await admin.req('GET', '/admin/work');
@@ -415,7 +416,7 @@ test('работа: недавно открытые классы сверху, �
   r = await admin.req('GET', '/admin/work');
   assert.strictEqual(order(r.text), '11А,11Б,11В');
   assert.match(r.text, /sort=added" aria-current/);
-  // во вкладке «Классы» сортировки нет
+  // главная админки — та же доска, с той же сортировкой
   r = await admin.req('GET', '/admin');
-  assert.doesNotMatch(r.text, /По дате бронирования/);
+  assert.strictEqual(order(r.text), '11А,11Б,11В');
 });

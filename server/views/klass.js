@@ -179,7 +179,7 @@ ${rows.map(x => html`      <div${x.muted ? raw(' class="is-admin"') : ''}><dt>${
 }
 
 function timerText(p) {
-  if (p.status === 'closed') return 'закрыто';
+  if (p.status === 'closed') return 'голосование закрыто';
   if (p.status === 'draft') {
     if (!p.state || !p.state.opensAt) return 'скоро';
     const s = Math.max(0, Math.floor((p.state.opensAt - Date.now()) / 1000));
@@ -218,7 +218,8 @@ ${steps.map((s, i) => stepSection(base, s, i + 1, steps.length, opts[s], Object.
 <section class="done" id="done" data-st="Все голоса">
   <p class="eyebrow">Готово</p>
   <h2>${COUNT_WORD[steps.length] || 'Все голоса учтены'}</h2>
-  <p>Когда голосование закроется, на этой странице останется выбор класса и всё, что нужно знать перед съёмкой. Ссылка та же.</p>
+  <ul class="done__list" id="done-list"></ul>
+  <p>Передумал? Нажми «Изменить» у этапа, сними голос и выбери заново, пока голосование открыто. Когда оно закроется, на этой странице останется выбор класса и всё, что нужно знать перед съёмкой. Ссылка та же.</p>
 </section>
 
 </div>
@@ -275,7 +276,8 @@ ${steps.map((s, i) => html`    <a href="#s-${s}" data-step="${s}"><i>${i + 1}</i
   <p class="eyebrow">Выпускной альбом ${year}</p>
   <h1 style="--w:${longest(p.cls.school)}"><span>${p.cls.school}</span><em>${p.cls.title}</em></h1>
   <p class="hero__lead">Привет, ребят, это личная страничка вашего класса для альбомов. Тут вы выберете понравившийся вариант, а потом останется только ваш выбор и вся основная информация по альбому. Короче, ваша шпаргалка.</p>
-${revote ? html`  <p class="draft">Переголосование: ${steps.map(s => STEP_TITLE[s].toLowerCase()).join(', ')}. Остальное уже выбрано, итог будет на этой странице, когда голосование закроется.</p>
+${p.design ? html`  <p class="draft design-note"><b>Индивидуальный дизайн.</b> ${p.design}</p>
+` : ''}${revote ? html`  <p class="draft">Переголосование: ${steps.map(s => STEP_TITLE[s].toLowerCase()).join(', ')}. Остальное уже выбрано, итог будет на этой странице, когда голосование закроется.</p>
 ` : ''}${draft ? html`  <p class="draft">${planned ? 'Голосование начнётся ' + fmtWhen(p.state.opensAt) + '.' : 'Голосование ещё не началось.'} Варианты уже можно посмотреть, а когда голосование откроется, страница обновится сама.</p>
 ` : ''}  <ol class="hero__steps">
 ${steps.map((s, i) => html`    <li><b>${i + 1}</b><span>${STEP_TITLE[s]}</span><small>${variants(opts[s].length)}</small></li>

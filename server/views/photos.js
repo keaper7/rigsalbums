@@ -2,7 +2,7 @@
 
 // Отбор фото: страница в админке и страница для учеников
 const { html, raw, plural, fmtWhen } = require('../lib/util');
-const { layout } = require('./admin');
+const { layout, classHub } = require('./admin');
 const { ROLES, ROLE_NAMES, TEACHER_WISH_MAX } = require('../lib/photos');
 
 function photosN(n) { return n + ' фото'; }
@@ -57,8 +57,7 @@ function adminPage(o) {
     '\n\nВыбор можно поменять, пока я не закрою отбор.';
   const remind = left.length ? 'Напоминаю про выбор фото для альбома. Ещё не закончили: ' + left.map(s => s.name).join(', ') + '.\n\n' + link : '';
   const body = html`
-<a class="back" href="/admin/c/${c.id}">← ${c.title} · ${c.school}</a>
-<h1 class="h1">Отбор фото</h1>
+${classHub(c, 'photos')}
 <p class="muted small" style="margin:6px 0 18px">Ученикам открывается только по ссылке ниже, голосование класса это не затрагивает.</p>
 ${o.msg && MSG[o.msg] ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
 ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
@@ -206,7 +205,7 @@ ${sections.length ? html`<section class="card">
   ${sections.map(s => html`<form method="post" action="/admin/c/${c.id}/photos/delsection" class="inline" data-confirm="Удалить раздел «${s}» и все выборы по нему?">${csrf(o.sess)}<input type="hidden" name="section" value="${s}"><button class="b b--sm b--danger" type="submit">${s}</button></form> `)}
 </section>` : ''}
 `;
-  return layout({ title: 'Отбор фото · ' + c.title, sess: o.sess, nav: 'classes', body: body, scripts: ['/admin/static/photos-admin.js'] });
+  return layout({ title: 'Отбор фото · ' + c.school + ' · ' + c.title, sess: o.sess, nav: 'work', tone: 'photos', body: body, scripts: ['/admin/static/photos-admin.js'] });
 }
 
 // Классный руководитель: своя ссылка, что выбрал

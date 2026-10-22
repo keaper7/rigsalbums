@@ -126,7 +126,7 @@ test('полный сценарий голосования', async t => {
   assert.strictEqual(r.data.state.counts.theme.neon, 1);
 
   r = await admin.req('GET', '/admin');
-  assert.match(r.text, /Нужно выбрать победителя/);
+  assert.match(r.text, /нужно выбрать победителя/);
 
   // Артур выбирает победителя
   await admin.post('/admin/c/' + id + '/pick', { step: 'theme', option: 'neon' });

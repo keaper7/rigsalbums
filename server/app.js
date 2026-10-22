@@ -16,13 +16,15 @@ const A = require('./views/admin');
 const PV = require('./views/photos');
 const { Photos, PHOTO_ID, PIN_RE, ROLES } = require('./lib/photos');
 const { Layout, numbered, pageOf, pageLabel, FILE_MAX: LAY_FILE_MAX } = require('./lib/layout');
+const { Books, FILE_MAX: BOOK_FILE_MAX } = require('./lib/books');
+const BV = require('./views/books');
 const LV = require('./views/layout');
 const { Work, half, shootText, stageOf, readFile, FILE_MAX, STATUS_NAMES, DESIGNER_STATUSES, PART_NAMES, HALF_NAMES } = require('./lib/work');
 const WV = require('./views/work');
 const { Stats, day: statDay, SITE_PAGES } = require('./lib/stats');
 const SV = require('./views/stats');
 
-const RESERVED = ['admin', 'assets', 'state', 'vote', 'react', 'new', 'media'];
+const RESERVED = ['admin', 'assets', 'state', 'vote', 'react', 'new', 'media', 'books'];
 const VOTER_RE = /^[A-Za-z0-9_-]{16,64}$/;
 // Так подписаны правки классного руководителя у дизайнера
 const TEACHER_LABEL = 'Классный руководитель';
@@ -116,6 +118,9 @@ function createApp(cfg) {
   const photos = new Photos(store, cfg.photosDir || path.join(cfg.dataDir, 'photos'));
   const work = new Work(store, cfg.fixesDir || path.join(cfg.dataDir, 'fixes'));
   const layout = new Layout(store, cfg.layoutDir || path.join(cfg.dataDir, 'layout'));
+  // листающиеся альбомы на «Работах»: поменялся список — страница сайта собирается заново
+  const books = new Books(store, cfg.booksDir || path.join(cfg.dataDir, 'books'), () => site.touch());
+  site.books = books;
   const stats = new Stats(store, auth.secret);
   // старые записи статистики — раз в сутки
   const pruneTimer = setInterval(() => { try { stats.prune(); } catch (e) { console.error(e); } }, 24 * 3600 * 1000);
@@ -242,7 +247,7 @@ function createApp(cfg) {
     const nonce = crypto.randomBytes(12).toString('base64');
     const url = baseUrl(ctx) + '/k/' + cls.slug;
     const body = klassView.classPage({
-      cls: withCommon(cls, cheatDefaults(cls)), opts: opts, status: st, state: state, result: result, base: '/', demo: false, nonce: nonce,
+      cls: withCommon(cls, cheatDefaults(cls)), opts: opts, status: st, state: state, result: result, base: '/', demo: false, nonce: nonce, design: work.get(cls.id).design,
       meta: {
         title: cls.title + ' · Выбор альбома · RIGSARTHUR',
         ogTitle: 'Выбор альбома · ' + cls.title + ', ' + cls.school,
@@ -308,6 +313,41 @@ function createApp(cfg) {
     H.json(ctx.res, 200, { ok: true, state: V.publicState(store, cat, cls, voter) });
   });
 
+  // ---------- листающиеся альбомы на «Работах» ----------
+  r.get('/admin/books', ctx => {
+    page(ctx, 200, A.layout({
+      title: 'Альбомы на сайте', nav: 'site', sess: ctx.sess, msg: ctx.q('m'), scripts: ['/admin/static/layout.js'],
+      body: BV.booksBody({ books: books.list(), csrf: ctx.sess.csrf, base: baseUrl(ctx) })
+    }));
+  });
+  r.post('/admin/api/books/start', ctx => {
+    const res = books.start(ctx.body || {});
+    H.json(ctx.res, res.error ? 400 : 200, res);
+  });
+  r.post('/admin/api/media/book/:id/:ver', async ctx => {
+    const buf = await readFile(ctx.req, BOOK_FILE_MAX);
+    const res = books.saveFile(parseInt(ctx.params.id, 10) || 0, parseInt(ctx.params.ver, 10) || 0, String(ctx.q('name') || ''), buf);
+    H.json(ctx.res, res.error ? 400 : 200, res);
+  }, { raw: true });
+  r.post('/admin/api/books/finish', ctx => {
+    const b = ctx.body || {};
+    const res = books.finish(parseInt(b.id, 10) || 0, parseInt(b.ver, 10) || 0);
+    H.json(ctx.res, res.error ? 400 : 200, res);
+  });
+  r.post('/admin/books/:id/:act', ctx => {
+    const id = parseInt(ctx.params.id, 10) || 0, act = ctx.params.act, f = ctx.form;
+    if (act === 'update') books.update(id, f);
+    else if (act === 'up' || act === 'down') books.move(id, act === 'up' ? -1 : 1);
+    else if (act === 'delete') books.remove(id);
+    else return notFound(ctx);
+    back(ctx, '/admin/books#b' + id, 'saved');
+  });
+  // картинки загруженных альбомов: адрес с версией, поэтому храним у посетителей надолго
+  r.get('/books/:id/:ver/:file', ctx => {
+    const f = books.file(parseInt(ctx.params.id, 10) || 0, parseInt(String(ctx.params.ver).replace(/^v/, ''), 10) || 0, String(ctx.params.file || '').replace(/\.jpg$/, ''));
+    if (!f || !H.serveStatic(f.dir, ctx.req, ctx.res, '/' + f.file, [], { cache: 'public, max-age=31536000, immutable' })) notFound(ctx);
+  });
+
   // ---------- макет альбома для проверки учениками ----------
 
   // Ученики по номерам, как у дизайнера, что загружено, кто проверил, сколько правок
@@ -346,8 +386,9 @@ function createApp(cfg) {
     const d = layoutData(cls);
     const base = '/admin/api/c/' + cls.id + '/layout';
     page(ctx, 200, A.layout({
-      title: 'Макет · ' + cls.title, nav: 'work', sess: ctx.sess, msg: ctx.q('m'), scripts: ['/admin/static/layout.js'],
+      title: 'Макет · ' + cls.school + ' · ' + cls.title, nav: 'work', tone: 'layout', sess: ctx.sess, msg: ctx.q('m'), scripts: ['/admin/static/layout.js'],
       body: LV.layoutBody(Object.assign(d, {
+        hub: A.classHub(cls, 'layout'),
         back: '/admin/c/' + cls.id + '/work', backLabel: cls.title,
         csrf: ctx.sess.csrf,
         api: { start: base + '/start', file: '/admin/api/media/lay/' + cls.id, finish: base + '/finish', first: '/admin/c/' + cls.id + '/layout/first', fixesDone: '/admin/c/' + cls.id + '/layout/fixesdone' },
@@ -649,34 +690,6 @@ function createApp(cfg) {
   });
 
   // ---------- классы ----------
-
-  function withPending(list) {
-    const cat = catalog();
-    const now = Date.now();
-    return list.map(c => {
-      if (V.status(c, now) === 'closed') {
-        c.pending = V.isPending(V.resolve(c, V.visibleOptions(cat, c), store.counts(c.id)));
-      }
-      return c;
-    });
-  }
-
-  // Что видно на карточке класса без захода в него: итоги голосования, съёмка, этап работы
-  function withInfo(list) {
-    const cat = catalog();
-    const all = work.all();
-    const t = today();
-    return list.map(c => {
-      const w = all.get(c.id) || work.get(c.id);
-      const res = c.voters || V.status(c) === 'closed' ? V.resolve(c, V.visibleOptions(cat, c), store.counts(c.id)) : null;
-      c.info = { res: res, shoot: shootText(w, t), stage: all.has(c.id) ? stageOf(w) : null, city: w.city };
-      return c;
-    });
-  }
-
-  r.get('/admin', ctx => {
-    page(ctx, 200, A.classesPage({ sess: ctx.sess, msg: ctx.q('m'), classes: withInfo(withPending(store.listClasses())), base: baseUrl(ctx) }));
-  });
 
   // Классы, с которых можно взять настройки: свежие сверху, архив не нужен
   function templates() {
@@ -1855,12 +1868,23 @@ function createApp(cfg) {
     syncShoots();
     const all = work.all();
     const open = work.openCounts();
+    const cat = noPick ? null : catalog();
     return store.listClasses().filter(c => withArchive || !c.archived).map(c => {
       const w = all.get(c.id) || work.get(c.id);
       const pk = noPick ? null : pkInfo(c);
       const lay = !noPick && pk && layout.ready(c.id) ? layoutSummary(c) : null;
-      return { c: c, w: w, pk: pk, lay: lay, open: open.get(c.id) || 0, half: half(c, w), m: work.money(w, c, pk ? pk.total : 0) };
+      return { c: c, w: w, pk: pk, lay: lay, vote: cat ? voteInfo(c, cat) : null, open: open.get(c.id) || 0, half: half(c, w), m: work.money(w, c, pk ? pk.total : 0) };
     }).filter(filter || (() => true));
+  }
+
+  // Голосование класса для карточки на доске: идёт, ждёт решения, что выбрали
+  function voteInfo(c, cat) {
+    const now = Date.now(), st = V.status(c, now);
+    if (st === 'draft') return V.opensAt(c, now) ? { st: 'plan', at: V.opensAt(c, now) } : null;
+    if (st === 'open') return { st: 'open', ends: c.ends_at };
+    const res = V.resolve(c, V.visibleOptions(cat, c), store.counts(c.id));
+    const picked = Object.keys(res).filter(k => res[k].option).map(k => ({ step: k, name: res[k].option.name }));
+    return { st: 'closed', pending: V.isPending(res), picked: picked };
   }
 
   // Сезон и половина из адреса. Без года — текущий сезон, а если в нём пусто — последний, где есть классы
@@ -1886,7 +1910,8 @@ function createApp(cfg) {
     };
   }
 
-  r.get('/admin/work', ctx => {
+  // Доска «Работа» — главная страница админки: все классы, рабочий стол, голосования, архив
+  const boardHandler = ctx => {
     const sc = seasonCtx(ctx, workRows());
     // Сортировка: недавно открытые (по умолчанию) или по дате бронирования — в этом порядке Артур
     // раздаёт даты съёмок. Выбор запоминается
@@ -1895,10 +1920,18 @@ function createApp(cfg) {
     else sort = ctx.cookies.wsort === 'added' ? 'added' : 'recent';
     const t = today();
     sc.rows.sort(sort === 'added' ? byAdded : byViewed);
+    // рабочий стол и голосования, которые ждут решения, — из всех сезонов, а не только из выбранного
+    const live = workRows(null, false);
     page(ctx, 200, WV.boardPage(Object.assign(sc, {
-      sess: ctx.sess, msg: ctx.q('m'), base: baseUrl(ctx), today: t, designers: work.designers(), templates: work.templates(), newLeads: work.newLeads(), by: ctx.q('by') === 'school' ? 'school' : '', sort: sort
+      sess: ctx.sess, msg: ctx.q('m'), base: baseUrl(ctx), today: t, designers: work.designers(), templates: work.templates(), newLeads: work.newLeads(), by: ctx.q('by') === 'school' ? 'school' : '', sort: sort,
+      desk: live.filter(r => r.w.pinned).sort((a, b) => b.w.pinned - a.w.pinned),
+      voting: live.filter(r => r.vote && (r.vote.st === 'open' || r.vote.pending)),
+      archived: store.listClasses().filter(c => c.archived).sort((a, b) => b.year - a.year || a.school.localeCompare(b.school, 'ru')),
+      self: ctx.url.pathname + ctx.url.search
     })));
-  });
+  };
+  r.get('/admin/work', boardHandler);
+  r.get('/admin', boardHandler);
 
   const byAdded = (a, b) => (a.c.created_at - b.c.created_at) || (a.c.id - b.c.id);
   // недавно открытые в админке сверху, ни разу не открытые — по дате бронирования
@@ -2094,6 +2127,26 @@ function createApp(cfg) {
   wact('tg', (ctx, cls) => {
     if (!work.setTg(cls.id, ctx.form.tg)) return page(ctx, 400, workView(ctx, cls, { err: 'Нужна ссылка на группу в Telegram: t.me/… или @имя группы' }));
     back(ctx, '/admin/c/' + cls.id + '/work#group', 'saved');
+  });
+
+  // Ссылка на папку с готовыми фото класса: дизайнер скачивает её одной кнопкой
+  wact('folder', (ctx, cls) => {
+    if (!work.setFolder(cls.id, ctx.form.folder)) return page(ctx, 400, workView(ctx, cls, { err: 'Нужна ссылка, которая начинается с http:// или https://' }));
+    work.event(cls.id, 'Артур', ctx.form.folder ? 'добавлена ссылка на папку с фото класса' : 'ссылка на папку с фото убрана');
+    wback(ctx, cls, 'saved', 'folder');
+  });
+
+  // Индивидуальный дизайн: комментарий видят дизайнер и ребята на странице класса
+  wact('design', (ctx, cls) => {
+    work.setDesign(cls.id, ctx.form.on ? (ctx.form.design || 'Индивидуальный дизайн') : '');
+    wback(ctx, cls, 'saved', 'design');
+  });
+
+  // Рабочий стол: положить класс сверху доски или убрать
+  wact('pin', (ctx, cls) => {
+    work.setPinned(cls.id, ctx.form.on === '1');
+    const to = String(ctx.form.back || '');
+    back(ctx, /^\/admin\/(work|c\/\d+\/work)(\?[\w=&%.-]*)?$/.test(to) ? to : '/admin/work', ctx.form.on === '1' ? 'pinned' : 'unpinned');
   });
 
   wact('half', (ctx, cls) => {

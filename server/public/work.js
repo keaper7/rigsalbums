@@ -262,4 +262,9 @@
     var d = document.querySelector(location.hash);
     if (d && d.tagName === 'DETAILS') d.open = true;
   }
+  // Индивидуальный дизайн: поле с комментарием видно, только когда отмечено
+  $$('[data-design-on]').forEach(function (cb) {
+    var box = cb.form.querySelector('[data-design-text]');
+    cb.addEventListener('change', function () { box.hidden = !cb.checked; if (cb.checked) box.querySelector('textarea').focus(); });
+  });
 })();

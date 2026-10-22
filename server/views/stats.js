@@ -90,8 +90,8 @@ function statsPage(o) {
   const today = o.period === 'today';
   const empty = !r.views;
   const pg = r.blocks[o.page];
-  // в порядке страницы: так блоки записываются, пока человек листает сверху вниз
-  const blockList = pg ? Object.values(pg.list) : [];
+  // сверху вниз, как на странице: чем выше блок, тем больше людей до него долистали
+  const blockList = pg ? Object.values(pg.list).map((b, i) => Object.assign({ i: i }, b)).sort((x, y) => (y.reached - x.reached) || (x.i - y.i)) : [];
   const body = html`${o.msg && MSG[o.msg] ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
 <h1 class="h1 wk-h1">Статистика</h1>
 ${onlineCard(o)}
@@ -100,7 +100,9 @@ ${onlineCard(o)}
 
 ${empty ? html`<div class="card empty"><h2 class="h">Пока данных нет</h2><p class="muted">Статистика начнёт собираться с первого посетителя. Ваши собственные заходы, пока вы вошли в админку, не считаются.</p></div>` : html`
 <div class="st-kpi">
-  <div class="card"><small>Посетители</small><b>${r.visitors}</b><span>впервые на сайте: ${r.fresh}</span>${prevLine(o, r.prev.visitors)}</div>
+  <div class="card"><small>Все посетители</small><b>${r.visitors}</b><span>сайт и страницы классов вместе</span>${prevLine(o, r.prev.visitors)}</div>
+  <div class="card st-kpi--site"><small>Сайт</small><b>${r.siteVisitors}</b><span>главная, работы, цены… впервые: ${r.fresh}</span></div>
+  <div class="card st-kpi--kids"><small>Ученики</small><b>${r.voteVisitors + r.pickVisitors}</b><span>голосование: ${r.voteVisitors}, отбор фото: ${r.pickVisitors}</span></div>
   <div class="card"><small>Хотели записаться</small><b>${r.contacts}</b><span>${pct(r.contacts, r.siteVisitors)}% от посетителей сайта</span>${prevLine(o, r.prev.contacts)}</div>
   <div class="card"><small>Просмотры страниц</small><b>${r.views}</b><span>${r.siteVisitors ? (r.siteViews / r.siteVisitors).toFixed(1).replace('.', ',') : 0} на человека</span></div>
   <div class="card"><small>С телефона</small><b>${pct(r.devices.mobile + r.devices.tablet, r.devices.mobile + r.devices.tablet + r.devices.desktop)}%</b><span>с компьютера: ${people(r.devices.desktop)}</span></div>
@@ -141,8 +143,13 @@ ${empty ? html`<div class="card empty"><h2 class="h">Пока данных не�
 
 ${r.themes.length ? html`<section class="card">
   <div class="card__h"><h2 class="h">Тематики альбомов</h2></div>
-  <p class="muted small">Сколько всего смотрели каждую тематику на странице «Дизайны» и сколько раз открывали её фото.</p>
-  <ul class="st-btns">${r.themes.map(t => html`<li class="st-btn"><span class="st-btn__t"><b>${t.name}</b><small>${t.timed ? 'смотрели ' + secs(t.ms / 1000) + ' всего, ' + secs(t.ms / t.timed / 1000) + ' в среднем' : 'долистали ' + t.reached}</small></span><b class="st-btn__n" title="Открыли фото">${t.opens ? '🖼 ' + t.opens : ''}</b></li>`)}</ul>
+  <p class="muted small">Страница «Дизайны». Под названием: сколько времени люди смотрели карточку этой тематики, всего и в среднем на человека. Справа 🖼: сколько раз открывали её фото крупно.</p>
+  <ul class="st-btns">${r.themes.map(t => html`<li class="st-btn"><span class="st-btn__t"><b>${t.name}</b><small>${t.timed ? 'смотрели ' + secs(t.ms / 1000) + ' всего, ' + secs(t.ms / t.timed / 1000) + ' в среднем' : t.reached ? 'долистали ' + people(t.reached) + ', но не задержались' : 'пока не смотрели'}</small></span><b class="st-btn__n" title="Открыли фото крупно">${t.opens ? '🖼 ' + t.opens : ''}</b></li>`)}</ul>
+</section>` : ''}
+${r.jumps && r.jumps.length ? html`<section class="card">
+  <div class="card__h"><h2 class="h">Разделы на странице «Дизайны»</h2><span class="muted small">сколько раз нажали</span></div>
+  <p class="muted small">Кнопки вверху страницы, по которым переходят к разделу.</p>
+  <ul class="st-btns">${r.jumps.map(j => html`<li class="st-btn"><span class="st-btn__t"><b>${j.name}</b></span><b class="st-btn__n">${j.n}</b></li>`)}</ul>
 </section>` : ''}
 
 <section class="card">

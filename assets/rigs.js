@@ -1535,6 +1535,8 @@
   // ---------- «Фото из принтера» ----------
   // Перед галереей камера Canon с моментальной печатью печатает первый снимок галереи: он выходит вверх
   // из щели, проявляется, подпрыгивает и, когда снизу показалась галерея, перелетает точно на своё место.
+  // Потом камера поднимается в воздух, в объёме разворачивается к посетителю объективом, наводится
+  // и снимает его со вспышкой — «следующий кадр за тобой». Так и остаётся висеть, чуть покачиваясь.
   // Камера — обычный блок страницы: едет вместе с ней, ничего не прилипает к экрану. Раньше камера держалась
   // на прилипшем экране, и в Safari на телефоне при медленной прокрутке и при смене направления (панель
   // браузера прячется и показывается) она дёргалась. Печать и полёт идут сами, по времени, на видеочипе
@@ -1545,32 +1547,96 @@
     var gal = box.nextElementSibling, tile = gal && $('.pics > .pic', gal), src = tile && $('img', tile);
     if (!fx || !src || !box.animate) return drop(box);
     box.classList.add('is-on', 'is-flow');
-    var photo = $('.print__photo', box), dev = $('.print__dev', photo);
+    var photo = $('.print__photo', box), dev = $('.print__dev', photo), shot = $('img', photo), thumb = $('.print__thumb', box);
+    var cam = $('.print__cam', box), look = $('.print__aim', box), floor = $('.print__floor', box), shades = $$('.print__shade', box);
+    var ring = $('.print__ring', box), barrel = $('.print__barrel', box), af = $('.print__af', box), flashWin = $('.print__flash i', box);
+    var gloss = $('.print__gloss', box), hull = $('.print__hull', box), hullKey = '';
+    // Корпус между задней и лицевой сторонами — замкнутая коробка со скруглёнными углами (радиусы как у сторон:
+    // 30 сверху, 24 снизу). Прямые грани и углы из узких полос; свет сверху слева, как на сторонах.
+    // Каждая грань смотрит наружу и видна только снаружи, поэтому с любого ракурса корпус цельный
+    var buildHull = function (W, Hh, D) {
+      var key = W + 'x' + Hh + 'x' + D;
+      if (key === hullKey) return;
+      hullKey = key;
+      var RT = 30, RB = 24, out = [];
+      var LX = -.5, LY = -.866;
+      var tone = function (nx, ny) {
+        var f = .25 + .75 * Math.max(0, nx * LX + ny * LY), a = [22, 12, 11], b = [92, 68, 62];
+        return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * f) + ',' + Math.round(a[1] + (b[1] - a[1]) * f) + ',' + Math.round(a[2] + (b[2] - a[2]) * f) + ')';
+      };
+      // полоса длиной L и шириной в толщину корпуса: середина в (x, y), смотрит наружу под углом phi (0 — вправо, 90 — вниз)
+      var wall = function (x, y, L, phi, over) {
+        var r = phi * Math.PI / 180, tf = 'translate3d(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px,0) rotateZ(' + (phi + 90).toFixed(2) + 'deg) rotateX(90deg)';
+        out.push('<i style="width:' + L.toFixed(2) + 'px;height:' + D + 'px;margin:' + (-D / 2) + 'px 0 0 ' + (-L / 2).toFixed(2) + 'px;-webkit-transform:' + tf + ';transform:' + tf +
+          ';background:' + (over ? over + ',' : '') + tone(Math.cos(r), Math.sin(r)) + '"></i>');
+      };
+      // скруглённый угол: четверть окружности радиуса R с центром (cx, cy), от угла from, n полос
+      var arc = function (cx, cy, R, from, n) {
+        var step = 90 / n, half = step / 2 * Math.PI / 180;
+        for (var k = 0; k < n; k++) {
+          var m = from + step * (k + .5), mr = m * Math.PI / 180, rr = R * Math.cos(half);
+          wall(cx + rr * Math.cos(mr), cy + rr * Math.sin(mr), 2 * R * Math.sin(half) + .8, m);
+        }
+      };
+      var w2 = W / 2, h2 = Hh / 2, side = Hh - RT - RB + .8, mid = (RT - RB) / 2;
+      // сверху — щель, из которой выходит снимок
+      wall(0, -h2, W - 2 * RT + .8, -90, 'linear-gradient(rgba(0,0,0,0) 42%, #080504 42%, #080504 58%, rgba(0,0,0,0) 58%) 50% 0 / 82% 100% no-repeat');
+      wall(0, h2, W - 2 * RB + .8, 90);
+      wall(-w2, mid, side, 180);
+      wall(w2, mid, side, 0);
+      arc(-w2 + RT, -h2 + RT, RT, 180, 7);
+      arc(w2 - RT, -h2 + RT, RT, 270, 7);
+      arc(w2 - RB, h2 - RB, RB, 0, 6);
+      arc(-w2 + RB, h2 - RB, RB, 90, 6);
+      hull.innerHTML = out.join('');
+    };
     var fly = $('.print__fly', box), flyPaper = $('.print__paper', fly);
-    var pbox = $('.print__box', box), lcd = $$('.print__lcd span', box), fill = $('.print__fill', box), led = $('.print__led i', box);
-    $$('img', box).forEach(function (im) { im.src = src.currentSrc || src.src; });
-    warm($$('img', box));
+    var pbox = $('.print__box', box), face = $('.print__face', box);
+    var lcd = $$('.print__lcd span', box), fill = $('.print__fill', box), led = $('.print__led i', box);
+    // Печатает первую плитку галереи
+    var imgs = [shot, thumb, $('img', fly)];
+    imgs.forEach(function (im) { im.src = src.currentSrc || src.src; });
+    warm(imgs);
     var els = [pbox, photo, dev, fly, flyPaper, fill, tile, led, lcd[0], lcd[1]];
+    // Разворот: корпус поднимается, камера поворачивается, тень на столе меньше, отвернувшаяся сторона темнеет,
+    // по лицевой стороне пробегает блик
+    var els3 = [pbox, cam, floor, shades[0], shades[1], gloss];
+    // Вспышка на весь экран — один слой поверх страницы
+    var bang = document.createElement('i');
+    bang.className = 'print__bang';
+    bang.setAttribute('aria-hidden', 'true');
+    body.appendChild(bang);
     var g = null, top = 0;
     var H = function () { return 100 * U.vh; };
-    // Размер снимка (тех же пропорций, что плитка), верх камеры (--slot), высота блока и где плитка.
+    // Размер снимка (тех же пропорций, что плитка), верх камеры (--slot), высота камеры и блока, где плитка.
     // Всё в пикселях один раз: от панели Safari ничего не пересчитывается
     var measure = function () {
-      var W = box.clientWidth, br = box.getBoundingClientRect(), tr = tile.getBoundingClientRect();
+      var W = box.clientWidth, tr = tile.getBoundingClientRect();
       var ratio = tr.width ? tr.height / tr.width : 1.5;
       // снимок, камера и плитка галереи должны помещаться на одном экране: тогда видно, куда снимок летит
-      var w = Math.min(Math.max(170, W * .52), 280, U.svh * 38 / ratio), h = w * ratio;
-      var slot = Math.max(50 * U.svh, 60 + h + 80);
-      // видна верхняя часть камеры с экраном, ниже блок обрезан, сразу за ним галерея
-      var pinH = Math.round(slot + 215);
+      var w = Math.min(Math.max(170, W * .5), 240, U.svh * 32 / ratio), h = w * ratio;
       box.style.setProperty('--pw', w.toFixed(1) + 'px');
       box.style.setProperty('--ph', h.toFixed(1) + 'px');
-      box.style.setProperty('--slot', slot.toFixed(1) + 'px');
-      box.style.setProperty('--pin-h', pinH + 'px');
-      br = box.getBoundingClientRect(); tr = tile.getBoundingClientRect();
+      // над камерой ровно столько места, сколько занимает готовый снимок в белой рамке, и небольшой отступ
+      var slot = Math.round(h + 66 + 18 + 10 + 22);
+      // камера целиком: верхняя грань, экран с кнопками и низ корпуса, под ней тень на «столе»
+      var camH = Math.round(56 + face.offsetHeight + 14);
+      // корпус шире, чем высота, как у настоящего фотоаппарата, но не шире экрана
+      var camW = Math.round(Math.max(w + 84, Math.min(camH * 1.45, W - 36)));
+      box.style.setProperty('--cam-w', camW + 'px');
+      var camD = Math.round(camW * .2);
+      box.style.setProperty('--cam-d', camD + 'px');
+      buildHull(camW, camH, camD);
+      box.style.setProperty('--slot', slot + 'px');
+      box.style.setProperty('--cam-h', camH + 'px');
+      box.style.setProperty('--pin-h', (slot + camH + 48) + 'px');
+      var br = box.getBoundingClientRect();
+      tr = tile.getBoundingClientRect();
       top = br.top + window.pageYOffset;
       g = {
-        w: w, h: h, slot: slot,
+        w: w, h: h, slot: slot, camH: camH,
+        // насколько камера поднимается: на середину блока, туда, где был снимок
+        lift: Math.max(0, Math.round(slot / 2 - 34)),
         // куда встаёт центр снимка: сдвиг от середины блока по x и от его верха по y
         x: tr.left + tr.width / 2 - (br.left + W / 2), y: tr.top - br.top + tr.height / 2 - h / 2, k: tr.width / w
       };
@@ -1590,6 +1656,36 @@
         { opacity: t > 0 && fed < 1 ? 1 : 0 },
         { opacity: fed < 1 ? 1 : 0 },
         { opacity: fed < 1 ? 0 : 1 }
+      ];
+    };
+    // Разворот: t от 0 до 1. Сначала камера отрывается от стола, по ходу подъёма поворачивается на 180°
+    // и чуть кивает, к концу смотрит объективом на посетителя
+    var lift = 0;
+    // Пружина: от 0 к 1 с перелётом и затухающим качанием (k — затухание, w — частота)
+    var spring = function (x, k, w) { return x >= 1 ? 1 : 1 - Math.exp(-k * x) * (Math.cos(w * x) + k / w * Math.sin(w * x)); };
+    // Положение камеры: сдвиг вбок и к зрителю, наклон вперёд-назад, разворот, крен
+    var camT = function (tx, z, px, ay, rz) {
+      return 'translate3d(' + tx.toFixed(2) + 'px,0,' + z.toFixed(2) + 'px) rotateX(' + px.toFixed(2) + 'deg) rotateY(' + ay.toFixed(2) + 'deg) rotateZ(' + rz.toFixed(2) + 'deg)';
+    };
+    // В конце камера смотрит на посетителя, чуть наклонившись к нему
+    var HOLD = camT(0, 0, -5, 180, 0);
+    // Разворот: t от 0 до 1. Камера приседает, подлетает с наклоном назад и креном, уходит дугой вбок и к зрителю,
+    // по пружине проскакивает разворот и встаёт объективом к посетителю
+    var atTurn = function (t) {
+      var a = clamp01(t / .16), dip = t < .16 ? Math.sin(Math.PI * a) : 0;
+      var u = clamp01((t - .1) / .9), x = clamp01((t - .16) / .84);
+      var up = lift ? spring(u, 6, 7) : 0, ang = 180 * spring(x, 5, 8);
+      var px = 6 * dip - 16 * Math.sin(Math.PI * clamp01(x / .7)) - 5 * ease2(x);
+      var rz = 9 * Math.sin(Math.PI * clamp01(x / .75)) * (1 - .5 * x);
+      var tx = 34 * Math.sin(Math.PI * clamp01(x / .85)), z = 60 * Math.sin(Math.PI * clamp01(x / .9));
+      var high = clamp01(up);
+      return [
+        { transform: 'translate3d(0,' + (7 * dip - lift * up).toFixed(2) + 'px,0)' },
+        { transform: camT(tx, z, px, ang, rz) },
+        { transform: 'translate3d(' + (tx * .5).toFixed(2) + 'px,0,0) scale(' + (1 - .4 * high).toFixed(4) + ')', opacity: (1 - .55 * high).toFixed(3) },
+        { opacity: (.6 * clamp01(ang / 90)).toFixed(3) },
+        { opacity: (.6 * clamp01((180 - ang) / 90)).toFixed(3) },
+        { opacity: (.7 * clamp01(1 - Math.abs(ang - 196) / 18)).toFixed(3) }
       ];
     };
     // Полёт: u от 0 до 1. Готовый снимок над щелью подхватывает второй (тот же снимок в том же месте страницы)
@@ -1614,33 +1710,32 @@
         { opacity: 1 }
       ];
     };
-    // Готово: снимок в галерее, на экране камеры «ГОТОВО»
-    var atEnd = function () { return atFly(1); };
     measure();
 
-    // idle → printing → printed → flying → done
-    var phase = 'idle', anims = [], pctLoop = 0, lastPct = -1, pct = lcd[0], wantFly = false;
+    // idle → printing → printed → flying → rest → turning → aim → flash → done
+    var phase = 'idle', anims = [], pctLoop = 0, lastPct = -1, pct = lcd[0], wantFly = false, restT = 0;
     var setPct = function (v) { if (v !== lastPct) { lastPct = v; pct.textContent = 'ПЕЧАТЬ ' + v + '%'; } };
     var stop = function () {
       anims.forEach(function (a) { a.onfinish = null; a.cancel(); });
       anims = [];
       cancelAnimationFrame(pctLoop);
+      clearTimeout(restT);
     };
     var hurry = function () { anims.forEach(function (a) { if (a.updatePlaybackRate) a.updatePlaybackRate(8); else a.playbackRate = 8; }); };
     // Шаги движения: считаем часто, видеочип ведёт между ними прямую
-    var play = function (fn, ms, steps, done) {
-      var frames = els.map(function () { return []; });
+    var play = function (list, fn, ms, steps, done) {
+      var frames = list.map(function () { return []; });
       for (var i = 0; i <= steps; i++) {
         var v = fn(i / steps);
-        for (var j = 0; j < els.length; j++) {
+        for (var j = 0; j < list.length; j++) {
           var k = { offset: i / steps };
           if (v[j].transform != null) k.transform = v[j].transform;
           if (v[j].opacity != null) k.opacity = v[j].opacity;
           frames[j].push(k);
         }
       }
-      var list = [];
-      els.forEach(function (el, j) {
+      var mine = [];
+      list.forEach(function (el, j) {
         var f = frames[j], first = JSON.stringify([f[0].transform, f[0].opacity]);
         // то, что за эту часть не меняется, сразу ставим как есть, без анимации
         if (f.every(function (k) { return JSON.stringify([k.transform, k.opacity]) === first; })) {
@@ -1648,42 +1743,123 @@
           if (f[0].opacity != null) el.style.opacity = f[0].opacity;
           return;
         }
-        list.push(el.animate(f, { duration: ms, easing: 'linear', fill: 'both' }));
+        mine.push(el.animate(f, { duration: ms, easing: 'linear', fill: 'both' }));
       });
-      anims = list;
+      anims = mine;
       var end = fn(1);
       var fin = function () {
         // конечное положение остаётся в самих элементах, анимации больше не нужны
-        applyAt(els, end);
+        applyAt(list, end);
         stop();
         if (done) done();
       };
-      if (list.length) list[0].onfinish = fin; else fin();
-      return list;
+      if (mine.length) mine[0].onfinish = fin; else fin();
+      return mine;
     };
     var set = function (ph, v) { stop(); phase = ph; wantFly = false; applyAt(els, v); };
-    var idle = function () { set('idle', atPrint(0)); setPct(0); };
-    var landed = function () { set('done', atEnd()); setPct(95); };
+    // keep — оставить подъём, выбранный при развороте (иначе — полный)
+    var turned = function (on, keep) {
+      if (!keep) lift = g.lift;
+      applyAt(els3, atTurn(on ? 1 : 0));
+      ring.style.rotate = on ? '28deg' : '';
+      barrel.style.transform = on ? 'translateZ(8px)' : '';
+      box.classList.toggle('is-float', on);
+      if (!on) aimAt(0, 0, true);
+    };
+    var idle = function () { set('idle', atPrint(0)); turned(false); setPct(0); };
+    // Всё уже случилось: снимок в галерее, камера висит объективом к посетителю
+    var landed = function () { set('done', atFly(1)); turned(true); setPct(95); };
 
     var PRINT_MS = 2700, FLY_MS = 1500;
-    var print = function () {
-      phase = 'printing';
-      var list = play(atPrint, PRINT_MS, 60, function () { phase = 'printed'; setPct(95); if (wantFly) flyNow(); });
-      // проценты на экране камеры — шагами по 5%, вслед за полосой
-      var a = list[0];
+    // проценты на экране камеры — шагами по 5%, вслед за полосой
+    var count = function (a, ph) {
       var tick = function () {
-        if (!a || phase !== 'printing') return;
+        if (!a || phase !== ph) return;
         var t = (a.currentTime || 0) / PRINT_MS;
         setPct(Math.min(95, Math.floor(ease2(clamp01((t - .05) / .8)) * 20) * 5));
         pctLoop = requestAnimationFrame(tick);
       };
       tick();
     };
+    var print = function () {
+      phase = 'printing';
+      var list = play(els, atPrint, PRINT_MS, 60, function () { phase = 'printed'; setPct(95); if (wantFly) flyNow(); });
+      count(list[0], 'printing');
+    };
     var flyNow = function () {
       wantFly = false;
       phase = 'flying';
-      play(atFly, FLY_MS, 80, function () { phase = 'done'; });
+      play(els, atFly, FLY_MS, 80, function () {
+        // снимок сел в плитку — камера поворачивается к посетителю
+        phase = 'rest';
+        restT = setTimeout(turn, 250);
+      });
     };
+    var turn = function () {
+      phase = 'turning';
+      // поднимается на середину блока, но не выше шапки сайта: на телефоне к этому моменту страницу уже листают дальше
+      var camTop = top + g.slot - window.pageYOffset, room = camTop - (hd ? hd.offsetHeight : 60) - .2 * H();
+      lift = Math.max(0, Math.min(g.lift, room));
+      play(els3, atTurn, 1700, 110, aim);
+    };
+    // Наводится: чуть поводит объективом, будто ищет посетителя в кадре, объектив выдвигается,
+    // кольцо фокуса проворачивается, подсветка фокуса мигает дважды
+    var aim = function (again) {
+      phase = 'aim';
+      anims.push(cam.animate([
+        { transform: HOLD, easing: 'ease-in-out' },
+        { transform: camT(0, 0, -7, 171, -1.5), offset: .3, easing: 'ease-in-out' },
+        { transform: camT(0, 0, -4, 186, 1), offset: .62, easing: 'ease-in-out' },
+        { transform: HOLD }
+      ], { duration: 900 }));
+      anims.push(barrel.animate([{ transform: again ? 'translateZ(8px)' : 'translateZ(0px)' }, { transform: again ? 'translateZ(2px)' : 'translateZ(4px)', offset: .4 }, { transform: 'translateZ(8px)' }], { duration: 800, delay: 100, easing: 'ease-out', fill: 'both' }));
+      anims.push(ring.animate([{ rotate: again ? '28deg' : '0deg' }, { rotate: again ? '-6deg' : '40deg', offset: .55 }, { rotate: '28deg' }], { duration: 800, delay: 100, easing: 'ease-in-out', fill: 'both' }));
+      anims.push(af.animate([{ opacity: .35 }, { opacity: 1 }, { opacity: .35 }, { opacity: 1 }, { opacity: .35 }], { duration: 600, delay: 350 }));
+      restT = setTimeout(shoot, 980);
+    };
+    // Щелчок: вспышка у камеры и, если камера на экране, короткая белая вспышка на весь экран из её вспышки
+    var shoot = function () {
+      phase = 'flash';
+      anims.push(flashWin.animate([{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: 0 }], { duration: 420 }));
+      var r = flashWin.getBoundingClientRect(), Hh = window.innerHeight;
+      if (r.bottom > (hd ? hd.offsetHeight : 0) && r.top < Hh) {
+        bang.style.setProperty('--fx', Math.round(r.left + r.width / 2) + 'px');
+        bang.style.setProperty('--fy', Math.round(r.top + r.height / 2) + 'px');
+        anims.push(bang.animate([{ opacity: 0 }, { opacity: .85, offset: .12 }, { opacity: 0 }], { duration: 560, easing: 'linear' }));
+      }
+      // отдача: камеру чуть толкает назад и она возвращается
+      anims.push(cam.animate([{ transform: HOLD }, { transform: camT(0, -16, -9, 180, 0), offset: .22 }, { transform: HOLD }], { duration: 420, easing: 'ease-out' }));
+      restT = setTimeout(function () {
+        stop();
+        phase = 'done';
+        turned(true, true);
+      }, 600);
+    };
+
+    // На компьютере камера, которая уже смотрит на посетителя, поводит объективом за курсором
+    var aimNow = { x: 0, y: 0, tx: 0, ty: 0, raf: 0 };
+    var aimStep = function () {
+      aimNow.x += (aimNow.tx - aimNow.x) * .1;
+      aimNow.y += (aimNow.ty - aimNow.y) * .1;
+      look.style.transform = 'rotateX(' + aimNow.y.toFixed(2) + 'deg) rotateY(' + aimNow.x.toFixed(2) + 'deg)';
+      aimNow.raf = Math.abs(aimNow.tx - aimNow.x) > .05 || Math.abs(aimNow.ty - aimNow.y) > .05 ? requestAnimationFrame(aimStep) : 0;
+    };
+    var aimAt = function (x, y, now) {
+      aimNow.tx = x; aimNow.ty = y;
+      if (now) { cancelAnimationFrame(aimNow.raf); aimNow.raf = 0; aimNow.x = x; aimNow.y = y; look.style.transform = ''; return; }
+      if (!aimNow.raf) aimNow.raf = requestAnimationFrame(aimStep);
+    };
+    if (window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      window.addEventListener('pointermove', function (e) {
+        if (phase !== 'done' || !near) return;
+        var r = pbox.getBoundingClientRect();
+        var dx = (e.clientX - (r.left + r.width / 2)) / window.innerWidth, dy = (e.clientY - (r.top + r.height / 2)) / window.innerHeight;
+        aimAt(Math.max(-18, Math.min(18, dx * 40)), Math.max(-12, Math.min(12, -dy * 26)));
+      }, { passive: true });
+      document.addEventListener('mouseleave', function () { if (phase === 'done') aimAt(0, 0); });
+    }
+    // Нажали на камеру — снимает ещё раз
+    pbox.addEventListener('click', function () { if (phase === 'done') aim(true); });
 
     // Где сейчас камера и плитка на экране — из прокрутки, без замеров раскладки каждый кадр
     var near = false;
@@ -1720,8 +1896,8 @@
     // Раскладка могла сдвинуться (шрифты, картинки, поворот экрана) — пересчитываем размеры и места
     var recheck = function () {
       measure();
-      if (phase === 'idle') applyAt(els, atPrint(0));
-      else if (phase === 'done') applyAt(els, atEnd());
+      if (phase === 'idle') { applyAt(els, atPrint(0)); applyAt(els3, atTurn(0)); }
+      else if (phase === 'done') { applyAt(els, atFly(1)); turned(true, true); }
       if (near) check(window.pageYOffset);
     };
     window.addEventListener('load', recheck);
@@ -1734,23 +1910,24 @@
   })();
 
   // ---------- «Фото на стол» ----------
-  // После галереи снимки из «Работ» один за другим ложатся на стол, как фотографии.
-  // Блок обычный, едет вместе со страницей: раньше он прилипал к экрану, и в Safari на телефоне снимки
-  // мелко дрожали при медленной прокрутке. Прокрутка только говорит «пора»: снимки ложатся сами, по времени,
-  // плавными переходами на видеочипе
+  // После галереи снимки из «Работ» один за другим ложатся на экран, как фотографии на стол.
+  // Потом разъезжаются в стороны, и за ними уже следующий блок
   (function () {
     var box = $('.desk');
     if (!box) return;
     // Снимки вставляет сервер: фото из «Работ», которых нет ни в галерее над переходом, ни на плёнке
-    var cards = $$('.desk__ph', box);
+    var cards = $$('.desk__ph', box), bg = $('.desk__bg', box);
     if (!fx || cards.length < 4) return drop(box);
-    box.classList.add('is-on', 'is-flow');
-    // Где снимок ложится: сдвиг от центра в долях ширины и высоты стола и наклон
+    box.classList.add('is-on');
+    var st = stage(box);
+    // Где снимок ложится: сдвиг от центра в долях ширины и высоты экрана и наклон
     var SPOT = [[-.2, -.2, -9], [.2, -.24, 7], [-.03, -.02, 3], [-.24, .17, -6], [.23, .12, 10], [.02, .26, -7], [.1, -.08, -3]];
+    // Снимки «бросают» на стол. Раньше каждый кадр движения считался от прокрутки, и на iPhone закреплённый
+    // экран и пересчёт по пальцу расходились на долю кадра — снимки мелко дрожали. Теперь прокрутка только
+    // говорит «пора»: снимки ложатся и разъезжаются сами, по времени, плавными переходами на видеочипе,
+    // как бы неровно ни двигался палец
     var setSpots = function () {
-      // стол — экран высотой, в пикселях один раз: от панели Safari ничего не пересчитывается
-      var W = window.innerWidth, H = Math.round(Math.min(U.svh * 100, 900));
-      box.style.setProperty('--desk-h', H + 'px');
+      var W = window.innerWidth, H = U.vh * 100 || window.innerHeight;
       cards.forEach(function (c, i) {
         var sp = SPOT[i % SPOT.length], dir = sp[0] < 0 ? -1 : 1;
         var x = sp[0] * W, y = sp[1] * H;
@@ -1758,90 +1935,81 @@
         // в воздухе: крупнее, чуть в стороне и с бо́льшим наклоном
         c.style.setProperty('--from', 'translate3d(' + (x + dir * .06 * W).toFixed(1) + 'px,' + (y - .05 * H).toFixed(1) + 'px,0) rotate(' + (sp[2] + (i % 2 ? 16 : -16)) + 'deg) scale(1.5)');
         c.style.setProperty('--at', 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0) rotate(' + sp[2] + 'deg)');
+        // уезжает за край экрана в свою сторону
+        c.style.setProperty('--away', 'translate3d(' + (x + dir * .9 * W).toFixed(1) + 'px,' + (y - .08 * H).toFixed(1) + 'px,0) rotate(' + (sp[2] + dir * 22) + 'deg)');
       });
     };
     setSpots();
     box.classList.add('is-time');
-    var landed = false;
-    // Стол показался почти наполовину — снимки ложатся. Ушли выше — в следующий раз лягут заново,
-    // ушли ниже — остаются лежать
-    watch([box], function (el, vis, io, en) {
-      if (vis && en && en.intersectionRatio >= .4) { if (!landed) { landed = true; box.classList.add('is-land'); } }
-      else if (!vis && en && en.boundingClientRect.top > 0 && landed) { landed = false; box.classList.remove('is-land'); }
-    }, { threshold: [0, .4] });
-    onRebuild(function () { setSpots(); });
+    var phase = '';
+    var show = function (ph) {
+      if (ph === phase) return;
+      if (ph === 'land') setSpots();
+      phase = ph;
+      box.classList.toggle('is-land', ph === 'land');
+      box.classList.toggle('is-gone', ph === 'gone');
+    };
+    // Небольшой запас у границ, чтобы на самой границе не мигало туда-сюда
+    st.fns.push(function (p) {
+      if (p < .04) show('');
+      else if (p < .06 && phase !== 'land') show(phase === 'gone' ? 'land' : '');
+      else if (p > .64) show('gone');
+      else if (p > .06 && p < .6) show('land');
+    });
+    onRebuild(function () { if (!phase) setSpots(); });
   })();
 
   // ---------- «Приближение» ----------
-  // Перед контактами слово «ТВОЙ ВЫПУСК», и в букву «О» влетаем, пока всё не станет бордовым, а дальше
-  // бордовый блок контактов. Блок обычный, едет вместе со страницей: раньше он прилипал к экрану, а приближение
-  // шло за пальцем, и в Safari на телефоне это дёргалось. Теперь блок дошёл до середины экрана — влёт идёт
-  // сам, по времени, на видеочипе. Слово растягивает видеочип готовой картинкой: приближаем копию слова,
-  // набранную вдвое крупнее и сначала уменьшенную вдвое, само слово невидимо и держит место.
-  // Под конец поверх растягивается сплошной бордовый слой — ровный цвет без мыла
+  // Перед контактами слово «ТВОЙ ВЫПУСК» стоит на месте, а прокрутка влетает в букву «О», пока экран
+  // не станет бордовым, — и по нему снизу уже выезжают контакты. Слово растягивает видеочип готовой картинкой,
+  // а не браузер, перерисовывая огромные буквы каждый кадр (из-за этого на iPhone приближение шло рывками).
+  // Чтобы растянутые буквы меньше мылились, приближаем копию слова, набранную вдвое крупнее и сначала
+  // уменьшенную вдвое, — само слово остаётся невидимым и держит место. Под конец поверх растягивается
+  // сплошной бордовый слой — ровный цвет без мыла
   (function () {
     var zoom = $('.zoom');
     if (!zoom) return;
-    if (!fx || !zoom.animate) return drop(zoom);
-    zoom.classList.add('is-on', 'is-flow');
+    if (!fx) return drop(zoom);
+    zoom.classList.add('is-on');
+    var st = stage(zoom);
     var word = $('.zoom__word', zoom), o = $('.zoom__o', zoom), sub = $('.zoom__sub', zoom);
-    var fillZ = $('.zoom__fill', zoom);
+    var fillZ = $('.zoom__fill', zoom), glow = $('.zoom__glow', zoom);
     var big = word.cloneNode(true);
     big.className = 'zoom__big';
     word.parentNode.insertBefore(big, word.nextSibling);
     word.classList.add('is-ghost');
-    var els = [big, sub, fillZ];
+    var els = [big, sub, fillZ, glow];
     var g = null;
-    // Высота блока — экран, в пикселях один раз. Где слово и точка приближения — середина левой стенки «О»
+    // Где слово на экране перехода и точка приближения — середина левой стенки буквы «О» (по раскладке, offset*)
     var measure = function () {
-      zoom.style.setProperty('--zoom-h', Math.round(U.svh * 100) + 'px');
       var L = word.offsetLeft, T = word.offsetTop, own = o.offsetParent === word;
       var ox = o.offsetLeft - (own ? 0 : L), oy = o.offsetTop - (own ? 0 : T);
+      var old = g;
       g = { L: L, T: T, x: L + ox + o.offsetWidth * .16, y: T + oy + o.offsetHeight * .52 };
       big.style.left = L.toFixed(1) + 'px';
       big.style.top = T.toFixed(1) + 'px';
+      return !old || ['L', 'T', 'x', 'y'].some(function (k) { return Math.abs(old[k] - g[k]) > .5; });
     };
-    var at = function (q) {
-      // Приближение с постоянной скоростью для глаза (во сколько раз за мгновение), до 91 раза
-      var z = Math.pow(91, q);
-      // Копия с верхним левым углом в (L, T), уменьшенная вдвое, совпадает со словом; приближение в z раз
-      // вокруг точки (x, y) — это сдвиг (точка − угол) · (1 − z) и масштаб z / 2
+    // Первые 62% прокрутки — влёт в букву; к концу бордовый закрывает экран, по нему выезжают контакты
+    var FULL = .62;
+    var at = function (p) {
+      // Приближение с постоянной скоростью для глаза (во сколько раз за сантиметр прокрутки), до 91 раза
+      var q = Math.min(1, p / FULL), z = Math.pow(91, q);
+      // Копия с верхним левым углом в (L, T) и уменьшенная вдвое совпадает со словом; приближение в z раз
+      // вокруг точки (x, y) экрана — это сдвиг (точка − угол) · (1 − z) и масштаб z / 2
       var dx = (g.x - g.L) * (1 - z), dy = (g.y - g.T) * (1 - z);
       return [
         { transform: 'translate3d(' + dx.toFixed(2) + 'px,' + dy.toFixed(2) + 'px,0) scale(' + (z / 2).toFixed(4) + ')', opacity: q < .995 ? 1 : 0 },
         { opacity: Math.max(0, 1 - q * 3).toFixed(3) },
-        { opacity: clamp01((q - .95) / .05).toFixed(3) }
+        { opacity: clamp01((q - .95) / .05).toFixed(3) },
+        // Свечение, как у блока контактов, разгорается, пока контакты выезжают
+        { opacity: clamp01((p - FULL) / (1 - FULL)).toFixed(3) }
       ];
     };
     measure();
-    applyAt(els, at(0));
-    var anims = [], state = 'idle';
-    var stop = function () { anims.forEach(function (a) { a.onfinish = null; a.cancel(); }); anims = []; };
-    var set = function (q, st) { stop(); state = st; applyAt(els, at(q)); };
-    var play = function () {
-      state = 'playing';
-      var frames = els.map(function () { return []; });
-      for (var i = 0; i <= 60; i++) {
-        var v = at(i / 60);
-        for (var j = 0; j < els.length; j++) {
-          var k = { offset: i / 60 };
-          if (v[j].transform != null) k.transform = v[j].transform;
-          if (v[j].opacity != null) k.opacity = v[j].opacity;
-          frames[j].push(k);
-        }
-      }
-      anims = els.map(function (el, j) { return el.animate(frames[j], { duration: 1500, easing: 'cubic-bezier(.55, 0, .45, 1)', fill: 'both' }); });
-      anims[0].onfinish = function () { set(1, 'done'); };
-    };
-    // Блок почти целиком на экране — влетаем. Ушли выше — в следующий раз заново, ушли ниже — уже бордовый
-    watch([zoom], function (el, vis, io, en) {
-      if (vis && en && en.intersectionRatio >= .65) { if (state === 'idle') play(); }
-      else if (!vis && en) {
-        if (en.boundingClientRect.top > 0) { if (state !== 'idle') set(0, 'idle'); }
-        else if (state !== 'done') set(1, 'done');
-      }
-    }, { threshold: [0, .65] });
-    var recheck = function () { measure(); if (state !== 'playing') applyAt(els, at(state === 'done' ? 1 : 0)); };
+    var rebuild = viewTl ? scrollKeys(st, 'zoom', els, at, 400) : null;
+    if (!viewTl) st.fns.push(function (p) { applyAt(els, at(p)); });
+    var recheck = function () { if (measure()) { if (rebuild) rebuild(); st.p = -1; if (st.on) stageTick(st, window.pageYOffset); } };
     onRebuild(recheck);
     window.addEventListener('load', recheck);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(recheck);

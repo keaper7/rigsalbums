@@ -256,7 +256,7 @@ function classCard(r, today, o) {
 // Ближайшие съёмки: первые сразу, остальные раскрываются списком по порядку
 const SOON_SHOWN = 4;
 function soonItem(x, today) {
-  return html`<li><span class="wk-soon__d">${when(x.d, today)}</span><a href="/admin/c/${x.r.c.id}/work">${x.r.c.title} ${schoolTag(x.r.c.school, '')}</a><small class="muted">${DATE_KIND_NAMES[x.d.kind]}${x.d.note ? ' · ' + x.d.note : ''}${x.r.w.city ? ' · ' + x.r.w.city : ''}</small></li>`;
+  return html`<li><span class="wk-soon__d">${when(x.d, today)}</span><a href="/admin/c/${x.r.c.id}/work"><i class="wk-sdot" style="--sc:${schoolColor(x.r.c.school)}"></i>${x.r.c.school} · ${x.r.c.title}</a><small class="muted">${DATE_KIND_NAMES[x.d.kind]}${x.d.note ? ' · ' + x.d.note : ''}${x.r.w.city ? ' · ' + x.r.w.city : ''}</small></li>`;
 }
 
 function boardPage(o) {
@@ -973,7 +973,7 @@ function designerClass(o) {
 
 ${layoutCard(o.lay, api + '/layout', true)}
 ${w.folder ? html`<section class="card wk-folder">
-  <div class="wk-lay__t"><h2 class="h">Фото класса</h2><p class="muted small">Готовые фото после ретуши, все в одной папке</p></div>
+  <div class="wk-lay__t"><h2 class="h">Фото класса</h2><p class="muted small">Готовые фото класса в wfolio</p></div>
   <a class="b b--main" href="${w.folder}" target="_blank" rel="noopener">Скачать фото класса</a>
 </section>` : ''}
 ${w.design ? html`<section class="card wk-dnote"><h2 class="h">Индивидуальный дизайн</h2><p>${w.design}</p></section>` : ''}
@@ -1033,14 +1033,14 @@ function designCard(o) {
   <form method="post" action="/admin/c/${c.id}/work/design" class="form wk-dform">
     ${csrf(o.sess)}
     <label class="check"><input type="checkbox" name="on" value="1"${w.design ? raw(' checked') : ''} data-design-on><span>Индивидуальный дизайн</span></label>
-    <label class="field" data-design-text${w.design ? '' : raw(' hidden')}><span>Что за дизайн</span><textarea name="design" rows="2" maxlength="500" placeholder="Например: совмещённый стиль грей и классик">${w.design}</textarea></label>
+    <label class="field" data-design-text${w.design ? '' : raw(' hidden')}><span>Что за дизайн</span><textarea name="design" rows="2" maxlength="500" placeholder="Что нужно сделать">${w.design}</textarea></label>
     <p class="muted small">Видят дизайнер у себя и ребята на странице класса.</p>
     <button class="b b--sm" type="submit">Сохранить</button>
   </form>
   <form method="post" action="/admin/c/${c.id}/work/folder" class="form wk-dform" id="folder">
     ${csrf(o.sess)}
-    <label class="field"><span>Папка с готовыми фото класса</span><input name="folder" type="url" value="${w.folder}" placeholder="Ссылка на wfolio, Яндекс Диск или облако" maxlength="500" autocomplete="off"></label>
-    <p class="muted small">Когда фото после доп. ретуши готовы, загрузите папку в облако и вставьте ссылку. У дизайнера появится кнопка «Скачать фото класса».${w.folder ? html` <a href="${w.folder}" target="_blank" rel="noopener">Открыть папку</a>` : ''}</p>
+    <label class="field"><span>Готовые фото класса в wfolio</span><input name="folder" type="url" value="${w.folder}" placeholder="Ссылка на wfolio" maxlength="500" autocomplete="off"></label>
+    <p class="muted small">У дизайнера появится кнопка «Скачать фото класса».${w.folder ? html` <a href="${w.folder}" target="_blank" rel="noopener">Открыть папку</a>` : ''}</p>
     <button class="b b--sm" type="submit">Сохранить ссылку</button>
   </form>
 </section>`;

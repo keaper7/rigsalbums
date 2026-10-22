@@ -172,7 +172,7 @@ class Books {
     const first = list[0];
     return '<section class="flip works-books" id="albums">\n  <div class="wrap">\n    <div class="flip__head rv">\n' +
       '      <p class="eyebrow">Альбомы целиком</p>\n      <h2 class="h2">Полистайте <em>готовые альбомы</em></h2>\n' +
-      '      <p class="lede">Нажмите на страницу, смахните или листайте стрелками. Ниже можно выбрать другой альбом.</p>\n    </div>\n' +
+      '      <p class="lede">Нажмите на страницу, смахните или листайте стрелками.</p>\n    </div>\n' +
       '    <div class="bk" data-book data-base="' + esc(first.base) + '" style="--bk-board: ' + esc(first.board) + '; --bk-spine: ' + esc(first.spine) + '" data-spreads="' + first.spreads + '" tabindex="0" aria-label="Альбом: листайте стрелками влево и вправо">\n' +
       '      <div class="bk__stage"><div class="bk__book"></div></div>\n' +
       '      <div class="bk__bar">\n        <button class="bk__btn" type="button" data-bk-prev aria-label="Назад">‹</button>\n' +

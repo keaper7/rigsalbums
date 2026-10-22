@@ -1797,11 +1797,6 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
   position: absolute; left: 0; top: 0; margin: 0; text-align: center; font: 800 34vw/.86 var(--disp); letter-spacing: -.06em; color: var(--wine-2);
   white-space: nowrap; -webkit-transform-origin: 0 0; transform-origin: 0 0; -webkit-transform: scale(.5); transform: scale(.5); will-change: transform;
 }
-/* Блок обычный, едет вместе со страницей: высоту в пикселях ставит rigs.js («Приближение») */
-.zoom.is-on.is-flow { height: auto; }
-.zoom.is-flow .zoom__pin { position: relative; height: 100vh; height: var(--zoom-h, 100vh); }
-.zoom.is-on.is-flow + .end { margin-top: 0; padding-top: 76px; background-color: var(--wine-2); background-image: radial-gradient(ellipse at 90% 10%, rgba(232, 201, 168, .18), rgba(232, 201, 168, 0) 55%); }
-.zoom.is-flow .zoom__glow { display: none; }
 .zoom__sub { margin-top: 22px; font: 700 12px/1 var(--sans); letter-spacing: .3em; text-transform: uppercase; color: var(--ink-2); }
 .zoom.is-on + .end {
   position: relative; z-index: 1; margin-top: -100vh; padding-top: 10vh;
@@ -1826,6 +1821,119 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .print.is-on.is-flow { height: auto; }
 .print.is-flow .print__pin { position: relative; height: 640px; height: var(--pin-h, 640px); }
 .print.is-on.is-flow + .gallery { margin-top: 0; }
+/* Камера целиком и в объёме. Корпус (.print__box) держит место и поднимается в воздух, внутри него .print__cam
+   из четырёх сторон: задняя (экран и кнопки), передняя (объектив и вспышка) и две боковые грани. Разворот к посетителю
+   ведёт rigs.js; ширину, высоту и толщину (--cam-w, --cam-h, --cam-d) считает он же */
+.print.is-flow .print__box {
+  width: var(--cam-w, 324px); height: var(--cam-h, 230px); margin-left: calc(var(--cam-w, 324px) / -2);
+  border-radius: 0; background: none; box-shadow: none;
+  -webkit-perspective: 1100px; perspective: 1100px;
+}
+.print.is-flow .print__box:before { display: none; }
+.print__aim, .print__cam { position: absolute; top: 0; left: 0; width: 100%; height: 100%; -webkit-transform-style: preserve-3d; transform-style: preserve-3d; will-change: transform; }
+.print__back, .print__front {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 30px 30px 24px 24px;
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), inset 0 -3px 0 rgba(0, 0, 0, .3);
+}
+.print__back {
+  -webkit-transform: translateZ(calc(var(--cam-d, 46px) / 2)); transform: translateZ(calc(var(--cam-d, 46px) / 2));
+  background: linear-gradient(90deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 28%, rgba(0, 0, 0, 0) 70%, rgba(0, 0, 0, .22)), linear-gradient(#34231F, #211513 38%, #1A100F);
+}
+/* Верхняя грань со щелью: из неё и выходит снимок */
+.print__back:before, .print__front:before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 24px; border-radius: 30px 30px 0 0; background: linear-gradient(#5A4440, #3A2826); }
+.print.is-flow .print__face { top: 56px; gap: 10px 10px; }
+.print.is-flow .print__screen { aspect-ratio: auto; height: 112px; }
+.print.is-flow .print__side { gap: 5px; padding: 6px 0; }
+.print.is-flow .print__dial { width: 34px; height: 34px; }
+/* Лицевая сторона: вспышка, надпись, кнопка спуска сверху и объектив. Свет падает слева, как и на задней */
+.print__front {
+  -webkit-transform-style: preserve-3d; transform-style: preserve-3d;
+  -webkit-transform: rotateY(180deg) translateZ(calc(var(--cam-d, 46px) / 2)); transform: rotateY(180deg) translateZ(calc(var(--cam-d, 46px) / 2));
+  background: linear-gradient(90deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, 0) 28%, rgba(0, 0, 0, 0) 70%, rgba(0, 0, 0, .22)), linear-gradient(#34231F, #211513 38%, #1A100F);
+}
+/* Всё на лицевой стороне — отдельными слоями чуть над её плоскостью и видно только спереди:
+   так Safari точно рисует их поверх корпуса и не показывает, когда камера развёрнута задом */
+.print__front > i, .print__front > span { -webkit-backface-visibility: hidden; backface-visibility: hidden; -webkit-transform: translateZ(.6px); transform: translateZ(.6px); }
+.print__front > .print__gloss { -webkit-transform: translateZ(1px); transform: translateZ(1px); }
+.print__front > .print__shade { -webkit-transform: translateZ(1.4px); transform: translateZ(1.4px); }
+/* Прорезиненная накладка под объективом */
+.print__front:after {
+  content: ''; position: absolute; left: 0; right: 0; top: 38%; bottom: 16%;
+  background: radial-gradient(circle, rgba(255, 255, 255, .045) 0 1px, transparent 1.5px) 0 0 / 5px 5px, rgba(0, 0, 0, .18);
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, .45), 0 1px 0 rgba(255, 255, 255, .05);
+}
+.print__flash {
+  position: absolute; z-index: 1; left: 20px; top: 34px; width: 24%; height: 24px; border-radius: 5px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .2) 0 2px, rgba(255, 255, 255, .04) 2px 5px), linear-gradient(#D6D0C9, #8E8681);
+  box-shadow: inset 0 0 0 2px #0D0909, 0 1px 0 rgba(255, 255, 255, .1);
+}
+/* Свечение вспышки: невидимо, пока скрипт не «щёлкнет» */
+.print__flash i { position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; border-radius: inherit; background: #FFF; box-shadow: 0 0 26px 10px rgba(255, 255, 255, .95), 0 0 90px 36px rgba(255, 246, 225, .65); opacity: 0; will-change: opacity; }
+.print__logo { position: absolute; z-index: 1; right: 22px; top: 36px; font: 700 18px/1 Georgia, 'Times New Roman', serif; letter-spacing: -.01em; color: #F4F2EF; }
+.print__lens {
+  --d: min(calc(var(--cam-h, 230px) * .6), calc(var(--cam-w, 324px) * .44));
+  position: absolute; z-index: 1; left: 50%; top: 61%; width: var(--d); height: var(--d); margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2); border-radius: 50%;
+  background: radial-gradient(circle, #1A1717 0 62%, #0B0909 63% 66%, #3A3535 67% 69%, #1B1818 70%);
+  box-shadow: 0 0 0 3px #0B0909, 0 0 0 4px rgba(255, 255, 255, .08), 0 12px 22px -8px rgba(0, 0, 0, .7);
+}
+/* Объектив выступает из корпуса: тубус — три кольца друг над другом, сверху кольцо фокуса и стекло.
+   При повороте камеры слои сдвигаются друг относительно друга, и видно, что объектив объёмный.
+   Наводясь, тубус выдвигается (rigs.js) */
+.print__lens { -webkit-transform-style: preserve-3d; transform-style: preserve-3d; }
+.print__barrel { position: absolute; top: 6%; left: 6%; right: 6%; bottom: 6%; border-radius: 50%; -webkit-transform-style: preserve-3d; transform-style: preserve-3d; will-change: transform; }
+.print__tube, .print__ring, .print__glass { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.print__tube { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 50%; background: radial-gradient(circle, transparent 0 64%, #0E0C0C 65% 86%, #34302F 87% 90%, #121010 91%); }
+.print__tube:nth-child(1) { -webkit-transform: translateZ(5px); transform: translateZ(5px); }
+.print__tube:nth-child(2) { -webkit-transform: translateZ(10px); transform: translateZ(10px); }
+.print__tube:nth-child(3) { -webkit-transform: translateZ(15px); transform: translateZ(15px); }
+/* Кольцо фокуса с насечками: поворачивается, когда камера наводится */
+.print__ring {
+  position: absolute; top: 3%; left: 3%; right: 3%; bottom: 3%; border-radius: 50%;
+  background: radial-gradient(circle, transparent 0 70%, #0C0B0B 71%), repeating-conic-gradient(#3C3838 0 4deg, #1C1A1A 4deg 8deg);
+  -webkit-transform: translateZ(18px); transform: translateZ(18px); will-change: transform;
+}
+/* Стекло: тёмная глубина, синеватые и сиреневые отблески просветления и блик от света слева */
+.print__glass {
+  position: absolute; top: 23%; left: 23%; right: 23%; bottom: 23%; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, .7) 0 3%, rgba(255, 255, 255, 0) 9%), radial-gradient(circle at 66% 68%, rgba(120, 180, 255, .35) 0 5%, rgba(120, 180, 255, 0) 20%), radial-gradient(circle at 70% 28%, rgba(170, 120, 255, .3), rgba(170, 120, 255, 0) 32%), radial-gradient(circle, #1B2A44 0, #0A0F1A 45%, #040507 72%);
+  box-shadow: 0 0 0 3px #111, 0 0 0 5px #B3262A, 0 0 0 8px #141212, inset 0 0 12px rgba(0, 0, 0, .9);
+  -webkit-transform: translateZ(19px); transform: translateZ(19px);
+}
+.print__glass:after { content: ''; position: absolute; top: 32%; left: 32%; right: 32%; bottom: 32%; border-radius: 50%; background: radial-gradient(circle, #000 0 55%, rgba(30, 45, 80, .6)); }
+/* Блик по лицевой стороне, когда камера доворачивается к посетителю */
+.print__gloss { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; background: linear-gradient(115deg, rgba(255, 255, 255, 0) 28%, rgba(255, 255, 255, .2) 44%, rgba(255, 255, 255, 0) 60%); opacity: 0; pointer-events: none; will-change: opacity; }
+/* Подсветка фокуса: мигает оранжевым перед снимком */
+.print__af {
+  position: absolute; z-index: 1; width: 9px; height: 9px; border-radius: 50%; right: 28px; top: 41%;
+  background: radial-gradient(circle at 40% 35%, #FFD9A8, #E07A2E 55%, #7A3A12); opacity: .35; will-change: opacity;
+}
+/* Тень на стороне, которая отворачивается: так разворот читается объёмным */
+.print__shade { position: absolute; z-index: 5; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit; background: #000; opacity: 0; pointer-events: none; will-change: opacity; }
+/* Корпус между сторонами: верх, низ, бока и скруглённые углы из узких граней. Их размеры и наклоны считает
+   rigs.js под размер камеры. Каждая грань видна только снаружи, поэтому корпус цельный с любой стороны */
+.print__hull { position: absolute; top: 0; left: 0; width: 100%; height: 100%; -webkit-transform-style: preserve-3d; transform-style: preserve-3d; pointer-events: none; }
+.print__hull i { position: absolute; left: 50%; top: 50%; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+/* Тень камеры на «столе»: остаётся внизу, когда камера поднимается, становится меньше и светлее */
+.print__floor {
+  position: absolute; z-index: 1; left: 50%; top: calc(var(--slot, 60vh) + var(--cam-h, 230px) - 16px);
+  width: calc(var(--cam-w, 324px) * .94); height: 38px; margin-left: calc(var(--cam-w, 324px) * -.47); border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(30, 15, 14, .34), rgba(30, 15, 14, 0)); will-change: transform, opacity;
+}
+.print:not(.is-flow) .print__floor, .print:not(.is-flow) .print__front, .print:not(.is-flow) .print__hull { display: none; }
+/* Камера висит в воздухе объективом к посетителю и чуть покачивается */
+.print.is-float .print__cam { -webkit-animation: print-float 4.2s ease-in-out infinite; animation: print-float 4.2s ease-in-out infinite; }
+.print.is-float:not(.is-live) .print__cam { -webkit-animation-play-state: paused; animation-play-state: paused; }
+@keyframes print-float { 0%, 100% { translate: 0 0; rotate: 1 2 0 -2deg; } 50% { translate: 0 -7px; rotate: 1 2 0 2deg; } }
+/* Висящую камеру можно нажать — снимет ещё раз */
+.print.is-float .print__box { pointer-events: auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* Вспышка на весь экран: одна, короткая. Центр — там, где у камеры вспышка */
+.print__bang {
+  position: fixed; z-index: 200; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0; will-change: opacity;
+  background: radial-gradient(circle at var(--fx, 50%) var(--fy, 50%), #FFF, rgba(255, 252, 246, .92) 30%, rgba(255, 248, 238, .7));
+}
+/* Корпус короче снимка: снимок, который ещё внутри, обрезан по щели и снизу из-под камеры не торчит */
+.print.is-flow .print__feed { overflow: hidden; }
 .print.is-on + .gallery { position: relative; z-index: 1; margin-top: -100vh; }
 .print.is-on + .gallery .pics.rv { opacity: 1; -webkit-transform: none; transform: none; -webkit-transition: none; transition: none; }
 .print.is-on + .gallery .pics > :first-child, .print.is-on + .gallery .pics > :first-child img { opacity: 1; -webkit-animation: none; animation: none; }
@@ -1934,11 +2042,6 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 .desk.is-on { height: 250vh; }
 .desk.is-on + section { position: relative; z-index: 1; margin-top: -100vh; }
 .desk__pin { position: -webkit-sticky; position: sticky; top: 0; height: 100vh; overflow: hidden; }
-/* Стол — обычный блок, едет вместе со страницей: высоту в пикселях ставит rigs.js («Фото на стол») */
-.desk.is-on.is-flow { margin-top: 0; height: 100vh; height: var(--desk-h, 100vh); }
-.desk.is-flow .desk__pin { position: relative; height: 100%; }
-.desk.is-on.is-flow + section { margin-top: 0; }
-.desk.is-flow .desk__bg { display: none; }
 /* Стол: бумага того же цвета, что страница, закрывает стык блоков, пока снимки лежат */
 .desk__bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--paper); opacity: 0; will-change: opacity; }
 .desk__ph {

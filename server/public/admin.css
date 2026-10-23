@@ -1136,6 +1136,8 @@ p.link code { display: inline-block; max-width: 100%; word-break: break-all; tex
 .wk-votes li { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
 .wk-votes a { text-decoration: none; }
 .wk-desk .group__h { color: #B07D10; }
+/* Рабочий стол стоит над переключателем сезонов: отступ, чтобы карточки не прилипали к нему */
+.wk-desk { margin-bottom: 22px; }
 .wk-arch { list-style: none; margin: 0; padding: 0 0 4px; display: grid; gap: 8px; }
 .wk-arch li { display: flex; justify-content: space-between; gap: 10px; }
 /* дизайн класса и папка с фото */

@@ -1634,7 +1634,8 @@
       buildHull(camW, camH, camD);
       box.style.setProperty('--slot', slot + 'px');
       box.style.setProperty('--cam-h', camH + 'px');
-      box.style.setProperty('--pin-h', (slot + camH + 48) + 'px');
+      // на телефоне под камерой ещё пятая часть экрана: пока до неё долистывают, камера успевает всё показать
+      box.style.setProperty('--pin-h', (slot + camH + 48 + (W < 700 ? Math.round(20 * U.svh) : 0)) + 'px');
       var br = box.getBoundingClientRect();
       tr = tile.getBoundingClientRect();
       top = br.top + window.pageYOffset;
@@ -1717,7 +1718,7 @@
     };
     measure();
 
-    // idle → printing → printed → flying → rest → turning → aim → flash → done
+    // idle → printing → printed → flying (и сразу turning) → aim → flash → done
     var phase = 'idle', anims = [], pctLoop = 0, lastPct = -1, pct = lcd[0], wantFly = false, restT = 0;
     var setPct = function (v) { if (v !== lastPct) { lastPct = v; pct.textContent = 'ПЕЧАТЬ ' + v + '%'; } };
     var stop = function () {
@@ -1750,12 +1751,13 @@
         }
         mine.push(el.animate(f, { duration: ms, easing: 'linear', fill: 'both' }));
       });
-      anims = mine;
+      anims = anims.concat(mine);
       var end = fn(1);
       var fin = function () {
-        // конечное положение остаётся в самих элементах, анимации больше не нужны
+        // конечное положение остаётся в самих элементах, свои анимации больше не нужны
+        // (чужие не трогаем: полёт снимка и разворот камеры идут одновременно)
         applyAt(list, end);
-        stop();
+        mine.forEach(function (a) { a.onfinish = null; a.cancel(); var k = anims.indexOf(a); if (k >= 0) anims.splice(k, 1); });
         if (done) done();
       };
       if (mine.length) mine[0].onfinish = fin; else fin();
@@ -1775,7 +1777,7 @@
     // Всё уже случилось: снимок в галерее, камера висит объективом к посетителю
     var landed = function () { set('done', atFly(1)); turned(true); setPct(95); };
 
-    var PRINT_MS = 2300, FLY_MS = 1300;
+    var PRINT_MS = 1700, FLY_MS = 1150;
     // проценты на экране камеры — шагами по 5%, вслед за полосой
     var count = function (a, ph) {
       var tick = function () {
@@ -1788,24 +1790,29 @@
     };
     var print = function () {
       phase = 'printing';
-      var list = play(els, atPrint, PRINT_MS, 60, function () { phase = 'printed'; setPct(95); if (wantFly) flyNow(); });
+      var list = play(els, atPrint, PRINT_MS, 60, function () {
+        phase = 'printed';
+        setPct(95);
+        // снимок не ждёт, пока долистают до галереи: чуть подпрыгнул — и летит в свою плитку
+        if (wantFly) flyNow();
+        else restT = setTimeout(function () { if (phase === 'printed') flyNow(); }, 150);
+      });
       count(list[0], 'printing');
     };
     var flyNow = function () {
       wantFly = false;
       phase = 'flying';
-      play(els, atFly, FLY_MS, 80, function () {
-        // снимок сел в плитку — камера поворачивается к посетителю
-        phase = 'rest';
-        restT = setTimeout(turn, 250);
-      });
+      play(els, atFly, FLY_MS, 80);
+      // камера не ждёт, пока снимок сядет: снимок отлетел — она уже поднимается и разворачивается
+      restT = setTimeout(turn, 250);
     };
     var turn = function () {
       phase = 'turning';
-      // поднимается на середину блока, но не выше шапки сайта: на телефоне к этому моменту страницу уже листают дальше
-      var camTop = top + g.slot - window.pageYOffset, room = camTop - (hd ? hd.offsetHeight : 60) - .2 * H();
+      // поднимается на середину блока, но не выше трети экрана: на телефоне к этому моменту страницу уже листают дальше,
+      // и камера, ушедшая вверх, быстрее скрылась бы под шапкой
+      var camTop = top + g.slot - window.pageYOffset, room = camTop - Math.max((hd ? hd.offsetHeight : 60) + .2 * H(), .35 * H());
       lift = Math.max(0, Math.min(g.lift, room));
-      play(els3, atTurn, 1500, 100, aim);
+      play(els3, atTurn, 1250, 90, aim);
     };
     // Наводится: чуть поводит объективом, будто ищет посетителя в кадре, объектив выдвигается,
     // кольцо фокуса проворачивается, подсветка фокуса мигает дважды
@@ -1816,11 +1823,11 @@
         { transform: camT(0, 0, -7, 171, -1.5), offset: .3, easing: 'ease-in-out' },
         { transform: camT(0, 0, -4, 186, 1), offset: .62, easing: 'ease-in-out' },
         { transform: HOLD }
-      ], { duration: 900 }));
-      anims.push(barrel.animate([{ transform: again ? 'translateZ(8px)' : 'translateZ(0px)' }, { transform: again ? 'translateZ(2px)' : 'translateZ(4px)', offset: .4 }, { transform: 'translateZ(8px)' }], { duration: 800, delay: 100, easing: 'ease-out', fill: 'both' }));
-      anims.push(ring.animate([{ rotate: again ? '28deg' : '0deg' }, { rotate: again ? '-6deg' : '40deg', offset: .55 }, { rotate: '28deg' }], { duration: 800, delay: 100, easing: 'ease-in-out', fill: 'both' }));
-      anims.push(af.animate([{ opacity: .35 }, { opacity: 1 }, { opacity: .35 }, { opacity: 1 }, { opacity: .35 }], { duration: 600, delay: 350 }));
-      restT = setTimeout(shoot, 980);
+      ], { duration: 780 }));
+      anims.push(barrel.animate([{ transform: again ? 'translateZ(8px)' : 'translateZ(0px)' }, { transform: again ? 'translateZ(2px)' : 'translateZ(4px)', offset: .4 }, { transform: 'translateZ(8px)' }], { duration: 680, delay: 80, easing: 'ease-out', fill: 'both' }));
+      anims.push(ring.animate([{ rotate: again ? '28deg' : '0deg' }, { rotate: again ? '-6deg' : '40deg', offset: .55 }, { rotate: '28deg' }], { duration: 680, delay: 80, easing: 'ease-in-out', fill: 'both' }));
+      anims.push(af.animate([{ opacity: .35 }, { opacity: 1 }, { opacity: .35 }, { opacity: 1 }, { opacity: .35 }], { duration: 520, delay: 280 }));
+      restT = setTimeout(shoot, 830);
     };
     // Щелчок: вспышка у камеры и, если камера на экране, короткая белая вспышка на весь экран из её вспышки
     var shoot = function () {
@@ -1880,8 +1887,8 @@
       if (phase === 'idle') {
         // пришли сразу к галерее (снизу или по ссылке), а камера уже ушла выше — показываем готовое
         if (tileOn && camera < 0) return landed();
-        // верх камеры показался снизу — печатает
-        if (camera < Hh - 120) print();
+        // камера показалась снизу — сразу печатает
+        if (camera < Hh - 40) print();
       }
       if (tileOn || leaving) {
         if (phase === 'printed') flyNow();
@@ -1942,8 +1949,8 @@
       });
     };
     box.classList.add('is-time');
-    // Сколько всё длится: все легли (последний — через 0,07 с × номер + 0,65 с), на миг замерли, разлетелись
-    var LAND = cards.length * 70 + 650, HOLD = 250, AWAY = 700 + cards.length * 30 + 250;
+    // Сколько всё длится: все легли (последний — через 0,06 с × номер + 0,6 с), чуть полежали, разлетелись
+    var LAND = cards.length * 60 + 600, HOLD = 350, AWAY = 650 + cards.length * 25 + 250;
     var phase = 'idle', t1 = 0, t2 = 0, top = 0;
     var clear = function () { clearTimeout(t1); clearTimeout(t2); };
     var reset = function () {
@@ -1962,13 +1969,13 @@
     };
     var measure = function () { top = box.getBoundingClientRect().top + window.pageYOffset; };
     measure();
-    // Место отметки (между галереей и следующим блоком) поднялось до 60% экрана — снимки летят.
+    // Место отметки (между галереей и следующим блоком) поднялось до 75% экрана — снимки летят.
     // Ушли выше отметки на экран — в следующий раз полетят снова
     var near = false;
     perFrame.push(function (y) {
       if (!near) return;
       var at = top - y, H = window.innerHeight;
-      if (phase === 'idle' && at < H * .6 && at > -H * .5) play();
+      if (phase === 'idle' && at < H * .75 && at > -H * .5) play();
       else if (phase !== 'idle' && at > H) reset();
     });
     watch([box], function (el, vis) {

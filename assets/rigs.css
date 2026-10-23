@@ -2069,13 +2069,13 @@ main > section, main > nav, main > div, .next { overflow-x: clip; }
 }
 .desk.is-time.is-land .desk__ph {
   -webkit-transform: var(--at); transform: var(--at); opacity: 1;
-  -webkit-transition: -webkit-transform .65s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .07s), opacity .3s ease calc(var(--i) * .07s);
-  transition: transform .65s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .07s), opacity .3s ease calc(var(--i) * .07s);
+  -webkit-transition: -webkit-transform .6s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .06s), opacity .26s ease calc(var(--i) * .06s);
+  transition: transform .6s cubic-bezier(.2, .8, .25, 1) calc(var(--i) * .06s), opacity .26s ease calc(var(--i) * .06s);
 }
 .desk.is-time.is-gone .desk__ph {
   -webkit-transform: var(--away); transform: var(--away); opacity: 0;
-  -webkit-transition: -webkit-transform .7s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .03s), opacity .45s ease calc(.2s + var(--i) * .03s);
-  transition: transform .7s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .03s), opacity .45s ease calc(.2s + var(--i) * .03s);
+  -webkit-transition: -webkit-transform .65s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .025s), opacity .4s ease calc(.18s + var(--i) * .025s);
+  transition: transform .65s cubic-bezier(.5, 0, .75, 0) calc(var(--i) * .025s), opacity .4s ease calc(.18s + var(--i) * .025s);
 }
 .desk.is-time .desk__bg { -webkit-transition: opacity .45s ease; transition: opacity .45s ease; }
 .desk.is-time.is-land .desk__bg { opacity: 1; }

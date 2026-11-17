@@ -117,6 +117,7 @@ function createApp(cfg) {
   const site = new Site(siteRoot, store);
   const photos = new Photos(store, cfg.photosDir || path.join(cfg.dataDir, 'photos'));
   const work = new Work(store, cfg.fixesDir || path.join(cfg.dataDir, 'fixes'));
+  const clientApi = require('./lib/client-api').createClientApi(store, work, process.env.RIGS_CLIENT_API_TOKEN);
   const layout = new Layout(store, cfg.layoutDir || path.join(cfg.dataDir, 'layout'));
   // листающиеся альбомы на «Работах»: поменялся список — страница сайта собирается заново
   const books = new Books(store, cfg.booksDir || path.join(cfg.dataDir, 'books'), () => site.touch());
@@ -2496,6 +2497,7 @@ function createApp(cfg) {
     const isApi = p.indexOf('/admin/api/') === 0;
 
     try {
+      if (clientApi && p.startsWith('/api/v1/')) return clientApi(req, res, url);
       const isAdmin = p === '/admin' || p.indexOf('/admin/') === 0;
       if (isAdmin) {
         ctx.sess = auth.session(ctx.cookies.rs);

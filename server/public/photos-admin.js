@@ -1,12 +1,10 @@
-// Отбор фото в админке: загрузка папки с оригиналами (в браузере делаем лёгкие копии)
+// Отбор фото в админке: загрузка папки с готовыми JPG и создание миниатюр
 // и раскладка оригиналов по папкам учеников (File System Access, Chrome на компьютере)
 (function () {
   'use strict';
 
   var csrf = (document.querySelector('meta[name=csrf]') || {}).content || '';
-  // Копии только для выбора: на экране телефона и ноутбука 1400 px не отличить от оригинала,
-  // а места на сервере уходит заметно меньше
-  var LG = 1400, SM = 480;
+  var SM = 480;
   var busy = false;
 
   function $(s, root) { return (root || document).querySelector(s); }
@@ -46,14 +44,13 @@
     return new Promise(function (resolve, reject) {
       var url = URL.createObjectURL(file);
       var img = new Image();
-      img.onload = function () { resolve(img); };
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
       img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Не получилось открыть ' + file.name)); };
       img.src = url;
     });
   }
 
-  // Уменьшенная копия на холсте. Оригинал с камеры (20–45 Мп) держим в памяти как можно меньше:
-  // из него делаем только большую копию, маленькую — уже из большой
+  // Миниатюра для сетки отбора
   function scaled(src, max) {
     var w = src.width, h = src.height;
     var k = Math.min(1, max / Math.max(w, h));
@@ -88,14 +85,19 @@
 
   function uploadOne(classId, file) {
     var rel = relPath(file);
+    var url = '/admin/api/media/pk/' + classId;
     return decode(file).then(function (img) {
-      var lgC = scaled(img, LG);
-      if (img.close) img.close();
-      var smC = scaled(lgC, SM);
-      return Promise.all([jpeg(lgC, 0.8), jpeg(smC, 0.75)]).then(function (b) {
-        lgC.width = lgC.height = smC.width = smC.height = 0;
-        return post('/admin/api/media/pk/' + classId + '?path=' + encodeURIComponent(rel), b[0]).then(function (res) {
-          return post('/admin/api/media/pk/' + classId + '/' + res.id + '/sm', b[1]);
+      var canvas;
+      try {
+        canvas = scaled(img, SM);
+      } finally {
+        if (img.close) img.close();
+      }
+      return jpeg(canvas, 0.75).finally(function () {
+        canvas.width = canvas.height = 0;
+      }).then(function (thumbnail) {
+        return post(url + '?path=' + encodeURIComponent(rel), file).then(function (res) {
+          return post(url + '/' + res.id + '/sm', thumbnail);
         });
       });
     });
@@ -153,7 +155,7 @@
           // повтор через пару секунд — на случай короткого обрыва связи;
           // если вышли из админки (403) или на сервере кончается место (507) — дальше не пытаемся
           return uploadOne(classId, f).catch(function (err) {
-            if (err.status === 403 || err.status === 507) throw err;
+            if (err.status === 403 || err.status === 413 || err.status === 507) throw err;
             return wait(2000).then(function () { return uploadOne(classId, f); });
           })
             .catch(function (err) {

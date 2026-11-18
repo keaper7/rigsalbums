@@ -53,7 +53,7 @@ function adminPage(o) {
     '2. «Мои фото»: выберите ' + a.personal_max + ' своих фото и отметьте, какое куда в альбоме' + (rolesNeed === ROLES.length ? ' (' + places + ')' : '') + '. Если нужна доп. ретушь, напишите под фото.\n' +
     (hasGroup ? '3. «Групповые»: это общий выбор всего класса, все видят одно и то же. Не убирайте чужие фото без причины.\n4. «Тексты»: цитата для альбома и пожелание себе в будущее, его никто из класса не увидит.\n'
       : '3. «Тексты»: цитата для альбома и пожелание себе в будущее, его никто из класса не увидит.\n') +
-    '\nФото на сайте сжатые, они только для выбора, не скриньте их.' + (a.wfolio ? ' Оригиналы: ' + a.wfolio : '') +
+    '\nФото на сайте только для выбора, не скриньте их.' + (a.wfolio ? ' Оригиналы: ' + a.wfolio : '') +
     '\n\nВыбор можно поменять, пока я не закрою отбор.';
   const remind = left.length ? 'Напоминаю про выбор фото для альбома. Ещё не закончили: ' + left.map(s => s.name).join(', ') + '.\n\n' + link : '';
   const body = html`
@@ -81,7 +81,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   <form class="form pk-wf" method="post" action="/admin/c/${c.id}/photos/wfolio">
     ${csrf(o.sess)}
     <label class="field"><span>Ссылка на оригиналы в wfolio</span><input name="wfolio" type="url" inputmode="url" maxlength="500" placeholder="https://…" value="${a.wfolio || ''}"></label>
-    <p class="muted small">У учеников появится кнопка «Оригиналы», чтобы не скринили сжатые фото.</p>
+    <p class="muted small">У учеников появится кнопка «Оригиналы».</p>
     <button class="b b--sm" type="submit">Сохранить ссылку</button>
   </form>
   <form method="post" action="/admin/c/${c.id}/photos/${a.closed_at ? 'open' : 'close'}" style="margin-top:14px"${a.closed_at ? '' : raw(' data-confirm="Закрыть отбор? Ученики больше не смогут менять выбор"')}>
@@ -92,7 +92,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
 
 <section class="card">
   <div class="card__h"><h2 class="h">Фото</h2><span class="muted small">${photosN(o.photos.length)}</span></div>
-  <p class="muted small">Выберите папку с оригиналами, внутри которой подпапки: «Парни», «Девочки», «Групповые» и т. д. Браузер сам сделает лёгкие копии и загрузит только их, оригиналы останутся у вас. Уже загруженные фото пропускаются, так что можно добавлять новые в любой момент.</p>
+  <p class="muted small">Выберите папку с готовыми JPG до 6 МБ на файл. Разложите фото по подпапкам «Парни», «Девочки», «Групповые» и т. д. Фото загружаются без повторного сжатия. Уже загруженные файлы пропускаются.</p>
   <label class="b b--main b--wide upl" style="margin-top:12px">
     <input type="file" webkitdirectory multiple data-pk-upload="${c.id}">
     <span>Выбрать папку с фото</span>

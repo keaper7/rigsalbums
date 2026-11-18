@@ -185,7 +185,7 @@
     input.addEventListener('input', fill);
     fill();
     app.textContent = '';
-    app.appendChild(compressNote());
+    app.appendChild(originalsNote());
     app.appendChild(el('section', { class: 'who' }, [
       el('h2', { text: 'Найдите себя в списке' }),
       el('p', { class: 'muted', text: 'Выбирайте только себя. При первом входе придумаете код из 4 цифр, чтобы никто другой не зашёл в ваш выбор.' }),
@@ -235,10 +235,9 @@
     setTimeout(function () { input.focus(); }, 50);
   }
 
-  // Заметно сверху: фото здесь сжатые, оригиналы — по ссылке
-  function compressNote() {
+  function originalsNote() {
     return el('div', { class: 'note note--orig' }, [
-      el('span', {}, [el('b', { text: 'Здесь сжатые фото, только для выбора' }),
+      el('span', {}, [el('b', { text: 'Фото здесь только для выбора' }),
         S.wfolio ? 'Не скриньте их, оригиналы в хорошем качестве можно скачать по кнопке' : 'Не скриньте их, оригиналы в хорошем качестве Артур пришлёт отдельно']),
       S.wfolio ? el('a', { class: 'btn btn--orig', href: S.wfolio, target: '_blank', rel: 'noopener' }, ['Оригиналы', arrow()]) : null
     ]);
@@ -991,7 +990,7 @@
     var tabs = S.admin ? [['group', 'Групповые']] : [['personal', 'Мои фото'], ['group', 'Групповые'], ['quote', 'Тексты']];
     if (!tab || !tabs.some(function (t) { return t[0] === tab; })) tab = tabs[0][0];
     app.textContent = '';
-    if (!S.admin) app.appendChild(compressNote());
+    if (!S.admin) app.appendChild(originalsNote());
     var nav = el('div', { class: 'tabs tabs--' + tabs.length, role: 'tablist' });
     tabs.forEach(function (t) {
       nav.appendChild(el('button', { type: 'button', role: 'tab', 'data-tab': t[0], 'aria-selected': tab === t[0] ? 'true' : 'false', onclick: function () {

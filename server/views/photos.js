@@ -20,6 +20,9 @@ const MSG = {
   closed: 'Отбор закрыт. Ученики видят свой выбор, но поменять уже не могут',
   opened: 'Отбор снова открыт',
   removed: 'Раздел удалён',
+  photoremoved: 'Фото удалено',
+  photomissing: 'Фото уже удалено или отсутствует в этом классе',
+  allphotosremoved: 'Все фото класса удалены',
   pinreset: 'Код сброшен. Ученик при следующем входе придумает новый',
   slim: 'Место освобождено: остались только выбранные фото в маленьком размере'
 };
@@ -30,9 +33,10 @@ function adminPage(o) {
   const link = o.base + '/f/' + a.slug;
   const bySection = new Map();
   o.photos.forEach(p => {
-    if (!bySection.has(p.section)) bySection.set(p.section, { n: 0, ready: 0 });
+    if (!bySection.has(p.section)) bySection.set(p.section, { n: 0, ready: 0, photos: [] });
     const s = bySection.get(p.section);
     s.n++;
+    s.photos.push(p);
     if (p.has_sm) s.ready++;
   });
   const sections = Array.from(bySection.keys()).sort((x, y) => x.localeCompare(y, 'ru'));
@@ -56,10 +60,11 @@ function adminPage(o) {
     '\nФото на сайте только для выбора, не скриньте их.' + (a.wfolio ? ' Оригиналы: ' + a.wfolio : '') +
     '\n\nВыбор можно поменять, пока я не закрою отбор.';
   const remind = left.length ? 'Напоминаю про выбор фото для альбома. Ещё не закончили: ' + left.map(s => s.name).join(', ') + '.\n\n' + link : '';
+  const photoMessage = ['removed', 'photoremoved', 'photomissing', 'allphotosremoved'].includes(o.msg);
   const body = html`
 ${classHub(c, 'photos')}
 <p class="muted small" style="margin:6px 0 18px">Ученикам открывается только по ссылке ниже, голосование класса это не затрагивает.</p>
-${o.msg && MSG[o.msg] ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
+${o.msg && MSG[o.msg] && !photoMessage ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
 ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
 
 <section class="card">
@@ -90,8 +95,9 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   </form>
 </section>
 
-<section class="card">
+<section class="card" id="photos">
   <div class="card__h"><h2 class="h">Фото</h2><span class="muted small">${photosN(o.photos.length)}</span></div>
+  ${photoMessage ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
   <p class="muted small">Выберите папку с готовыми JPG до 6 МБ на файл. Разложите фото по подпапкам «Парни», «Девочки», «Групповые» и т. д. Фото загружаются без повторного сжатия. Уже загруженные файлы пропускаются.</p>
   <label class="b b--main b--wide upl" style="margin-top:12px">
     <input type="file" webkitdirectory multiple data-pk-upload="${c.id}">
@@ -117,6 +123,35 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
     })}
     <button class="b b--sm" type="submit" style="margin-top:10px">Сохранить разделы</button>
   </form>` : ''}
+  ${sections.length ? html`<details class="pk-msg pk-manage" id="manage-photos"${o.openPhotoSection ? raw(' open') : ''}>
+    <summary>Удаление фото</summary>
+    <p class="muted small">Вместе со снимками удаляются отметки выбора по ним.</p>
+    ${sections.map(s => html`<details class="pk-manage__section"${o.openPhotoSection === s ? raw(' open') : ''}>
+      <summary>${s} · ${photosN(bySection.get(s).n)}</summary>
+      <ul class="pk-manage__list">
+        ${bySection.get(s).photos.map(ph => html`<li>
+          ${ph.has_sm ? html`<a href="/f/${a.slug}/p/${ph.id}.jpg?v=${ph.ver}" target="_blank" rel="noopener" aria-label="Открыть ${ph.path}">
+            <img src="/f/${a.slug}/p/${ph.id}-sm.jpg?v=${ph.ver}" alt="" width="56" height="56" loading="lazy">
+          </a>` : ''}
+          <span class="pk-manage__path">${ph.path}</span>
+          <form method="post" action="/admin/c/${c.id}/photos/delphoto" data-confirm="Удалить фото «${ph.path}» и отметки выбора по нему?">
+            ${csrf(o.sess)}
+            <input type="hidden" name="photo" value="${ph.id}">
+            <button class="b b--sm b--danger" type="submit" aria-label="Удалить ${ph.path}">Удалить</button>
+          </form>
+        </li>`)}
+      </ul>
+      <form method="post" action="/admin/c/${c.id}/photos/delsection" data-confirm="Удалить раздел «${s}» и все выборы по нему?">
+        ${csrf(o.sess)}
+        <input type="hidden" name="section" value="${s}">
+        <button class="b b--sm b--danger" type="submit">Удалить раздел</button>
+      </form>
+    </details>`)}
+    <form method="post" action="/admin/c/${c.id}/photos/delall" class="pk-slim" data-confirm="Удалить все фото класса «${c.school} · ${c.title}» (${photosN(o.photos.length)}) и выбор по ним?">
+      ${csrf(o.sess)}
+      <button class="b b--sm b--danger" type="submit">Удалить все фото класса</button>
+    </form>
+  </details>` : ''}
 </section>
 
 <section class="card">
@@ -199,11 +234,6 @@ ${o.students.some(st => (counts.get(st.id) || 0) || st.quote || st.wish) ? html`
   ${o.log.length ? html`<ul class="pk-log">${o.log.map(l => html`<li><span>${fmtWhen(l.at)}</span> <b>${l.who}</b> ${l.action === 'add' ? 'добавил(а)' : 'убрал(а)'} <code>${l.path || 'фото удалено'}</code>${l.action === 'remove' && l.path && !l.inGroup ? html` <form method="post" action="/admin/c/${c.id}/photos/restore" class="inline">${csrf(o.sess)}<input type="hidden" name="photo" value="${l.photo_id}"><button class="b b--sm" type="submit">вернуть</button></form>` : ''}</li>`)}</ul>` : html`<p class="muted small">Пока никто ничего не менял.</p>`}
 </section>
 
-${sections.length ? html`<section class="card">
-  <div class="card__h"><h2 class="h">Удалить раздел</h2></div>
-  <p class="muted small">Убирает загруженные копии раздела и выборы по ним. Оригиналы на компьютере не трогаются.</p>
-  ${sections.map(s => html`<form method="post" action="/admin/c/${c.id}/photos/delsection" class="inline" data-confirm="Удалить раздел «${s}» и все выборы по нему?">${csrf(o.sess)}<input type="hidden" name="section" value="${s}"><button class="b b--sm b--danger" type="submit">${s}</button></form> `)}
-</section>` : ''}
 `;
   return layout({ title: 'Отбор фото · ' + c.school + ' · ' + c.title, sess: o.sess, nav: 'work', tone: 'photos', body: body, scripts: ['/admin/static/photos-admin.js'] });
 }

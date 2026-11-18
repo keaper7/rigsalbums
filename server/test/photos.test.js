@@ -16,6 +16,64 @@ test('пути файлов из папки с оригиналами', () => {
   assert.strictEqual(cleanPath(''), null);
 });
 
+test('админ удаляет один снимок или все фото только в выбранном классе', async t => {
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const id = +await createClass(admin, 'Школа №1', '11А');
+  const otherId = +await createClass(admin, 'Школа №1', '11Б');
+  const photos = s.app.photos;
+  const adminUrl = '/admin/c/' + id + '/photos';
+  async function upload(classId, rel) {
+    const base = '/admin/api/media/pk/' + classId;
+    const large = await admin.upload(base + '?path=' + encodeURIComponent(rel), JPEG_WIDE);
+    assert.strictEqual(large.status, 200);
+    const small = await admin.upload(base + '/' + large.data.id + '/sm', JPEG_TALL);
+    assert.strictEqual(small.status, 200);
+    return large.data.id;
+  }
+  const first = await upload(id, 'Личные/1.jpg');
+  const second = await upload(id, 'Личные/2.jpg');
+  const teacher = await upload(id, 'Учитель/1.jpg');
+  const other = await upload(otherId, 'Личные/1.jpg');
+  photos.setStudents(id, 'Анна');
+  const student = photos.students(id)[0];
+  photos.setQuote(id, student.id, 'Моя цитата');
+  photos.setPersonal(photos.album(id), student.id, first, true);
+  photos.setPersonal(photos.album(id), student.id, second, true);
+  photos.setRetouchDone(id, student.id, true);
+  photos.setTeacher(id, { cover: teacher, wish: 'Удачи!' });
+
+  const list = await admin.req('GET', adminUrl);
+  assert.match(list.text, /Удалить все фото класса/);
+  assert.match(list.text, /Личные\/1\.jpg/);
+  assert.strictEqual((await client(s.base).req('POST', adminUrl + '/delall')).status, 403);
+  assert.strictEqual((await admin.req('POST', adminUrl + '/delall')).status, 403);
+  await admin.post(adminUrl + '/delphoto', { photo: other });
+  assert.ok(photos.photo(otherId, other));
+
+  const result = await admin.post(adminUrl + '/delphoto', { photo: first });
+  assert.strictEqual(result.status, 303);
+  assert.match(result.headers.get('location'), /m=photoremoved#photos$/);
+  assert.deepStrictEqual(photos.personal(student.id), [second]);
+  assert.strictEqual(photos.student(id, student.id).retouch_done_at, null);
+  for (const suffix of ['.jpg', '-sm.jpg']) {
+    assert.strictEqual(fs.existsSync(photos.file(id, first + suffix)), false);
+  }
+  assert.strictEqual((await admin.upload('/admin/api/media/pk/' + id + '/' + first + '/sm', JPEG_TALL)).status, 404);
+
+  assert.strictEqual((await admin.post(adminUrl + '/delall')).status, 303);
+  assert.deepStrictEqual(photos.photos(id), []);
+  assert.deepStrictEqual(photos.personal(student.id), []);
+  assert.strictEqual(photos.student(id, student.id).quote, 'Моя цитата');
+  assert.strictEqual(photos.album(id).teacher_cover, '');
+  assert.strictEqual(photos.album(id).teacher_wish, 'Удачи!');
+  assert.strictEqual(photos.usage(id), 0);
+  assert.ok(photos.photo(otherId, other));
+  assert.strictEqual((await admin.post(adminUrl + '/delall')).status, 303);
+  assert.ok(photos.photo(id, await upload(id, 'Личные/1.jpg')));
+});
+
 test('отбор фото: загрузка, выбор учеников, групповые, раскладка', async t => {
   const s = await start();
   t.after(() => s.stop());

@@ -1422,6 +1422,7 @@ function createApp(cfg) {
       cls: cls, album: photos.album(cls.id), photos: list, teacher: teacher,
       isTeacher: s => photos.isTeacherSection(s), students: students, counts: counts, groupCount: group.length, log: log,
       disk: photos.disk(), usage: photos.usage(cls.id), picks: picks, byId: byId,
+      openPhotoSection: ctx.q('photo_section'),
       isGroup: s => photos.isGroupSection(album, s), sess: ctx.sess, base: baseUrl(ctx), msg: ctx.q('m')
     }, extra || {}));
   }
@@ -1505,7 +1506,19 @@ function createApp(cfg) {
 
   pact('delsection', (ctx, cls) => {
     photos.deleteSection(cls.id, str(ctx.form.section, 120));
-    pback(ctx, cls, 'removed');
+    back(ctx, '/admin/c/' + cls.id + '/photos#photos', 'removed');
+  });
+
+  pact('delphoto', (ctx, cls) => {
+    const photo = photos.photo(cls.id, ctx.form.photo);
+    if (!photo) return back(ctx, '/admin/c/' + cls.id + '/photos#photos', 'photomissing');
+    photos.deletePhoto(cls.id, photo.id);
+    back(ctx, '/admin/c/' + cls.id + '/photos?photo_section=' + encodeURIComponent(photo.section) + '#photos', 'photoremoved');
+  });
+
+  pact('delall', (ctx, cls) => {
+    photos.deletePhotos(cls.id);
+    back(ctx, '/admin/c/' + cls.id + '/photos#photos', 'allphotosremoved');
   });
 
   r.get('/admin/api/c/:id/photos/have', ctx => {

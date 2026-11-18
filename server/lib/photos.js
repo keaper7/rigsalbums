@@ -399,10 +399,11 @@ class Photos {
 
   // Маленькая копия для сетки
   async saveSmall(classId, id, req) {
-    const ph = this.photo(classId, id);
-    if (!ph) { req.resume(); throw fail(404, 'Фото не найдено'); }
+    if (!this.photo(classId, id)) { req.resume(); throw fail(404, 'Фото не найдено'); }
     const buf = await readAll(req, IMAGE_MAX);
     if (!jpegSize(buf)) throw fail(415, 'Это не похоже на JPEG');
+    // Пока приходила миниатюра, фото могли удалить.
+    if (!this.photo(classId, id)) throw fail(404, 'Фото не найдено');
     const tmp = this.file(classId, id + '-sm.jpg.' + process.pid + '.' + Date.now() + '.part');
     fs.writeFileSync(tmp, buf);
     fs.renameSync(tmp, this.file(classId, id + '-sm.jpg'));
@@ -411,8 +412,30 @@ class Photos {
   }
 
   deleteSection(classId, section) {
-    const list = this.db.prepare('SELECT id FROM pk_photos WHERE class_id = ? AND section = ?').all(classId, section);
-    this.db.prepare('DELETE FROM pk_photos WHERE class_id = ? AND section = ?').run(classId, section);
+    return this.deletePhotos(classId, 'section', section);
+  }
+
+  deletePhoto(classId, id) {
+    return this.deletePhotos(classId, 'id', id);
+  }
+
+  deletePhotos(classId, field, value) {
+    const filter = 'class_id = ?' + (field === 'section' ? ' AND section = ?' : field === 'id' ? ' AND id = ?' : '');
+    const args = field ? [classId, value] : [classId];
+    const list = this.store.tx(() => {
+      this.db.prepare(`UPDATE pk_students SET retouch_done_at = NULL
+        WHERE class_id = ? AND retouch_done_at IS NOT NULL AND id IN (
+          SELECT student_id FROM pk_personal WHERE photo_id IN (SELECT id FROM pk_photos WHERE ${filter})
+        )`).run(classId, ...args);
+      const removed = this.db.prepare('DELETE FROM pk_photos WHERE ' + filter + ' RETURNING id').all(...args);
+      if (!removed.length) return removed;
+      this.db.prepare(`UPDATE pk_albums SET
+        teacher_cover = CASE WHEN teacher_cover IN (SELECT id FROM pk_photos WHERE class_id = ?) THEN teacher_cover ELSE '' END,
+        teacher_list = CASE WHEN teacher_list IN (SELECT id FROM pk_photos WHERE class_id = ?) THEN teacher_list ELSE '' END,
+        slim_at = CASE WHEN EXISTS (SELECT 1 FROM pk_photos WHERE class_id = ?) THEN slim_at ELSE NULL END
+        WHERE class_id = ?`).run(classId, classId, classId, classId);
+      return removed;
+    });
     list.forEach(r => ['.jpg', '-sm.jpg'].forEach(s => { try { fs.unlinkSync(this.file(classId, r.id + s)); } catch (e) {} }));
     return list.length;
   }

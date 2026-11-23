@@ -171,14 +171,24 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
     <button class="b b--main" type="submit">Сохранить список</button>
   </form>
   ${o.students.length ? html`<div class="pk-scroll"><table class="pk-table">
-    <thead><tr><th>Ученик</th><th>Фото</th><th>Цитата</th><th>Пожел.</th><th>Код</th></tr></thead>
+    <thead><tr><th>Ученик <small class="pk-contact-label">Номер / Telegram для связи</small></th><th>Фото</th><th>Цитата</th><th>Пожел.</th><th>Код</th></tr></thead>
     <tbody>${o.students.map(s => {
       const n = counts.get(s.id) || 0;
       const r = rolesOf(s);
       const full = n >= a.personal_max && r >= rolesNeed;
-      return html`<tr><td><details class="pk-ren"><summary>${s.name}</summary><form method="post" action="/admin/c/${c.id}/photos/rename">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><input name="name" value="${s.name}" maxlength="60" required aria-label="Новое имя"><button class="b b--sm" type="submit">Сохранить</button></form></details></td><td class="${full ? 'ok' : n ? '' : 'muted'}">${n} из ${a.personal_max}${n && r < Math.min(n, rolesNeed) ? html`<small class="pk-warn">мест ${r} из ${rolesNeed}</small>` : ''}</td><td class="${s.quote ? 'ok' : 'muted'}">${s.quote ? '✓' : '—'}</td><td class="${s.wish ? 'ok' : 'muted'}">${s.wish ? '✓' : '—'}</td><td>${s.pin ? html`<span class="pk-pin">${s.pin}</span><form method="post" action="/admin/c/${c.id}/photos/resetpin" class="inline" data-confirm="Сбросить код ученика «${s.name}»? При следующем входе он придумает новый. Выбор сохранится">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><button class="pk-x" type="submit" title="Сбросить код" aria-label="Сбросить код">×</button></form>` : html`<span class="muted">—</span>`}</td></tr>`;
+      return html`<tr>
+        <td>
+          <details class="pk-ren"><summary>${s.name}</summary><form method="post" action="/admin/c/${c.id}/photos/rename">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><input name="name" value="${s.name}" maxlength="60" required aria-label="Новое имя"><button class="b b--sm" type="submit">Сохранить</button></form></details>
+          <div class="pk-contact" data-pk-contact="${s.id}" hidden></div>
+        </td>
+        <td class="${full ? 'ok' : n ? '' : 'muted'}">${n} из ${a.personal_max}${n && r < Math.min(n, rolesNeed) ? html`<small class="pk-warn">мест ${r} из ${rolesNeed}</small>` : ''}</td>
+        <td class="${s.quote ? 'ok' : 'muted'}">${s.quote ? '✓' : '—'}</td>
+        <td class="${s.wish ? 'ok' : 'muted'}">${s.wish ? '✓' : '—'}</td>
+        <td>${s.pin ? html`<span class="pk-pin">${s.pin}</span><form method="post" action="/admin/c/${c.id}/photos/resetpin" class="inline" data-confirm="Сбросить код ученика «${s.name}»? При следующем входе он придумает новый. Выбор сохранится">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><button class="pk-x" type="submit" title="Сбросить код" aria-label="Сбросить код">×</button></form>` : html`<span class="muted">—</span>`}</td>
+      </tr>`;
     })}</tbody>
   </table></div>
+  <p class="muted small" role="status" data-pk-contacts="/admin/api/c/${c.id}/photos/contacts" hidden></p>
   <p class="muted small" style="margin-top:8px">Код ученик придумывает сам при первом входе, все коды видны здесь. Если под чужим именем зашёл кто-то другой, сбросьте код крестиком, выбор останется.</p>` : ''}
 </section>
 

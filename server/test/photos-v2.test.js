@@ -114,11 +114,11 @@ test('код ученика: придумать, войти снова, неве
 });
 
 test('два человека одновременно придумывают код для одного имени — код у одного', async t => {
-  const { s, slug, st } = await setup(t);
+  const { s, id, slug, st } = await setup(t);
   const a = client(s.base), b = client(s.base);
   const [ra, rb] = await Promise.all([
-    a.req('POST', '/f/' + slug + '/me', { json: { student: st[1].id, newPin: '1111' } }),
-    b.req('POST', '/f/' + slug + '/me', { json: { student: st[1].id, newPin: '2222' } })
+    a.req('POST', '/f/' + slug + '/me', { json: { student: st[1].id, newPin: '1111', telegram: '@first_test' } }),
+    b.req('POST', '/f/' + slug + '/me', { json: { student: st[1].id, newPin: '2222', telegram: '@second_test' } })
   ]);
   // второй получает отказ с просьбой ввести код (403, а если запросы совпали совсем впритык — 409)
   const lose = ra.status === 200 ? rb : ra;
@@ -128,6 +128,67 @@ test('два человека одновременно придумывают к
   const pin = s.app.store.db.prepare('SELECT pin FROM pk_students WHERE id = ?').get(st[1].id).pin;
   const winner = ra.status === 200 ? '1111' : '2222';
   assert.strictEqual(pin, winner);
+  assert.strictEqual(s.app.photos.student(id, st[1].id).telegram, ra.status === 200 ? 'first_test' : 'second_test');
+});
+
+test('контакты ученика сохраняются при первом входе и доступны только ему и Артуру', async t => {
+  const { s, admin, id, slug, st } = await setup(t);
+  const base = '/f/' + slug;
+  const adminUrl = '/admin/api/c/' + id + '/photos/contacts';
+  const kid = client(s.base), other = client(s.base), guest = client(s.base);
+  const anna = st[0].id, timur = st[1].id;
+  const first = { student: anna, newPin: '4817', phone: '8 (900) 000-00-01', telegram: '@anna_test' };
+  let r = await kid.req('POST', base + '/me', { json: { ...first, phone: '+7 bad' } });
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual(r.data.field, 'phone');
+  r = await kid.req('POST', base + '/me', { json: { ...first, telegram: 'https://example.org' } });
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual(r.data.field, 'telegram');
+  assert.strictEqual(s.app.photos.student(id, anna).pin, '');
+  r = await kid.req('POST', base + '/me', { json: first });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.data.canEditContact, true);
+  assert.doesNotMatch(r.text, /anna_test|9000000001/);
+
+  const initial = { student: anna, phone: '+79000000001', telegram: 'anna_test' };
+  r = await kid.req('GET', base + '/contact');
+  assert.deepStrictEqual(r.data, initial);
+  assert.strictEqual(r.headers.get('cache-control'), 'no-store');
+  r = await admin.req('GET', adminUrl);
+  assert.deepStrictEqual(r.data[anna], { phone: initial.phone, telegram: initial.telegram });
+  assert.strictEqual((await guest.req('GET', base + '/contact')).status, 403);
+  assert.strictEqual((await guest.req('POST', base + '/contact', { json: { student: anna, phone: '' } })).status, 403);
+  assert.strictEqual((await guest.req('GET', adminUrl)).status, 302);
+  r = await guest.req('GET', base);
+  assert.doesNotMatch(r.text, /anna_test|9000000001/);
+  r = await other.req('POST', base + '/me', { json: { student: timur, newPin: '3071' } });
+  assert.strictEqual(r.status, 200);
+  r = await other.req('POST', base + '/contact', { json: { student: anna, telegram: '@wrong' } });
+  assert.strictEqual(r.status, 409);
+  r = await other.req('GET', base + '/contact');
+  assert.deepStrictEqual(r.data, { student: timur, phone: '', telegram: '' });
+
+  await admin.post('/admin/c/' + id + '/photos/close', {});
+  r = await kid.req('POST', base + '/contact', { json: { student: anna, phone: '', telegram: 'new_test' } });
+  assert.strictEqual(r.status, 200, r.text);
+  const moved = client(s.base);
+  r = await moved.req('POST', base + '/me', { json: { student: anna, pin: '4817', telegram: '@ignored' } });
+  assert.strictEqual(r.status, 200);
+  r = await moved.req('GET', base + '/contact');
+  assert.deepStrictEqual(r.data, { student: anna, phone: '', telegram: 'new_test' });
+  r = await admin.req('GET', adminUrl);
+  assert.deepStrictEqual(r.data[anna], { phone: '', telegram: 'new_test' });
+  assert.strictEqual(r.headers.get('cache-control'), 'no-store');
+  r = await admin.req('GET', '/admin/c/' + id + '/photos');
+  assert.match(r.text, /Номер \/ Telegram для связи/);
+  assert.doesNotMatch(r.text, /new_test/);
+  r = await admin.req('GET', '/admin/api/c/' + id + '/photos/export');
+  assert.doesNotMatch(r.text, /new_test|"phone"|"telegram"/);
+  await admin.post('/admin/c/' + id + '/photos/resetpin', { student: String(anna) });
+  assert.strictEqual((await kid.req('GET', base + '/contact')).status, 403);
+  r = await kid.req('POST', base + '/me', { json: { student: anna, newPin: '2181' } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual((await kid.req('GET', base + '/contact')).data.telegram, 'new_test');
 });
 
 test('места в альбоме, доп. ретушь, пожелание и раскладка с именами по местам', async t => {

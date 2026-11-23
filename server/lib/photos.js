@@ -80,6 +80,8 @@ const COLUMNS = [
   // пожелание себе в будущее, код входа ученика, когда Артур отметил ретушь сделанной
   ['pk_students', 'wish', "TEXT NOT NULL DEFAULT ''"],
   ['pk_students', 'pin', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_students', 'phone', "TEXT NOT NULL DEFAULT ''"],
+  ['pk_students', 'telegram', "TEXT NOT NULL DEFAULT ''"],
   ['pk_students', 'retouch_done_at', 'INTEGER'],
   // ссылка на оригиналы в wfolio и когда освобождали место
   ['pk_albums', 'wfolio', "TEXT NOT NULL DEFAULT ''"],
@@ -103,6 +105,22 @@ const QUOTE_MAX = 2000;
 const WISH_MAX = 2000;
 const RETOUCH_MAX = 500;
 const PIN_RE = /^\d{4}$/;
+
+function studentContact(fields) {
+  const rawPhone = typeof fields.phone === 'string' ? fields.phone.trim() : '';
+  let phone = rawPhone.replace(/[\s().-]/g, '');
+  if (/^[78]\d{10}$/.test(phone)) phone = '+7' + phone.slice(1);
+  if (/^\d{10}$/.test(phone)) phone = '+7' + phone;
+  if (rawPhone && (rawPhone.length > 40 || !/^\+[1-9]\d{7,14}$/.test(phone))) {
+    return { field: 'phone', error: 'Проверьте номер телефона. Например, +7 999 123-45-67' };
+  }
+  const rawTelegram = typeof fields.telegram === 'string' ? fields.telegram.trim() : '';
+  const telegram = rawTelegram.replace(/^@/, '');
+  if (rawTelegram && !/^[a-zA-Z0-9_]{1,32}$/.test(telegram)) {
+    return { field: 'telegram', error: 'Укажите имя в Telegram, например @username' };
+  }
+  return { phone: phone, telegram: telegram };
+}
 // Места в альбоме для личных фото: у каждого ученика по одному фото на место.
 // Ключ хранится в базе, название — в интерфейсе и в имени файла при раскладке
 const ROLES = [['cover', 'Обложка'], ['page', 'Личная страница'], ['list', 'Список класса']];
@@ -313,10 +331,10 @@ class Photos {
   }
 
   studentBusy(id) {
-    const s = this.db.prepare('SELECT quote, wish, pin FROM pk_students WHERE id = ?').get(id);
+    const s = this.db.prepare('SELECT quote, wish, pin, phone, telegram FROM pk_students WHERE id = ?').get(id);
     const n = this.db.prepare('SELECT COUNT(*) n FROM pk_personal WHERE student_id = ?').get(id).n;
     const g = this.db.prepare('SELECT COUNT(*) n FROM pk_group WHERE student_id = ?').get(id).n;
-    return !!(n || g || (s && (s.quote || s.wish || s.pin)));
+    return !!(n || g || (s && (s.quote || s.wish || s.pin || s.phone || s.telegram)));
   }
 
   setQuote(classId, studentId, text) {
@@ -333,9 +351,16 @@ class Photos {
 
   // Код ученик придумывает сам при первом входе. Только если кода ещё нет: два человека,
   // одновременно выбравшие одно имя, не перезапишут код друг друга
-  setPin(classId, studentId, pin) {
+  setPin(classId, studentId, pin, { phone = '', telegram = '' } = {}) {
     if (!PIN_RE.test(String(pin))) return false;
-    return this.db.prepare("UPDATE pk_students SET pin = ? WHERE class_id = ? AND id = ? AND pin = ''").run(String(pin), classId, studentId).changes === 1;
+    return this.db.prepare(`UPDATE pk_students SET pin = ?,
+      phone = COALESCE(NULLIF(?, ''), phone), telegram = COALESCE(NULLIF(?, ''), telegram)
+      WHERE class_id = ? AND id = ? AND pin = ''`).run(String(pin), phone, telegram, classId, studentId).changes === 1;
+  }
+
+  setStudentContact(student, contact) {
+    this.db.prepare('UPDATE pk_students SET phone = ?, telegram = ? WHERE class_id = ? AND id = ?')
+      .run(contact.phone, contact.telegram, student.class_id, student.id);
   }
 
   resetPin(classId, studentId) {
@@ -669,4 +694,4 @@ class Photos {
   }
 }
 
-module.exports = { Photos, cleanPath, sectionOf, PHOTO_ID, QUOTE_MAX, WISH_MAX, RETOUCH_MAX, PIN_RE, ROLES, ROLE_NAMES, TEACHER_WISH_MAX };
+module.exports = { Photos, cleanPath, sectionOf, studentContact, PHOTO_ID, QUOTE_MAX, WISH_MAX, RETOUCH_MAX, PIN_RE, ROLES, ROLE_NAMES, TEACHER_WISH_MAX };

@@ -14,7 +14,7 @@ const { Site, SLOTS, COVER, coverKey, coverSrc, GALLERIES, TEXTS, TOGGLES, PAGES
 const klassView = require('./views/klass');
 const A = require('./views/admin');
 const PV = require('./views/photos');
-const { Photos, PHOTO_ID, PIN_RE, ROLES } = require('./lib/photos');
+const { Photos, studentContact, PHOTO_ID, PIN_RE, ROLES } = require('./lib/photos');
 const { Layout, numbered, pageOf, pageLabel, FILE_MAX: LAY_FILE_MAX } = require('./lib/layout');
 const { Books, FILE_MAX: BOOK_FILE_MAX } = require('./lib/books');
 const BV = require('./views/books');
@@ -1445,7 +1445,7 @@ function createApp(cfg) {
   pact('students', (ctx, cls) => {
     const res = photos.setStudents(cls.id, String(ctx.form.names || '').slice(0, 20000));
     if (res.dups.length) return page(ctx, 400, photosView(ctx, cls, { err: 'Повторяются имена: ' + res.dups.join(', ') + '. Если это разные ученики, добавьте фамилию или первую букву. Список не сохранён', names: ctx.form.names }));
-    if (res.kept.length) return page(ctx, 400, photosView(ctx, cls, { err: 'Остались в списке, потому что уже выбрали фото или написали цитату: ' + res.kept.join(', ') + '. Остальное сохранено' }));
+    if (res.kept.length) return page(ctx, 400, photosView(ctx, cls, { err: 'Остались в списке, потому что по ним уже есть данные: ' + res.kept.join(', ') + '. Остальное сохранено' }));
     pback(ctx, cls, 'students');
   });
 
@@ -1548,6 +1548,13 @@ function createApp(cfg) {
     H.json(ctx.res, 200, photos.exportPlan(cls.id));
   });
 
+  r.get('/admin/api/c/:id/photos/contacts', ctx => {
+    const cls = loadClass(ctx);
+    if (!cls) return H.json(ctx.res, 404, { error: 'Класс не найден' });
+    const contacts = photos.students(cls.id).map(s => [s.id, { phone: s.phone, telegram: s.telegram }]);
+    H.json(ctx.res, 200, Object.fromEntries(contacts));
+  });
+
   // ----- страница учеников -----
   const PK_COOKIE = id => 'rp' + id;
   // В cookie — номер ученика и подпись, в которую входит его код: подделать cookie нельзя,
@@ -1585,6 +1592,7 @@ function createApp(cfg) {
       wfolio: p.album.wfolio || '',
       slim: !!p.album.slim_at,
       me: p.me ? { id: p.me.id, name: p.me.name } : null,
+      canEditContact: !!p.me && !p.admin,
       admin: p.admin && !p.me
     };
   }
@@ -1646,8 +1654,10 @@ function createApp(cfg) {
         pinLimit.reset(key);
       } else {
         if (!PIN_RE.test(String(b.newPin || ''))) return H.json(ctx.res, 400, { error: 'Придумайте код из 4 цифр', pin: 'new' });
+        const contact = studentContact(b);
+        if (contact.error) return H.json(ctx.res, 400, contact);
         // Код успел придумать кто-то другой (два человека выбрали одно имя одновременно)
-        if (!photos.setPin(p.cls.id, s.id, b.newPin)) return H.json(ctx.res, 409, { error: 'Под этим именем только что вошли и придумали код. Если это не вы — напишите Артуру', pin: 'ask' });
+        if (!photos.setPin(p.cls.id, s.id, b.newPin, contact)) return H.json(ctx.res, 409, { error: 'Под этим именем только что вошли и придумали код. Если это не вы — напишите Артуру', pin: 'ask' });
         s = photos.student(p.cls.id, s.id);
       }
     } else if (!s.pin) {
@@ -1657,6 +1667,31 @@ function createApp(cfg) {
     H.setCookie(ctx.res, PK_COOKIE(p.cls.id), pkCookie(s), cookieOpts(ctx, YEAR));
     p.me = s;
     H.json(ctx.res, 200, pickState(p));
+  });
+
+  function contactStudent(ctx) {
+    const p = pickCtx(ctx);
+    if (!p || p.admin || !p.me) {
+      H.json(ctx.res, 403, { error: 'Войдите под своим именем, чтобы изменить контакты' });
+      return null;
+    }
+    return p.me;
+  }
+
+  r.get('/f/:slug/contact', ctx => {
+    const me = contactStudent(ctx);
+    if (me) H.json(ctx.res, 200, { student: me.id, phone: me.phone, telegram: me.telegram });
+  });
+
+  r.post('/f/:slug/contact', ctx => {
+    const me = contactStudent(ctx);
+    if (!me) return;
+    const fields = ctx.body || {};
+    if (fields.student !== me.id) return H.json(ctx.res, 409, { error: 'Вы вошли под другим именем. Обновите страницу' });
+    const contact = studentContact(fields);
+    if (contact.error) return H.json(ctx.res, 400, contact);
+    photos.setStudentContact(me, contact);
+    H.json(ctx.res, 200, { ok: true });
   });
 
   r.post('/f/:slug/leave', ctx => {

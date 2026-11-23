@@ -144,6 +144,17 @@ button { cursor: pointer; }
 .dlg__box p.muted { font-size: 14.5px; }
 .pin { display: block; width: 100%; margin: 16px 0 6px; padding: 12px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; text-align: center; font: 800 30px/1 var(--sans); letter-spacing: .5em; text-indent: .5em; font-variant-numeric: tabular-nums; }
 .pin:focus { border-color: var(--wine); outline: none; }
+.dlg__box--pin { max-height: 100%; overflow-y: auto; }
+.pin-contact { min-width: 0; margin: 14px 0 10px; padding: 0; border: 0; }
+.pin-contact legend, .contact-card summary { font-size: 14.5px; font-weight: 800; }
+.contact-fields { display: grid; gap: 10px; margin: 10px 0; }
+.contact-fields label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
+.contact-fields input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; font-size: 16px; font-weight: 500; }
+.contact-fields input:focus { outline: 2px solid var(--wine); outline-offset: -1px; }
+.contact-card { margin: 0 0 14px; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.contact-card summary { color: var(--wine); cursor: pointer; }
+.contact-card > p { margin-top: 6px; }
+.contact-card > p:empty { display: none; }
 .dlg__err { color: var(--wine); font-weight: 700; font-size: 14px; }
 .dlg__err[hidden] { display: none; }
 .dlg__btns { display: flex; margin-top: 14px; }

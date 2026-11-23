@@ -450,6 +450,9 @@ a.row:active { background: var(--paper-2); }
 .pk-table th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); padding: 6px 4px; border-bottom: 1px solid var(--line); }
 .pk-table td { padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .pk-table td.ok { color: var(--ok); font-weight: 700; }
+.pk-contact-label { display: block; margin-top: 2px; font-size: 11px; text-transform: none; letter-spacing: normal; }
+.pk-contact { margin-top: 4px; font-size: 13px; }
+.pk-contact a { display: block; width: fit-content; color: var(--wine); overflow-wrap: anywhere; }
 .pk-log { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 .pk-log li { padding: 8px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .pk-log li > span { color: var(--ink-2); font-size: 12.5px; }

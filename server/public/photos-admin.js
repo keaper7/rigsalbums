@@ -9,6 +9,38 @@
 
   function $(s, root) { return (root || document).querySelector(s); }
 
+  // Контакты не попадают в HTML, который админка сохраняет для работы без сети.
+  var contactStatus = $('[data-pk-contacts]');
+  if (contactStatus) {
+    fetch(contactStatus.dataset.pkContacts, { credentials: 'same-origin' }).then(function (r) {
+      if (!r.ok) throw new Error('Не удалось загрузить контакты');
+      return r.json();
+    }).then(function (contacts) {
+      document.querySelectorAll('[data-pk-contact]').forEach(function (cell) {
+        var contact = contacts[cell.dataset.pkContact];
+        if (!contact || (!contact.phone && !contact.telegram)) return;
+        if (contact.phone) {
+          var phone = document.createElement('a');
+          phone.href = 'tel:' + contact.phone;
+          phone.textContent = contact.phone;
+          cell.appendChild(phone);
+        }
+        if (contact.telegram) {
+          var tg = document.createElement('a');
+          tg.href = 'https://t.me/' + encodeURIComponent(contact.telegram);
+          tg.target = '_blank';
+          tg.rel = 'noopener noreferrer';
+          tg.textContent = '@' + contact.telegram;
+          cell.appendChild(tg);
+        }
+        cell.hidden = false;
+      });
+    }).catch(function () {
+      contactStatus.textContent = 'Не удалось загрузить контакты. Обновите страницу.';
+      contactStatus.hidden = false;
+    });
+  }
+
   function state(el, text, part, bad) {
     el.hidden = false;
     el.classList.toggle('is-bad', !!bad);

@@ -18,6 +18,7 @@
   // Места в альбоме: [ключ, название]; на кнопках — коротко
   var PLACES = D.placeList || [];
   var SHORT = { cover: 'Обложка', page: 'Личная', list: 'Список' };
+  var CONTACT_HINT = 'Оставьте контакты, чтобы я мог связаться с вами и прислать фотографии.';
   var hint = false;     // все фото выбраны — подсвечиваем места и ретушь
 
   function el(tag, attrs, kids) {
@@ -67,7 +68,7 @@
         var changed = false;
         if (j.state) changed = setState(j.state);
         else if (r.ok && !j.error) changed = setState(j);
-        if (!r.ok) throw Object.assign(new Error(j.error || 'Не получилось. Попробуйте ещё раз'), { pin: j.pin, status: r.status });
+        if (!r.ok) throw Object.assign(new Error(j.error || 'Не получилось. Попробуйте ещё раз'), { pin: j.pin, field: j.field, status: r.status });
         return changed;
       });
     }, function () {
@@ -193,29 +194,113 @@
     ]));
   }
 
+  function filterContactInput(input, prefix, disallowed) {
+    function clean(value) {
+      return (value.trimStart().charAt(0) === prefix ? prefix : '') + value.replace(disallowed, '');
+    }
+    input.addEventListener('input', function () {
+      var value = input.value;
+      var cleaned = clean(value);
+      if (cleaned === value) return;
+      var caret = clean(value.slice(0, input.selectionStart)).length;
+      input.value = cleaned;
+      input.setSelectionRange(caret, caret);
+    });
+  }
+
+  function contactFields() {
+    var phone = el('input', { type: 'tel', inputmode: 'tel', name: 'phone', autocomplete: 'tel', placeholder: '+7 999 123-45-67' });
+    var telegram = el('input', { type: 'text', name: 'telegram', autocapitalize: 'none', autocomplete: 'off', spellcheck: 'false', placeholder: '@username' });
+    filterContactInput(phone, '+', /[^0-9]/g);
+    filterContactInput(telegram, '@', /[^A-Za-z0-9_]/g);
+    return {
+      phone: phone,
+      telegram: telegram,
+      box: el('div', { class: 'contact-fields' }, [
+        el('label', {}, [el('span', { text: 'Номер телефона' }), phone]),
+        el('label', {}, [el('span', { text: 'Имя в Telegram (если есть)' }), telegram])
+      ])
+    };
+  }
+
+  function contactCard() {
+    var student = S.me.id;
+    var fields = contactFields();
+    var status = el('p', { class: 'muted small', role: 'status' });
+    var save = el('button', { type: 'submit', class: 'btn btn--main', text: 'Сохранить контакты' });
+    var form = el('form', { hidden: true }, [fields.box, save]);
+    var loading = false;
+    var card = el('details', { class: 'contact-card' }, [
+      el('summary', { text: 'Номер / Telegram для связи' }),
+      el('p', { class: 'muted small', text: CONTACT_HINT }),
+      form, status
+    ]);
+    card.addEventListener('toggle', function () {
+      if (!card.open || !form.hidden || loading) return;
+      loading = true;
+      status.textContent = 'Загружаем контакты…';
+      fetch(base + '/contact', { credentials: 'same-origin' }).then(function (r) {
+        if (!r.ok) throw new Error('Обновите страницу и войдите под своим именем');
+        return r.json();
+      }, function () {
+        throw new Error('Не удалось загрузить контакты. Попробуйте ещё раз');
+      }).then(function (data) {
+        if (data.student !== student) throw new Error('Вы вошли под другим именем. Обновите страницу');
+        fields.phone.value = data.phone;
+        fields.telegram.value = data.telegram ? '@' + data.telegram : '';
+        form.hidden = false;
+        status.textContent = '';
+      }).catch(function (e) { status.textContent = e.message; })
+        .then(function () { loading = false; });
+    });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      save.disabled = true;
+      status.textContent = '';
+      api('/contact', { student: student, phone: fields.phone.value, telegram: fields.telegram.value })
+        .then(function () { status.textContent = 'Контакты сохранены'; })
+        .catch(function (err) {
+          status.textContent = err.message;
+          if (err.field) fields[err.field].focus();
+        })
+        .then(function () { save.disabled = false; });
+    });
+    return card;
+  }
+
   // Окно с кодом: придумать при первом входе или ввести, если уже входили
   function askPin(s) {
     var fresh = !s.locked;
     var input = el('input', { type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '4', autocomplete: 'off', class: 'pin', 'aria-label': 'Код из 4 цифр', placeholder: '••••' });
-    var err = el('p', { class: 'dlg__err', hidden: true });
+    var fields = fresh ? contactFields() : null;
+    var err = el('p', { class: 'dlg__err', role: 'alert', hidden: true });
     var ok = el('button', { type: 'submit', class: 'btn btn--main', text: 'Войти' });
-    var form = el('form', { class: 'dlg__box', novalidate: '' }, [
-      el('h2', { text: s.name }),
+    var form = el('form', { class: 'dlg__box dlg__box--pin', novalidate: '' }, [
+      el('h2', { id: 'pin-title', text: s.name }),
       el('p', { class: 'muted', text: fresh
         ? 'Придумайте код из 4 цифр и запомните его, лучше сделайте скрин. С ним вы зайдёте снова, а без него в ваш выбор никто не попадёт.'
         : 'Под этим именем уже заходили, введите свой код. Если забыли код или вы здесь впервые, напишите Артуру.' }),
-      input, err,
+      input,
+      fields ? el('fieldset', { class: 'pin-contact' }, [
+        el('legend', { text: 'Номер / Telegram для связи' }),
+        el('p', { class: 'muted', text: CONTACT_HINT }),
+        fields.box
+      ]) : null,
+      err,
       el('div', { class: 'dlg__btns' }, [el('button', { type: 'button', class: 'btn', text: 'Это не я', onclick: close }), ok])
     ]);
-    var dlg = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true' }, [form]);
+    var dlg = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pin-title' }, [form]);
     function close() { dlg.remove(); }
     input.addEventListener('input', function () { input.value = input.value.replace(/\D/g, '').slice(0, 4); err.hidden = true; });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       if (!/^\d{4}$/.test(input.value)) { err.textContent = 'Нужно 4 цифры'; err.hidden = false; return; }
       ok.disabled = true;
-      api('/me', fresh ? { student: s.id, newPin: input.value } : { student: s.id, pin: input.value })
+      var login = fields ? { student: s.id, newPin: input.value, phone: fields.phone.value, telegram: fields.telegram.value }
+        : { student: s.id, pin: input.value };
+      api('/me', login)
         .then(function () {
+          s.locked = true;
           close();
           tab = 'personal';
           render();
@@ -226,8 +311,8 @@
           if (e2.pin === 'ask' && fresh) { s.locked = true; close(); askPin(s); return toast(e2.message, true); }
           err.textContent = e2.message;
           err.hidden = false;
-          input.value = '';
-          input.focus();
+          if (fields && e2.field) fields[e2.field].focus();
+          else { input.value = ''; input.focus(); }
         })
         .then(function () { ok.disabled = false; });
     });
@@ -991,6 +1076,7 @@
     if (!tab || !tabs.some(function (t) { return t[0] === tab; })) tab = tabs[0][0];
     app.textContent = '';
     if (!S.admin) app.appendChild(originalsNote());
+    if (S.canEditContact) app.appendChild(contactCard());
     var nav = el('div', { class: 'tabs tabs--' + tabs.length, role: 'tablist' });
     tabs.forEach(function (t) {
       nav.appendChild(el('button', { type: 'button', role: 'tab', 'data-tab': t[0], 'aria-selected': tab === t[0] ? 'true' : 'false', onclick: function () {

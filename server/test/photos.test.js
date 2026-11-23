@@ -74,6 +74,65 @@ test('админ удаляет один снимок или все фото т�
   assert.ok(photos.photo(id, await upload(id, 'Личные/1.jpg')));
 });
 
+test('диапазон удаляется только после проверки имён и только в выбранной папке класса', async t => {
+  const s = await start();
+  t.after(() => s.stop());
+  const admin = await adminLogin(s.base);
+  const id = await createClass(admin, 'Школа №1', '11А');
+  const other = await createClass(admin, 'Школа №1', '11Б');
+  const photos = s.app.photos;
+  const url = '/admin/c/' + id + '/photos';
+  const range = { section: 'Девочки', first: 'rigs4497.JPG', last: 'RIGS4710' };
+  const confirmToken = r => /name="check" value="([a-f0-9]{64})"/.exec(r.text)?.[1];
+  const upload = async (cid, rel) => {
+    const r = await admin.upload('/admin/api/media/pk/' + cid + '?path=' + encodeURIComponent(rel), JPEG_WIDE);
+    assert.strictEqual(r.status, 200);
+    return r.data.id;
+  };
+  const first = await upload(id, 'Девочки/RIGS4497.jpg');
+  const last = await upload(id, 'Девочки/RIGS4710.jpg');
+  const kept = [await upload(id, 'Девочки/RIGS4711.jpg'), await upload(id, 'Парни/RIGS4497.jpg'),
+    await upload(id, 'Девочки/IMG_4497.jpg'), await upload(id, 'Девочки/Сармаково_0860.jpg')];
+  const otherPhoto = await upload(other, 'Девочки/RIGS4497.jpg');
+  photos.setStudents(id, 'Анна');
+  const student = photos.students(id)[0];
+  photos.setPersonal(photos.album(id), student.id, first, true);
+  photos.setRetouchDone(id, student.id, true);
+
+  assert.strictEqual((await admin.post(url + '/rangepreview', { ...range, last: 'IMG4710' })).status, 400);
+  const copied = await admin.post(url + '/rangepreview', { section: 'Девочки', first: 'Сармаково_０８６０\u200b', last: 'сармаково_0860.jpg' });
+  assert.strictEqual(copied.status, 200);
+  assert.match(copied.text, /Найдено 1 фото/);
+  assert.strictEqual((await client(s.base).req('POST', url + '/delrange', { form: range })).status, 403);
+  assert.strictEqual((await admin.req('POST', url + '/delrange', { form: range })).status, 403);
+  assert.strictEqual((await admin.post(url + '/delrange', range)).status, 409);
+  const preview = await admin.post(url + '/rangepreview', range);
+  assert.strictEqual(preview.status, 200);
+  assert.match(preview.text, /Найдено 2 фото/);
+  assert.match(preview.text, /отметки выбора \(1\)/);
+  const check = confirmToken(preview);
+  assert.ok(check);
+  assert.ok(photos.photo(id, first));
+  assert.strictEqual((await admin.post('/admin/c/' + other + '/photos/delrange', { ...range, check })).status, 409);
+
+  const added = await upload(id, 'Девочки/RIGS4550.jpg');
+  const stale = await admin.post(url + '/delrange', { ...range, check });
+  assert.strictEqual(stale.status, 409);
+  assert.match(stale.text, /Найдено 3 фото/);
+  assert.ok(photos.photo(id, first));
+  const done = await admin.post(url + '/delrange', { ...range, check: confirmToken(stale) });
+  assert.strictEqual(done.status, 303);
+  assert.match(done.headers.get('location'), /m=rangeremoved#photos$/);
+  for (const pid of [first, last, added]) {
+    assert.ok(!photos.photo(id, pid));
+    assert.ok(!fs.existsSync(photos.file(id, pid + '.jpg')));
+  }
+  for (const pid of kept) assert.ok(photos.photo(id, pid));
+  assert.ok(photos.photo(other, otherPhoto));
+  assert.deepStrictEqual(photos.personal(student.id), []);
+  assert.strictEqual(photos.student(id, student.id).retouch_done_at, null);
+});
+
 test('отбор фото: загрузка, выбор учеников, групповые, раскладка', async t => {
   const s = await start();
   t.after(() => s.stop());
@@ -238,6 +297,10 @@ test('отбор фото: загрузка, выбор учеников, гру
   assert.match(r.text, /Анна/);
 
   // Опечатку в имени исправляем без потери выбора; занятое имя не даём
+  r = await admin.post('/admin/c/' + id + '/photos/students', { names: 'Анна Козлова\nТимур' });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.text, /Список не сохранён.*Исправить имя/);
+  assert.deepStrictEqual(s.app.photos.students(id).map(s => s.id), students.map(s => s.id));
   r = await admin.post('/admin/c/' + id + '/photos/rename', { student: String(students[0].id), name: 'Тимур' });
   assert.strictEqual(r.status, 400);
   r = await admin.post('/admin/c/' + id + '/photos/rename', { student: String(students[0].id), name: 'Анна Козлова' });

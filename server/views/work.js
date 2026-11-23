@@ -3,7 +3,7 @@
 // Работа над альбомами. У Артура: вкладки «Работа» (классы по этапам), «Деньги» (сезон, осень, весна)
 // и «Телефоны», страница класса с этапами и деньгами. У дизайнера — кабинет по личной ссылке
 const { html, raw, plural, fmtWhen, fmtTime } = require('../lib/util');
-const { layout, classHub } = require('./admin');
+const { layout, classHub, PHONE_ICON, TG_ICON } = require('./admin');
 const { ROLES, ROLE_NAMES } = require('../lib/photos');
 const { numbered } = require('../lib/layout');
 const { LEAD_STATUSES, TEMPLATES, fill, STATUSES, STATUS_NAMES, PARTS, FIXES, FIX_NAMES, FILE_LABELS, SELF, SEASON_FIELDS, STAGES, HALVES, HALF_NAMES, DATE_KINDS, DATE_KIND_NAMES, stepOn, stageOf, upcoming } = require('../lib/work');
@@ -111,9 +111,6 @@ function halfChip(h) {
   return html`<span class="chip wk-half wk-half--${h}">${HALF_NAMES[h]}</span>`;
 }
 
-const PHONE_ICON = raw('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>');
-
-
 // Галочки дизайнера кружками: ●●●○○
 function partsDots(done) {
   const n = PARTS.filter(p => done[p[0]]).length;
@@ -184,7 +181,6 @@ function seasonNav(o, base) {
 
 // ---------- вкладка «Работа»: /admin/work ----------
 const WA_ICON = raw('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 2.2a9.7 9.7 0 0 0-8.4 14.6L2.3 21.8l5.1-1.3A9.7 9.7 0 1 0 12 2.2zm0 17.7a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 19.9zm4.4-6c-.2-.1-1.4-.7-1.7-.8-.2-.1-.4-.1-.5.1l-.8.9c-.1.2-.3.2-.5.1a6.6 6.6 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.5-.4h-.5a.9.9 0 0 0-.7.3 2.8 2.8 0 0 0-.9 2.1 4.9 4.9 0 0 0 1 2.6 11.2 11.2 0 0 0 4.3 3.8c1.6.7 2.2.7 3 .6a2.6 2.6 0 0 0 1.7-1.2 2.1 2.1 0 0 0 .2-1.2c-.1-.1-.2-.2-.5-.3z"/></svg>');
-const TG_ICON = raw('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21.4 3.6 2.9 10.8c-1.3.5-1.2 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.4.8.8.8s.6-.2.9-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.1-14.7c.3-1.3-.5-1.9-1.4-1.4zM9.4 14.1l8.5-7.7c.4-.3-.1-.5-.6-.2L6.9 13.2"/></svg>');
 // Кнопки связи на карточке: группа в Telegram, WhatsApp и звонок по первому телефону
 function callButton(contacts, tgLink) {
   const c = (contacts || [])[0];

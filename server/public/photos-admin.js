@@ -11,7 +11,8 @@
 
   // Контакты не попадают в HTML, который админка сохраняет для работы без сети.
   var contactStatus = $('[data-pk-contacts]');
-  if (contactStatus) {
+  var contactLinks = $('[data-pk-contact-links]');
+  if (contactStatus && contactLinks) {
     fetch(contactStatus.dataset.pkContacts, { credentials: 'same-origin' }).then(function (r) {
       if (!r.ok) throw new Error('Не удалось загрузить контакты');
       return r.json();
@@ -20,17 +21,15 @@
         var contact = contacts[cell.dataset.pkContact];
         if (!contact || (!contact.phone && !contact.telegram)) return;
         if (contact.phone) {
-          var phone = document.createElement('a');
+          var phone = $('[data-pk-phone]', contactLinks.content).cloneNode(true);
           phone.href = 'tel:' + contact.phone;
-          phone.textContent = contact.phone;
+          $('span', phone).textContent = contact.phone;
           cell.appendChild(phone);
         }
         if (contact.telegram) {
-          var tg = document.createElement('a');
+          var tg = $('[data-pk-telegram]', contactLinks.content).cloneNode(true);
           tg.href = 'https://t.me/' + encodeURIComponent(contact.telegram);
-          tg.target = '_blank';
-          tg.rel = 'noopener noreferrer';
-          tg.textContent = '@' + contact.telegram;
+          $('span', tg).textContent = '@' + contact.telegram;
           cell.appendChild(tg);
         }
         cell.hidden = false;
@@ -57,15 +56,31 @@
 
   // ---------- загрузка ----------
 
-  // Путь внутри выбранной папки: «Фото 11А/Парни/IMG_1.jpg» → «Парни/IMG_1.jpg»
-  function relPath(file) {
-    var p = (file.webkitRelativePath || file.name).split('/');
-    if (p.length > 1) p.shift();
-    return p.join('/');
+  function namedSection(name, sections) {
+    if (sections.indexOf(name) !== -1) return name;
+    var key = name.normalize('NFC').toLowerCase();
+    var matches = sections.filter(function (s) { return s.normalize('NFC').toLowerCase() === key; });
+    return matches.length === 1 ? matches[0] : '';
+  }
+
+  function relPath(file, target, sections) {
+    var parts = (file.webkitRelativePath || file.name).split('/').map(function (s) { return s.trim(); });
+    var root = parts.length > 1 ? parts.shift() : '';
+    var nested = parts.length > 1 ? namedSection(parts[0], sections) : '';
+    if (target) {
+      if (nested === target) parts.shift();
+      parts.unshift(target);
+    } else {
+      // «Фото 11А/Девочки/IMG.jpg» и отдельно выбранная «Девочки/IMG.jpg».
+      var rootSection = namedSection(root, sections);
+      if (rootSection) parts.unshift(rootSection);
+      else if (nested) parts[0] = nested;
+    }
+    return parts.join('/');
   }
 
   function isJpeg(file) {
-    var rel = relPath(file);
+    var rel = file.webkitRelativePath || file.name;
     return /\.jpe?g$/i.test(file.name) && !rel.split('/').some(function (s) { return s.charAt(0) === '.'; });
   }
 
@@ -115,8 +130,8 @@
     });
   }
 
-  function uploadOne(classId, file) {
-    var rel = relPath(file);
+  function uploadOne(classId, job) {
+    var file = job.file;
     var url = '/admin/api/media/pk/' + classId;
     return decode(file).then(function (img) {
       var canvas;
@@ -128,7 +143,7 @@
       return jpeg(canvas, 0.75).finally(function () {
         canvas.width = canvas.height = 0;
       }).then(function (thumbnail) {
-        return post(url + '?path=' + encodeURIComponent(rel), file).then(function (res) {
+        return post(url + '?path=' + encodeURIComponent(job.path), file).then(function (res) {
           return post(url + '/' + res.id + '/sm', thumbnail);
         });
       });
@@ -139,9 +154,9 @@
 
   // Что нашлось в папке: разделы и сколько в каждом
   function summary(files) {
-    var by = {}, order = [];
+    var by = Object.create(null), order = [];
     files.forEach(function (f) {
-      var parts = relPath(f).split('/');
+      var parts = f.path.split('/');
       var sec = parts.length > 1 ? parts[0] : 'Без папки';
       if (!by[sec]) { by[sec] = 0; order.push(sec); }
       by[sec]++;
@@ -154,14 +169,18 @@
     if (!input.hasAttribute || !input.hasAttribute('data-pk-upload')) return;
     var classId = input.getAttribute('data-pk-upload');
     var box = $('[data-pk-state]');
+    var destination = $('[data-pk-upload-section]');
+    var sections = destination ? Array.prototype.map.call(destination.options, function (o) { return o.value; }).filter(Boolean) : [];
+    var target = destination ? destination.value : '';
     var all = Array.prototype.slice.call(input.files || []);
     var files = all.filter(isJpeg);
     input.value = '';
     if (busy) return;
     if (!files.length) return state(box, 'В папке не нашлось фото JPG', 0, true);
     var skipped = all.length - files.length;
-    var nested = files.some(function (f) { return relPath(f).split('/').length > 2; });
-    if (!confirm('Нашлось ' + files.length + ' фото JPG' + (skipped ? ' (другие файлы пропустим: ' + skipped + ')' : '') + ':\n\n' + summary(files) +
+    var jobs = files.map(function (f) { return { file: f, path: relPath(f, target, sections) }; });
+    var nested = jobs.some(function (f) { return f.path.split('/').length > 2; });
+    if (!confirm('Нашлось ' + files.length + ' фото JPG' + (skipped ? ' (другие файлы пропустим: ' + skipped + ')' : '') + ':\n\n' + summary(jobs) +
       (nested ? '\n\nВнимание: внутри есть вложенные папки. Разделами станут папки первого уровня' : '') + '\n\nЗагружаем?')) return;
 
     busy = true;
@@ -175,9 +194,9 @@
         });
       })
       .then(function (j) {
-        var have = {};
+        var have = Object.create(null);
         (j.paths || []).forEach(function (p) { have[p] = true; });
-        var queue = files.filter(function (f) { return !have[relPath(f)]; });
+        var queue = jobs.filter(function (f) { return !have[f.path]; });
         var total = queue.length, done = 0, failed = [], stop = '', stopCode = 0;
         if (!total) { busy = false; input.parentNode.classList.remove('is-busy'); return state(box, 'Все ' + files.length + ' фото уже загружены', 1); }
         state(box, 'Загружаем 0 из ' + total + '. Не закрывайте страницу', 0);
@@ -192,7 +211,7 @@
           })
             .catch(function (err) {
               if (err.status === 403 || err.status === 507) { stop = err.message; stopCode = err.status; }
-              failed.push(relPath(f) + ': ' + err.message);
+              failed.push(f.path + ': ' + err.message);
             })
             .then(function () {
               done++;
@@ -221,6 +240,12 @@
         input.parentNode.classList.remove('is-busy');
         state(box, err.message || 'Не получилось загрузить', 0, true);
       });
+  });
+
+  document.addEventListener('input', function (e) {
+    if (!e.target.matches || !e.target.matches('.pk-range input[name="first"], .pk-range input[name="last"]')) return;
+    var result = $('[data-pk-range-result]', e.target.closest('.pk-range'));
+    if (result) result.hidden = true;
   });
 
   // Сразу говорим, если устройство не подходит: папку можно выбрать только на компьютере,

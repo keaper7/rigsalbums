@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS pk_students (
   quote TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS pk_student_ids (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  last_id INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO pk_student_ids (id, last_id) SELECT 1, COALESCE(MAX(id), 0) FROM pk_students;
 CREATE TABLE IF NOT EXISTS pk_photos (
   id TEXT PRIMARY KEY,
   class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
@@ -160,6 +165,13 @@ function cleanPath(p) {
 function sectionOf(p) {
   const parts = p.split('/');
   return parts.length > 1 ? parts[0] : 'Без папки';
+}
+
+function photoFileNumber(value) {
+  const name = value.normalize('NFKC').replace(/[\u200B-\u200F\u2060\uFEFF]/g, '').trim().replace(/\.jpe?g$/i, '');
+  const match = /^([\p{L}\p{N} _-]*?)(\d+)$/u.exec(name);
+  if (!match || !Number.isSafeInteger(Number(match[2]))) return null;
+  return { prefix: match[1].toLowerCase(), number: Number(match[2]) };
 }
 
 function readAll(req, limit) {
@@ -293,22 +305,30 @@ class Photos {
       else names.push(n);
     });
     if (dups.length) return { kept: [], dups: dups };
-    const have = this.students(classId);
     const kept = [];
     const now = Date.now();
-    this.store.tx(() => {
-      have.forEach(s => {
-        if (names.indexOf(s.name) !== -1) return;
-        if (this.studentBusy(s.id)) kept.push(s.name);
-        else this.db.prepare('DELETE FROM pk_students WHERE id = ?').run(s.id);
-      });
+    const blocked = this.store.tx(() => {
+      const have = this.students(classId);
+      const removed = have.filter(s => !names.includes(s.name));
+      const protectedIds = new Set(removed.filter(s => this.studentBusy(s.id)).map(s => s.id));
+      for (const s of removed) if (protectedIds.has(s.id)) kept.push(s.name);
+      // Замена имени в тексте не должна создать дубль для ученика с сохранёнными данными.
+      if (kept.length && names.some(n => !have.some(s => s.name === n))) return true;
+      for (const s of removed) if (!protectedIds.has(s.id)) this.db.prepare('DELETE FROM pk_students WHERE id = ?').run(s.id);
       names.forEach((n, i) => {
         const old = have.find(s => s.name === n);
         if (old) this.db.prepare('UPDATE pk_students SET sort = ? WHERE id = ?').run(i, old.id);
-        else this.db.prepare('INSERT INTO pk_students (class_id, name, sort, created_at) VALUES (?, ?, ?, ?)').run(classId, n, i, now);
+        else {
+          // Старые cookie подписаны идентификатором ученика и его PIN. Идентификаторы не переиспользуем.
+          const { last_id: id } = this.db.prepare(`UPDATE pk_student_ids
+            SET last_id = max(last_id, (SELECT COALESCE(MAX(id), 0) FROM pk_students)) + 1
+            WHERE id = 1 RETURNING last_id`).get();
+          this.db.prepare('INSERT INTO pk_students (id, class_id, name, sort, created_at) VALUES (?, ?, ?, ?, ?)').run(id, classId, n, i, now);
+        }
       });
+      return false;
     });
-    return { kept: kept, dups: [] };
+    return { kept: kept, dups: [], blocked: blocked };
   }
 
   // Переименовать, не теряя выбор ученика (опечатка в имени)
@@ -317,9 +337,21 @@ class Photos {
     if (!n) return { error: 'Напишите имя' };
     const s = this.student(classId, id);
     if (!s) return { error: 'Ученик не найден' };
-    if (this.students(classId).some(x => x.id !== s.id && x.name.toLowerCase() === n.toLowerCase())) return { error: 'Такое имя уже есть в списке. Добавьте фамилию или первую букву' };
+    if (this.students(classId).some(x => x.id !== s.id && x.name.toLowerCase() === n.toLowerCase())) return { error: 'Такое имя уже есть в списке. Если это пустой дубль, уберите его из общего списка и снова исправьте имя.' };
     this.db.prepare('UPDATE pk_students SET name = ? WHERE id = ?').run(n, s.id);
     return { ok: true };
+  }
+
+  deleteStudent(classId, id, name) {
+    return this.store.tx(() => {
+      const gone = this.db.prepare('DELETE FROM pk_students WHERE class_id = ? AND id = ? AND name = ?').run(classId, id, name).changes === 1;
+      if (!gone) return false;
+      this.db.prepare('UPDATE pk_student_ids SET last_id = max(last_id, ?) WHERE id = 1').run(id);
+      // Личный выбор удаляется каскадом. Групповой принадлежит классу, поэтому оставляем его без имени ученика.
+      this.db.prepare("UPDATE pk_log SET who = 'Удалённый ученик', student_id = NULL WHERE class_id = ? AND student_id = ?")
+        .run(classId, id);
+      return true;
+    });
   }
 
   // Кто уже что-то выбрал или написал — для подсказки «под этим именем уже выбирали»
@@ -444,9 +476,31 @@ class Photos {
     return this.deletePhotos(classId, 'id', id);
   }
 
+  photoRange(classId, section, first, last) {
+    const from = photoFileNumber(first), to = photoFileNumber(last);
+    if (!from || !to || from.prefix !== to.prefix) {
+      return { error: 'Укажите начальное и конечное имя с одинаковым префиксом, например RIGS4497 и RIGS4710.' };
+    }
+    if (from.number > to.number) return { error: 'Начальный номер больше конечного. Поменяйте имена местами.' };
+    const rows = this.db.prepare('SELECT id, path, ver FROM pk_photos WHERE class_id = ? AND section = ?').all(classId, section)
+      .flatMap(row => {
+        const file = photoFileNumber(path.basename(row.path));
+        return file && file.prefix === from.prefix && file.number >= from.number && file.number <= to.number
+          ? [{ ...row, number: file.number }] : [];
+      })
+      .sort((a, b) => a.number - b.number || a.path.localeCompare(b.path, 'ru'));
+    const ids = JSON.stringify(rows.map(row => row.id));
+    const selected = this.db.prepare(`WITH ids AS (SELECT value FROM json_each(?))
+      SELECT (SELECT COUNT(*) FROM pk_personal WHERE photo_id IN ids)
+      + (SELECT COUNT(*) FROM pk_group WHERE photo_id IN ids)
+      + (SELECT (teacher_cover IN ids) + (teacher_list IN ids) FROM pk_albums WHERE class_id = ?) AS n`).get(ids, classId).n;
+    return { rows, selected };
+  }
+
   deletePhotos(classId, field, value) {
-    const filter = 'class_id = ?' + (field === 'section' ? ' AND section = ?' : field === 'id' ? ' AND id = ?' : '');
-    const args = field ? [classId, value] : [classId];
+    const filters = { section: ' AND section = ?', id: ' AND id = ?', ids: ' AND id IN (SELECT value FROM json_each(?))' };
+    const filter = 'class_id = ?' + (field ? filters[field] : '');
+    const args = field ? [classId, field === 'ids' ? JSON.stringify(value) : value] : [classId];
     const list = this.store.tx(() => {
       this.db.prepare(`UPDATE pk_students SET retouch_done_at = NULL
         WHERE class_id = ? AND retouch_done_at IS NOT NULL AND id IN (

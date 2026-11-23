@@ -5,6 +5,9 @@ const { STEP_NAMES, status, opensAt, visibleOptions, activeSteps, resolve } = re
 const { STEPS } = require('../lib/db');
 const { SLOTS, GALLERIES, TEXTS, TOGGLES, isWide } = require('../lib/site');
 
+const PHONE_ICON = raw('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>');
+const TG_ICON = raw('<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M21.4 3.6 2.9 10.8c-1.3.5-1.2 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.4.8.8.8s.6-.2.9-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.1-14.7c.3-1.3-.5-1.9-1.4-1.4zM9.4 14.1l8.5-7.7c.4-.3-.1-.5-.6-.2L6.9 13.2"/></svg>');
+
 const MSG = {
   saved: 'Сохранено',
   created: 'Класс создан. Проверьте данные и отправьте ссылку классу',
@@ -836,5 +839,5 @@ function notFoundPage(o) {
 
 module.exports = {
   layout, classHub, loginPage, newClassPage, classPage, resultsBlock, sitePage, galleryPage,
-  catalogPage, optionPage, settingsPage, notFoundPage, fmtDate
+  catalogPage, optionPage, settingsPage, notFoundPage, fmtDate, PHONE_ICON, TG_ICON
 };

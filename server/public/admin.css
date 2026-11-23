@@ -451,8 +451,11 @@ a.row:active { background: var(--paper-2); }
 .pk-table td { padding: 8px 4px; border-bottom: 1px solid var(--line); }
 .pk-table td.ok { color: var(--ok); font-weight: 700; }
 .pk-contact-label { display: block; margin-top: 2px; font-size: 11px; text-transform: none; letter-spacing: normal; }
-.pk-contact { margin-top: 4px; font-size: 13px; }
-.pk-contact a { display: block; width: fit-content; color: var(--wine); overflow-wrap: anywhere; }
+.pk-student-name { font-weight: 700; }
+.pk-contact { display: grid; justify-items: start; gap: 3px; margin-top: 4px; font-size: 13px; }
+.pk-contact a { display: inline-flex; align-items: center; gap: 6px; color: var(--wine); overflow-wrap: anywhere; text-decoration: none; }
+.pk-contact a:hover span, .pk-contact a:focus-visible span { text-decoration: underline; }
+.pk-contact svg { flex: 0 0 14px; width: 14px; height: 14px; color: var(--ink-2); }
 .pk-log { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 .pk-log li { padding: 8px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .pk-log li > span { color: var(--ink-2); font-size: 12.5px; }
@@ -462,9 +465,14 @@ form.inline { display: inline-block; margin: 4px 4px 0 0; }
 .fold__link b { display: block; font-weight: 800; }
 .fold__link small { display: block; font-size: 13px; color: var(--ink-2); }
 .fold__link:after { content: '→'; float: right; margin-top: -32px; font-weight: 800; color: var(--wine); }
-.pk-ren summary { cursor: pointer; list-style: none; text-decoration: underline dotted; text-underline-offset: 3px; }
+.pk-student-actions { display: flex; align-items: flex-start; gap: 12px; }
+.pk-student-actions > form { flex: none; }
+.pk-ren summary, .pk-student-delete { width: fit-content; min-height: 28px; padding: 5px 0; font-size: 12px; font-weight: 700; cursor: pointer; }
+.pk-ren summary { list-style: none; color: var(--ink-2); white-space: nowrap; }
 .pk-ren summary::-webkit-details-marker { display: none; }
-.pk-ren form { display: flex; gap: 6px; margin-top: 6px; }
+.pk-student-delete { border: 0; background: transparent; color: var(--wine); }
+.pk-ren summary:hover, .pk-student-delete:hover { color: var(--wine-2); }
+.pk-ren form { display: flex; gap: 6px; margin: 4px 0 6px; }
 .pk-ren input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .pk-disk { margin-top: 10px; }
 .pk-disk.is-low { color: var(--warn); font-weight: 700; }
@@ -498,6 +506,11 @@ form.inline { display: inline-block; margin: 4px 4px 0 0; }
 p.pk-slim { display: block; }
 .pk-manage__section { padding: 8px 0; border-top: 1px solid var(--line); }
 .pk-manage__section > summary { color: var(--ink); font-weight: 700; }
+.pk-range { padding: 12px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 12px; scroll-margin-top: 85px; }
+.pk-range__result { margin-top: 14px; }
+.pk-range__result > .flash:last-child { margin-bottom: 0; }
+.pk-range__confirm { padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.pk-range__confirm ul { max-height: 160px; overflow: auto; padding-left: 20px; overflow-wrap: anywhere; }
 .pk-manage__list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 440px; overflow-y: auto; }
 .pk-manage__list li { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
 .pk-manage__list img { display: block; width: 56px; height: 56px; object-fit: contain; border-radius: 6px; }

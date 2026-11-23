@@ -9,6 +9,7 @@
   var base = '/f/' + D.slug;
   var S = D;            // текущее состояние, обновляется ответами сервера
   var tab = null;
+  var personalFolder = null;
   var onlyChosen = false;
   var tiles = {};       // id фото → плитка на экране
   var pending = {};     // фото, по которому ждём ответа сервера
@@ -55,7 +56,9 @@
   function setState(j) {
     var who = S.me ? S.me.id : 0;
     S = Object.assign({}, S, j);
-    return (S.me ? S.me.id : 0) !== who;
+    var changed = (S.me ? S.me.id : 0) !== who;
+    if (changed) personalFolder = null;
+    return changed;
   }
 
   function api(path, body, keep) {
@@ -123,7 +126,7 @@
   function src(p, big) { return base + '/p/' + p.id + (big ? '' : '-sm') + '.jpg?v=' + p.v; }
 
   function sections(isGroup) {
-    var out = [], seen = {};
+    var out = [], seen = Object.create(null);
     photos.forEach(function (p) {
       if (p.group !== isGroup) return;
       if (!seen[p.section]) { seen[p.section] = { name: p.section, list: [] }; out.push(seen[p.section]); }
@@ -963,19 +966,44 @@
     ]);
   }
 
+  function choosePersonalFolder(name) {
+    personalFolder = name;
+    render();
+    var heading = document.getElementById(name === null ? 'personal-folders' : 'personal-folder');
+    heading.focus({ preventScroll: true });
+    heading.scrollIntoView({ block: 'start' });
+  }
+
   function renderPersonal(box) {
+    var folders = sections(false);
+    var folder = folders.length === 1 ? folders[0] : folders.find(function (s) { return s.name === personalFolder; });
     box.appendChild(el('div', { class: 'note note--closed', 'data-closed': '', hidden: !S.closed }, [el('b', { text: 'Отбор закрыт' }), 'Ваш выбор сохранён, менять его уже нельзя.']));
     box.appendChild(doneNote());
+    if (folders.length > 1 && !folder) {
+      box.appendChild(el('section', { class: 'sec', 'aria-labelledby': 'personal-folders' }, [
+        el('h2', { id: 'personal-folders', tabindex: '-1', text: 'Папки с фото' }),
+        el('div', { class: 'photo-folders' }, folders.map(function (s) {
+          return el('button', { class: 'photo-folder', type: 'button', onclick: function () { choosePersonalFolder(s.name); } }, [
+            el('span', { class: 'photo-folder__icon', 'aria-hidden': 'true' }),
+            el('span', { class: 'photo-folder__title' }, [el('b', { text: s.name }), el('span', { class: 'muted', text: s.list.length + ' фото' })]),
+            el('span', { class: 'photo-folder__arrow', 'aria-hidden': 'true', text: '›' })
+          ]);
+        }))
+      ]));
+    }
     if (PLACES.length) box.appendChild(scheme());
     renderMine(box);
     renderPreview(box);
     box.appendChild(nextNote('personal'));
-    var secs = sections(false);
-    box.appendChild(el('div', { class: 'note' }, [el('b', { text: 'Выберите ' + S.personalMax + ' своих фото' }), 'Нажмите на фото, чтобы посмотреть крупно, или на кружок, чтобы сразу выбрать. Передумали? Нажмите ещё раз.']));
-    if (!secs.length) box.appendChild(el('p', { class: 'muted', text: 'Фото ещё не загружены.' }));
-    secs.forEach(function (s) {
-      box.appendChild(el('section', { class: 'sec' }, [el('h2', {}, [s.name, el('small', { text: s.list.length + ' фото' })]), grid(s.list)]));
-    });
+    if (!folders.length) box.appendChild(el('p', { class: 'muted', text: 'Фото ещё не загружены.' }));
+    if (folder) {
+      box.appendChild(el('section', { class: 'sec', 'aria-labelledby': 'personal-folder' }, [
+        el('h2', { id: 'personal-folder', tabindex: '-1' }, [folder.name, el('small', { text: folder.list.length + ' фото' })]),
+        folders.length > 1 ? el('button', { type: 'button', class: 'btn photo-folder-back', text: '‹ Все папки', onclick: function () { choosePersonalFolder(null); } }) : null,
+        el('div', { class: 'note' }, [el('b', { text: 'Выберите ' + S.personalMax + ' своих фото' }), 'Нажмите на фото, чтобы посмотреть крупно, или на кружок, чтобы сразу выбрать. Передумали? Нажмите ещё раз.']),
+        grid(folder.list)
+      ]));
+    }
   }
 
   function renderGroup(box) {

@@ -2,7 +2,7 @@
 
 // Отбор фото: страница в админке и страница для учеников
 const { html, raw, plural, fmtWhen } = require('../lib/util');
-const { layout, classHub } = require('./admin');
+const { layout, classHub, PHONE_ICON, TG_ICON } = require('./admin');
 const { ROLES, ROLE_NAMES, TEACHER_WISH_MAX } = require('../lib/photos');
 
 function photosN(n) { return n + ' фото'; }
@@ -17,15 +17,50 @@ function csrf(sess) { return html`<input type="hidden" name="_csrf" value="${ses
 const MSG = {
   saved: 'Сохранено',
   students: 'Список учеников сохранён',
+  studentrenamed: 'Имя исправлено',
+  studentremoved: 'Ученик удалён из списка',
   closed: 'Отбор закрыт. Ученики видят свой выбор, но поменять уже не могут',
   opened: 'Отбор снова открыт',
   removed: 'Раздел удалён',
   photoremoved: 'Фото удалено',
+  rangeremoved: 'Снимки из диапазона удалены',
   photomissing: 'Фото уже удалено или отсутствует в этом классе',
   allphotosremoved: 'Все фото класса удалены',
   pinreset: 'Код сброшен. Ученик при следующем входе придумает новый',
   slim: 'Место освобождено: остались только выбранные фото в маленьком размере'
 };
+
+function photoRangeForm(c, s, sess, range) {
+  const url = '/admin/c/' + c.id + '/photos';
+  const r = range && range.section === s ? range : null;
+  return html`<div class="pk-range" id="photo-range-${s}">
+    <form class="form" method="post" action="${url}/rangepreview#photo-range-${encodeURIComponent(s)}">
+      ${csrf(sess)}<input type="hidden" name="section" value="${s}">
+      <p><b>Удалить диапазон</b></p>
+      <div class="two">
+        <label class="field"><span>От файла</span><input name="first" value="${r ? r.first : ''}" placeholder="RIGS4497" maxlength="120" required></label>
+        <label class="field"><span>До файла включительно</span><input name="last" value="${r ? r.last : ''}" placeholder="RIGS4710" maxlength="120" required></label>
+      </div>
+      <button class="b b--sm" type="submit">Проверить диапазон</button>
+    </form>
+    ${r ? html`<div class="pk-range__result" data-pk-range-result>
+    ${r.error ? html`<p class="flash flash--err" role="alert">${r.error}</p>` : ''}
+    ${r && r.rows && !r.rows.length ? html`<p class="muted small" role="status">В этой папке нет снимков из диапазона.</p>` : ''}
+    ${r && r.check ? html`<div class="pk-range__confirm">
+      <p><b>Найдено ${photosN(r.rows.length)}</b> · ${c.school} · ${c.title} · ${s}</p>
+      ${r.selected ? html`<p class="pk-warn">Вместе со снимками удалятся отметки выбора (${r.selected}).</p>` : ''}
+      <details><summary>Имена файлов</summary><ul>${r.rows.map(row => html`<li>${row.path}</li>`)}</ul></details>
+      <form class="pk-slim" method="post" action="${url}/delrange#photo-range-${encodeURIComponent(s)}">
+        ${csrf(sess)}
+        <input type="hidden" name="section" value="${s}"><input type="hidden" name="first" value="${r.first}">
+        <input type="hidden" name="last" value="${r.last}"><input type="hidden" name="check" value="${r.check}">
+        <button class="b b--sm b--danger" type="submit">Удалить ${photosN(r.rows.length)}</button>
+        <a class="b b--sm" href="${url}?photo_section=${encodeURIComponent(s)}#photo-range-${encodeURIComponent(s)}">Отмена</a>
+      </form>
+    </div>` : ''}
+    </div>` : ''}
+  </div>`;
+}
 
 // ---------- админка: /admin/c/:id/photos ----------
 function adminPage(o) {
@@ -40,6 +75,10 @@ function adminPage(o) {
     if (p.has_sm) s.ready++;
   });
   const sections = Array.from(bySection.keys()).sort((x, y) => x.localeCompare(y, 'ru'));
+  const uploadSections = sections.filter(s => s !== 'Без папки');
+  for (const name of ['Парни', 'Девочки', 'Групповые']) {
+    if (!uploadSections.some(s => s.toLowerCase() === name.toLowerCase())) uploadSections.push(name);
+  }
   const counts = o.counts;
   // Сколько мест в альбоме нужно отметить: по одному фото на место, но не больше, чем фото
   const rolesNeed = Math.min(ROLES.length, a.personal_max);
@@ -60,11 +99,12 @@ function adminPage(o) {
     '\nФото на сайте только для выбора, не скриньте их.' + (a.wfolio ? ' Оригиналы: ' + a.wfolio : '') +
     '\n\nВыбор можно поменять, пока я не закрою отбор.';
   const remind = left.length ? 'Напоминаю про выбор фото для альбома. Ещё не закончили: ' + left.map(s => s.name).join(', ') + '.\n\n' + link : '';
-  const photoMessage = ['removed', 'photoremoved', 'photomissing', 'allphotosremoved'].includes(o.msg);
+  const photoMessage = ['removed', 'photoremoved', 'rangeremoved', 'photomissing', 'allphotosremoved'].includes(o.msg);
+  const studentMessage = ['studentrenamed', 'studentremoved'].includes(o.msg);
   const body = html`
 ${classHub(c, 'photos')}
 <p class="muted small" style="margin:6px 0 18px">Ученикам открывается только по ссылке ниже, голосование класса это не затрагивает.</p>
-${o.msg && MSG[o.msg] && !photoMessage ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
+${o.msg && MSG[o.msg] && !photoMessage && !studentMessage ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
 ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
 
 <section class="card">
@@ -98,7 +138,11 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
 <section class="card" id="photos">
   <div class="card__h"><h2 class="h">Фото</h2><span class="muted small">${photosN(o.photos.length)}</span></div>
   ${photoMessage ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
-  <p class="muted small">Выберите папку с готовыми JPG до 6 МБ на файл. Разложите фото по подпапкам «Парни», «Девочки», «Групповые» и т. д. Фото загружаются без повторного сжатия. Уже загруженные файлы пропускаются.</p>
+  <p class="muted small">Выберите папку с готовыми JPG до 6 МБ на файл. Для догрузки укажите папку назначения. Уже загруженные файлы пропускаются, фото повторно не сжимаются.</p>
+  <label class="field"><span>Куда загрузить</span><select data-pk-upload-section>
+    <option value="">По структуре папок на компьютере</option>
+    ${uploadSections.map(s => html`<option value="${s}">${s}</option>`)}
+  </select></label>
   <label class="b b--main b--wide upl" style="margin-top:12px">
     <input type="file" webkitdirectory multiple data-pk-upload="${c.id}">
     <span>Выбрать папку с фото</span>
@@ -128,6 +172,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
     <p class="muted small">Вместе со снимками удаляются отметки выбора по ним.</p>
     ${sections.map(s => html`<details class="pk-manage__section"${o.openPhotoSection === s ? raw(' open') : ''}>
       <summary>${s} · ${photosN(bySection.get(s).n)}</summary>
+      ${photoRangeForm(c, s, o.sess, o.range)}
       <ul class="pk-manage__list">
         ${bySection.get(s).photos.map(ph => html`<li>
           ${ph.has_sm ? html`<a href="/f/${a.slug}/p/${ph.id}.jpg?v=${ph.ver}" target="_blank" rel="noopener" aria-label="Открыть ${ph.path}">
@@ -154,8 +199,9 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   </details>` : ''}
 </section>
 
-<section class="card">
+<section class="card" id="students">
   <div class="card__h"><h2 class="h">Ученики</h2><span class="muted small">${o.students.length ? 'закончили: ' + done + ' из ' + o.students.length : ''}</span></div>
+  ${studentMessage ? html`<p class="flash" role="status">${MSG[o.msg]}</p>` : ''}
   ${remind ? html`<details class="pk-msg">
     <summary>Напомнить тем, кто не закончил (${left.length})</summary>
     <textarea readonly rows="5">${remind}</textarea>
@@ -167,7 +213,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
   <form class="form" method="post" action="/admin/c/${c.id}/photos/students">
     ${csrf(o.sess)}
     <label class="field"><span>Имена, каждое с новой строки</span><textarea name="names" rows="${Math.min(14, Math.max(5, o.students.length + 1))}" placeholder="Анна Козлова&#10;Тимур Хасанов">${o.names !== undefined ? o.names : o.students.map(s => s.name).join('\n')}</textarea></label>
-    <p class="muted small">Новые имена добавятся, убранные удалятся, если ученик ещё ничего не выбрал. Опечатку у того, кто уже выбирал, можно исправить, нажав на имя в таблице.</p>
+    <p class="muted small">Общий список добавляет новые записи. Чтобы исправить опечатку, нажмите «Исправить имя» рядом с учеником в таблице.</p>
     <button class="b b--main" type="submit">Сохранить список</button>
   </form>
   ${o.students.length ? html`<div class="pk-scroll"><table class="pk-table">
@@ -178,7 +224,17 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
       const full = n >= a.personal_max && r >= rolesNeed;
       return html`<tr>
         <td>
-          <details class="pk-ren"><summary>${s.name}</summary><form method="post" action="/admin/c/${c.id}/photos/rename">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><input name="name" value="${s.name}" maxlength="60" required aria-label="Новое имя"><button class="b b--sm" type="submit">Сохранить</button></form></details>
+          <p class="pk-student-name">${s.name}</p>
+          <div class="pk-student-actions">
+            <details class="pk-ren">
+              <summary aria-label="Исправить имя: ${s.name}">Исправить имя</summary>
+              <form method="post" action="/admin/c/${c.id}/photos/rename">${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><input name="name" value="${s.name}" maxlength="60" required aria-label="Новое имя"><button class="b b--sm" type="submit">Сохранить имя</button></form>
+            </details>
+            <form method="post" action="/admin/c/${c.id}/photos/delstudent" data-confirm="Удалить ученика «${s.name}» из класса «${c.school} · ${c.title}»? Его контакты, код, тексты и личный выбор будут удалены. Это действие нельзя отменить.">
+              ${csrf(o.sess)}<input type="hidden" name="student" value="${s.id}"><input type="hidden" name="name" value="${s.name}">
+              <button class="pk-student-delete" type="submit" aria-label="Удалить ученика: ${s.name}">Удалить</button>
+            </form>
+          </div>
           <div class="pk-contact" data-pk-contact="${s.id}" hidden></div>
         </td>
         <td class="${full ? 'ok' : n ? '' : 'muted'}">${n} из ${a.personal_max}${n && r < Math.min(n, rolesNeed) ? html`<small class="pk-warn">мест ${r} из ${rolesNeed}</small>` : ''}</td>
@@ -188,6 +244,10 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
       </tr>`;
     })}</tbody>
   </table></div>
+  <template data-pk-contact-links>
+    <a data-pk-phone title="Позвонить">${PHONE_ICON}<span></span></a>
+    <a data-pk-telegram title="Открыть в Telegram" target="_blank" rel="noopener noreferrer">${TG_ICON}<span></span></a>
+  </template>
   <p class="muted small" role="status" data-pk-contacts="/admin/api/c/${c.id}/photos/contacts" hidden></p>
   <p class="muted small" style="margin-top:8px">Код ученик придумывает сам при первом входе, все коды видны здесь. Если под чужим именем зашёл кто-то другой, сбросьте код крестиком, выбор останется.</p>` : ''}
 </section>

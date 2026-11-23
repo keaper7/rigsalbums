@@ -1445,6 +1445,7 @@ function createApp(cfg) {
   pact('students', (ctx, cls) => {
     const res = photos.setStudents(cls.id, String(ctx.form.names || '').slice(0, 20000));
     if (res.dups.length) return page(ctx, 400, photosView(ctx, cls, { err: 'Повторяются имена: ' + res.dups.join(', ') + '. Если это разные ученики, добавьте фамилию или первую букву. Список не сохранён', names: ctx.form.names }));
+    if (res.blocked) return page(ctx, 400, photosView(ctx, cls, { err: 'Список не сохранён. Чтобы исправить опечатку у ученика с сохранёнными данными, нажмите «Исправить имя» в его строке. Убраны из текста: ' + res.kept.join(', '), names: ctx.form.names }));
     if (res.kept.length) return page(ctx, 400, photosView(ctx, cls, { err: 'Остались в списке, потому что по ним уже есть данные: ' + res.kept.join(', ') + '. Остальное сохранено' }));
     pback(ctx, cls, 'students');
   });
@@ -1452,7 +1453,20 @@ function createApp(cfg) {
   pact('rename', (ctx, cls) => {
     const res = photos.renameStudent(cls.id, +ctx.form.student, ctx.form.name);
     if (res.error) return page(ctx, 400, photosView(ctx, cls, { err: res.error }));
-    pback(ctx, cls, 'saved');
+    back(ctx, '/admin/c/' + cls.id + '/photos#students', 'studentrenamed');
+  });
+
+  pact('delstudent', (ctx, cls) => {
+    const student = photos.student(cls.id, +ctx.form.student);
+    if (!student) return notFound(ctx);
+    const lay = layout.get(cls.id);
+    if (lay && (lay.ver || lay.pending_ver)) {
+      return page(ctx, 409, photosView(ctx, cls, { err: 'Список связан с макетом альбома. При удалении ученика собьются номера страниц, поэтому запись сохранена.' }));
+    }
+    if (!photos.deleteStudent(cls.id, student.id, String(ctx.form.name || ''))) {
+      return page(ctx, 409, photosView(ctx, cls, { err: 'Имя ученика изменилось. Проверьте запись перед удалением.' }));
+    }
+    back(ctx, '/admin/c/' + cls.id + '/photos#students', 'studentremoved');
   });
 
   pact('settings', (ctx, cls, album) => {
@@ -1515,6 +1529,28 @@ function createApp(cfg) {
     photos.deletePhoto(cls.id, photo.id);
     back(ctx, '/admin/c/' + cls.id + '/photos?photo_section=' + encodeURIComponent(photo.section) + '#photos', 'photoremoved');
   });
+
+  function photoRangeAction(ctx, cls, remove) {
+    const section = str(ctx.form.section, 120);
+    if (!photos.photos(cls.id).some(p => p.section === section)) return notFound(ctx);
+    const first = str(ctx.form.first, 120), last = str(ctx.form.last, 120);
+    const range = Object.assign({ section, first, last }, photos.photoRange(cls.id, section, first, last));
+    const show = (status) => page(ctx, status, photosView(ctx, cls, { range, openPhotoSection: section }));
+    if (range.error) return show(400);
+    if (!range.rows.length) return show(200);
+    range.check = crypto.createHmac('sha256', auth.secret)
+      .update(JSON.stringify([cls.id, section, first, last, range.rows, range.selected])).digest('hex');
+    if (!remove) return show(200);
+    if (ctx.form.check !== range.check) {
+      range.error = 'Список файлов или число отметок изменились. Проверьте диапазон и подтвердите заново.';
+      return show(409);
+    }
+    photos.deletePhotos(cls.id, 'ids', range.rows.map(row => row.id));
+    back(ctx, '/admin/c/' + cls.id + '/photos?photo_section=' + encodeURIComponent(section) + '#photos', 'rangeremoved');
+  }
+
+  pact('rangepreview', (ctx, cls) => photoRangeAction(ctx, cls, false));
+  pact('delrange', (ctx, cls) => photoRangeAction(ctx, cls, true));
 
   pact('delall', (ctx, cls) => {
     photos.deletePhotos(cls.id);

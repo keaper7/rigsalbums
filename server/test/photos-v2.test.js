@@ -191,6 +191,56 @@ test('контакты ученика сохраняются при первом
   assert.strictEqual((await kid.req('GET', base + '/contact')).data.telegram, 'new_test');
 });
 
+test('админ удаляет ученика с контактами, сохраняя фотографии и общий выбор', async t => {
+  const { s, admin, id, slug, up, st } = await setup(t);
+  const photos = s.app.photos;
+  const anna = st[0], target = st[2];
+  const other = await createClass(admin, 'Школа', '11Б');
+  const url = '/admin/c/' + id + '/photos';
+  const del = url + '/delstudent';
+  const kid = client(s.base);
+  const base = '/f/' + slug;
+  assert.strictEqual((await kid.req('POST', base + '/me', { json: {
+    student: target.id, newPin: '4567', phone: '+79000000002', telegram: '@removed_test'
+  } })).status, 200);
+  const personal = await up('Личные/IMG_1.jpg');
+  const group = await up('Групповые/IMG_2.jpg');
+  photos.setPersonal(photos.album(id), anna.id, personal, true);
+  await kid.req('POST', base + '/pick', { json: { photo: personal, on: true } });
+  await kid.req('POST', base + '/group', { json: { photo: group, on: true } });
+  await kid.req('POST', base + '/quote', { json: { text: 'Тестовая цитата' } });
+  assert.strictEqual((await admin.post(url + '/students', { names: 'Анна\nТимур' })).status, 400);
+  const page = await admin.req('GET', url);
+  assert.match(page.text, /data-confirm="Удалить ученика «Зарина» из класса/);
+
+  const form = { student: String(target.id), name: target.name };
+  assert.strictEqual((await kid.req('POST', del, { form })).status, 403);
+  assert.strictEqual((await admin.req('POST', del, { form })).status, 403);
+  assert.strictEqual((await admin.post('/admin/c/' + other + '/photos/delstudent', form)).status, 404);
+  assert.strictEqual((await admin.post(del, { ...form, name: 'Старое имя' })).status, 409);
+
+  const removed = await admin.post(del, form);
+  assert.strictEqual(removed.status, 303);
+  assert.match(removed.headers.get('location'), /m=studentremoved#students$/);
+  assert.strictEqual(photos.student(id, target.id), null);
+  assert.deepStrictEqual(photos.personal(target.id), []);
+  assert.deepStrictEqual(photos.personal(anna.id), [personal]);
+  assert.deepStrictEqual(photos.group(id).map(r => r.photo_id), [group]);
+  assert.strictEqual(photos.log(id)[0].who, 'Удалённый ученик');
+  assert.ok(fs.existsSync(photos.file(id, personal + '.jpg')));
+  assert.strictEqual((await kid.req('GET', base + '/contact')).status, 403);
+
+  await admin.post(url + '/students', { names: 'Анна\nТимур\nЗарина' });
+  const newStudent = photos.students(id).find(row => row.name === target.name);
+  assert.notStrictEqual(newStudent.id, target.id);
+  photos.setPin(id, newStudent.id, '4567');
+  assert.strictEqual((await kid.req('GET', base + '/state')).data.me, null);
+  assert.strictEqual((await admin.post(del, form)).status, 404);
+  s.app.layout.start(id, { spreads: 1, covers: [] });
+  assert.strictEqual((await admin.post(del, { student: String(newStudent.id), name: target.name })).status, 409);
+  assert.ok(photos.student(id, newStudent.id));
+});
+
 test('места в альбоме, доп. ретушь, пожелание и раскладка с именами по местам', async t => {
   const { s, admin, id, slug, up, st } = await setup(t);
   const p = [];

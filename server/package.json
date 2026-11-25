@@ -14,5 +14,8 @@
   },
   "engines": {
     "node": ">=22.13"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1178.0"
   }
 }

@@ -148,7 +148,7 @@ ${o.err ? html`<p class="flash flash--err" role="alert">${o.err}</p>` : ''}
     <span>Выбрать папку с фото</span>
   </label>
   <div class="upl__state" data-pk-state hidden><div class="upl__bar"><i></i></div><p></p></div>
-  ${o.disk ? html`<p class="muted small pk-disk${o.disk.free < 3 * GB ? ' is-low' : ''}">Копии фото этого класса: ${size(o.usage)}. Свободно на сервере: ${size(o.disk.free)} из ${size(o.disk.total)}${o.disk.free < 3 * GB ? '. Места мало, освободите место у классов, где отбор закончен' : ''}.</p>` : ''}
+  ${o.disk ? html`<p class="muted small pk-disk${o.disk.free < 3 * GB ? ' is-low' : ''}">Фото на диске: ${size(o.usage)}${o.cloudUsage ? '. Фото в облаке: ' + size(o.cloudUsage) : ''}. Свободно на сервере: ${size(o.disk.free)} из ${size(o.disk.total)}${o.disk.free < 3 * GB ? '. Места на диске мало' : ''}.</p>` : ''}
   ${a.slim_at ? html`<p class="flash pk-slim">Место освобождено ${fmtWhen(a.slim_at)}: остались только выбранные фото в маленьком размере. Если загрузить папку снова, вернутся все фото.</p>`
     : o.photos.length ? html`<form method="post" action="/admin/c/${c.id}/photos/slim" class="pk-slim"${a.closed_at ? raw(' data-confirm="Удалить с сервера все фото, которые никто не выбрал? У выбранных останется маленькая копия, выбор, места, ретушь и тексты сохранятся. Оригиналы на компьютере не трогаются"') : ''}>
     ${csrf(o.sess)}

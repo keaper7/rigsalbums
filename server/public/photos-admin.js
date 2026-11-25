@@ -144,7 +144,7 @@
         canvas.width = canvas.height = 0;
       }).then(function (thumbnail) {
         return post(url + '?path=' + encodeURIComponent(job.path), file).then(function (res) {
-          return post(url + '/' + res.id + '/sm', thumbnail);
+          return post(url + '/' + res.id + '/sm?ver=' + res.ver, thumbnail);
         });
       });
     });

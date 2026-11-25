@@ -7,6 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const { randomUUID } = require('node:crypto');
 
 const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
 const dbFile = path.join(dataDir, 'rigs.db');
@@ -100,9 +101,53 @@ function demo() {
   console.log('Собрано: ' + file);
 }
 
-const cmds = { password: password, backup: backup, demo: demo };
+async function photosS3() {
+  const action = process.argv[3];
+  if (!['check', 'copy', 'prune'].includes(action)) {
+    throw new Error('Использование: node cli.js photos-s3 check | copy [ID класса] | prune [ID класса]');
+  }
+  const { photoS3 } = require('./lib/photo-s3');
+  const cloud = photoS3(process.env);
+  if (!cloud) throw new Error('Сначала настройте S3');
+  if (action === 'check') {
+    const key = '_connection-test/' + randomUUID() + '.txt';
+    const data = Buffer.from('Rigsarthur S3 test\\n');
+    await cloud.put(key, data, 'text/plain');
+    console.log('Загрузка OK');
+    try {
+      const result = await cloud.get(key);
+      if (!data.equals(Buffer.from(await result.Body.transformToByteArray()))) throw new Error('Тестовый файл изменился');
+      console.log('Скачивание OK, файл совпадает');
+    } finally {
+      await cloud.remove(key);
+      console.log('Удаление OK');
+    }
+    return;
+  }
+
+  const classId = process.argv[4] === undefined ? null : Number(process.argv[4]);
+  if (classId !== null && (!Number.isSafeInteger(classId) || classId < 1)) throw new Error('Укажите числовой ID класса');
+  if (!fs.existsSync(dbFile)) throw new Error('Не найдена база: ' + dbFile);
+  const { Store } = require('./lib/db');
+  const { Photos } = require('./lib/photos');
+  const store = new Store(dbFile);
+  try {
+    if (classId !== null && !store.db.prepare('SELECT id FROM classes WHERE id = ?').get(classId)) {
+      throw new Error('Класс не найден: ' + classId);
+    }
+    const photos = new Photos(store, path.join(dataDir, 'photos'), cloud);
+    const report = await photos.migrateCloud(action === 'prune', classId);
+    console.log('Скопировано: %d. Удалено с диска: %d (%d байт). Пропущено: %d.',
+      report.copied, report.pruned, report.freedBytes, report.skipped);
+    if (report.skipped) process.exitCode = 1;
+  } finally {
+    store.close();
+  }
+}
+
+const cmds = { password: password, backup: backup, demo: demo, 'photos-s3': photosS3 };
 if (!cmds[cmd]) {
-  console.log('Команды: password, backup, demo');
+  console.log('Команды: password, backup, demo, photos-s3');
   process.exit(1);
 }
 Promise.resolve(cmds[cmd]()).catch(e => { console.error(e); process.exit(1); });

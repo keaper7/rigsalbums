@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { pipeline } = require('node:stream/promises');
 
 const { Store, STEPS } = require('./lib/db');
 const { Auth, Limiter, SESSION_TTL } = require('./lib/auth');
@@ -115,7 +116,7 @@ function createApp(cfg) {
   const siteRoot = path.resolve(cfg.siteRoot);
   const media = new Media(store, cfg.mediaDir || path.join(cfg.dataDir, 'media'));
   const site = new Site(siteRoot, store);
-  const photos = new Photos(store, cfg.photosDir || path.join(cfg.dataDir, 'photos'));
+  const photos = new Photos(store, cfg.photosDir || path.join(cfg.dataDir, 'photos'), cfg.photoS3);
   const work = new Work(store, cfg.fixesDir || path.join(cfg.dataDir, 'fixes'));
   const clientApi = require('./lib/client-api').createClientApi(store, work, process.env.RIGS_CLIENT_API_TOKEN);
   const layout = new Layout(store, cfg.layoutDir || path.join(cfg.dataDir, 'layout'));
@@ -1421,7 +1422,7 @@ function createApp(cfg) {
     return PV.adminPage(Object.assign({
       cls: cls, album: photos.album(cls.id), photos: list, teacher: teacher,
       isTeacher: s => photos.isTeacherSection(s), students: students, counts: counts, groupCount: group.length, log: log,
-      disk: photos.disk(), usage: photos.usage(cls.id), picks: picks, byId: byId,
+      disk: photos.disk(), usage: photos.usage(cls.id), cloudUsage: photos.cloudUsage(cls.id), picks: picks, byId: byId,
       openPhotoSection: ctx.q('photo_section'),
       isGroup: s => photos.isGroupSection(album, s), sess: ctx.sess, base: baseUrl(ctx), msg: ctx.q('m')
     }, extra || {}));
@@ -1575,7 +1576,7 @@ function createApp(cfg) {
   r.post('/admin/api/media/pk/:id/:pid/sm', async ctx => {
     const cls = loadClass(ctx);
     if (!cls) { ctx.req.resume(); return H.json(ctx.res, 404, { error: 'Класс не найден' }); }
-    H.json(ctx.res, 200, await photos.saveSmall(cls.id, ctx.params.pid, ctx.req));
+    H.json(ctx.res, 200, await photos.saveSmall(cls.id, ctx.params.pid, ctx.req, ctx.q('ver')));
   }, { raw: true });
 
   r.get('/admin/api/c/:id/photos/export', ctx => {
@@ -1662,14 +1663,50 @@ function createApp(cfg) {
     H.json(ctx.res, 200, pickState(p));
   });
 
-  r.get('/f/:slug/p/:file', ctx => {
+  r.get('/f/:slug/p/:file', async ctx => {
     const album = photos.albumBySlug(ctx.params.slug);
     const m = /^([a-z0-9]{16})(-sm)?\.jpg$/.exec(ctx.params.file);
     const ph = album && m ? photos.photo(album.class_id, m[1]) : null;
     if (!ph) return notFound(ctx);
     // После «Освободить место» большой копии нет — показываем маленькую
     const file = ph.slim ? ph.id + '-sm.jpg' : ctx.params.file;
-    if (!H.serveStatic(photos.classDir(album.class_id), ctx.req, ctx.res, '/' + file, [], { cache: 'private, max-age=604800' })) notFound(ctx);
+    const cache = 'private, max-age=604800';
+    const object = photos.object(ph.id, ph.slim || m[2] ? 'small' : 'full');
+    if (!object) {
+      if (!H.serveStatic(photos.classDir(album.class_id), ctx.req, ctx.res, '/' + file, [], { cache })) notFound(ctx);
+      return;
+    }
+
+    const head = ctx.req.method === 'HEAD';
+    const options = { IfNoneMatch: ctx.req.headers['if-none-match'], Range: ctx.req.headers.range };
+    let result;
+    try {
+      result = await photos.cloud.get(object.object_key, options, head);
+    } catch (e) {
+      const status = e.$metadata?.httpStatusCode;
+      if (status === 304) {
+        ctx.res.writeHead(304, { 'Cache-Control': cache });
+        return ctx.res.end();
+      }
+      if (status === 416) {
+        ctx.res.writeHead(416, { 'Content-Range': 'bytes */' + object.bytes });
+        return ctx.res.end();
+      }
+      if (status === 404) return notFound(ctx);
+      console.error('S3 GET:', e.name, status || '');
+      return H.send(ctx.res, 503, 'Хранилище фото временно недоступно', 'text/plain; charset=utf-8');
+    }
+
+    const headers = {
+      'Content-Type': 'image/jpeg', 'Cache-Control': cache, 'Accept-Ranges': 'bytes',
+      'Content-Length': result.ContentLength ?? object.bytes
+    };
+    if (result.ContentRange) headers['Content-Range'] = result.ContentRange;
+    if (result.ETag) headers.ETag = result.ETag;
+    if (result.LastModified) headers['Last-Modified'] = result.LastModified.toUTCString();
+    ctx.res.writeHead(result.ContentRange ? 206 : 200, headers);
+    if (head) return ctx.res.end();
+    await pipeline(result.Body, ctx.res);
   });
 
   r.post('/f/:slug/me', ctx => {

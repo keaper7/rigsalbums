@@ -3,6 +3,7 @@
 const http = require('http');
 const path = require('path');
 const { createApp } = require('./app');
+const { photoS3 } = require('./lib/photo-s3');
 
 const env = process.env;
 const app = createApp({
@@ -12,7 +13,8 @@ const app = createApp({
   trustProxy: env.TRUST_PROXY === '1',
   cookieSecure: env.COOKIE_SECURE === '1',
   adminPassword: env.ADMIN_PASSWORD || '',
-  legacyUrl: env.LEGACY_URL || ''
+  legacyUrl: env.LEGACY_URL || '',
+  photoS3: photoS3(env)
 });
 
 const port = parseInt(env.PORT || '3000', 10);
@@ -30,7 +32,11 @@ server.listen(port, host, () => {
   if (!app.auth.hasPassword()) console.log('Пароль админки не задан: npm run password');
 });
 
+const cleanup = () => app.photos.cleanCloud().catch(error => console.error('Очередь удаления фото:', error));
+const cleanupTimer = app.photos.cloud ? setInterval(cleanup, 15000).unref() : null;
+
 function stop() {
+  if (cleanupTimer) clearInterval(cleanupTimer);
   server.close(() => { app.store.close(); process.exit(0); });
   setTimeout(() => process.exit(0), 5000).unref();
 }

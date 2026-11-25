@@ -1,7 +1,7 @@
 # Сервер rigsarthur.ru
 
 Отдаёт сайт, страницы классов с голосованием и админку для Артура.
-Сторонних пакетов нет: только Node.js и встроенный в него SQLite.
+База работает на встроенном SQLite. Для подключения хранилища фото используется AWS SDK для S3.
 
 Нужен Node.js 22.13 или новее, лучше 24 LTS. Проверить версию: `node -v`.
 
@@ -9,6 +9,7 @@
 
 ```bash
 cd server
+npm ci
 npm run password   # один раз: задать пароль админки
 npm start          # http://127.0.0.1:3000, админка на /admin
 ```
@@ -110,7 +111,7 @@ server/
    sudo git clone https://github.com/keaper7/rigsalbums.git /srv/rigsalbums
    sudo mkdir -p /srv/rigsalbums/server/data
    sudo chown -R rigs:rigs /srv/rigsalbums/server/data
-   cd /srv/rigsalbums/server && sudo -u rigs npm run password
+   cd /srv/rigsalbums/server && sudo -u rigs npm ci --omit=dev && sudo -u rigs npm run password
    ```
 3. Сервис: скопировать `deploy/rigsalbums.service` в `/etc/systemd/system/`, затем:
    ```bash
@@ -149,9 +150,79 @@ server/
 Обновление после изменений в репозитории:
 
 ```bash
-sudo -u rigs git -C /srv/rigsalbums pull && sudo systemctl restart rigsalbums
+sudo -u rigs git -C /srv/rigsalbums pull --ff-only &&
+  sudo -u rigs npm --prefix /srv/rigsalbums/server ci --omit=dev &&
+  sudo systemctl restart rigsalbums
 ```
 
 Логи: `sudo journalctl -u rigsalbums -f`.
 
 Демо `class.html` и `prep.html` на боевом сервере не нужны. Их можно удалить там или закрыть в nginx.
+
+## S3 для «Отбора фото»
+
+Бакет должен быть закрытым. Ключу нужны операции `PutObject`, `GetObject` и `DeleteObject` для объектов бакета. Браузер получает JPG по прежним ссылкам сайта. Ключи используются только на сервере. SQLite хранит классы, выбор и ссылки на файлы.
+
+1. На сервере подготовить файл для ключей с правами только для root.
+
+   ```bash
+   sudo touch /etc/rigsalbums-s3.env
+   sudo chown root:root /etc/rigsalbums-s3.env
+   sudo chmod 600 /etc/rigsalbums-s3.env
+   sudoedit /etc/rigsalbums-s3.env
+   ```
+
+   ```dotenv
+   PHOTO_S3_ENDPOINT=https://s3.regru.cloud
+   PHOTO_S3_BUCKET=rigsarthur-photos
+   PHOTO_S3_REGION=us-east-1
+   PHOTO_S3_ACCESS_KEY_ID=заменить_на_Access_Key_ID
+   PHOTO_S3_SECRET_ACCESS_KEY=заменить_на_Secret_Access_Key
+   ```
+
+2. После обновления кода и `npm ci --omit=dev` проверить S3 с сервера тем же Node.js, который запускает сайт. Команда загружает, скачивает, сравнивает и удаляет тестовый файл.
+
+   ```bash
+   photo_s3() {
+     sudo systemd-run --quiet --wait --pipe --collect \
+       -p User=rigs -p EnvironmentFile=/etc/rigsalbums-s3.env \
+       --working-directory=/srv/rigsalbums/server /usr/bin/node cli.js photos-s3 "$@"
+   }
+   photo_s3 check
+   ```
+
+3. Сделать резервную копию базы. После успешной проверки добавить отдельный файл настроек systemd. Он сохранит существующие настройки сервиса и API.
+
+   ```bash
+   cd /srv/rigsalbums/server
+   sudo -u rigs node cli.js backup
+   sudo mkdir -p /etc/systemd/system/rigsalbums.service.d
+   sudoedit /etc/systemd/system/rigsalbums.service.d/photos-s3.conf
+   ```
+
+   ```ini
+   [Service]
+   EnvironmentFile=/etc/rigsalbums-s3.env
+   ```
+
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl restart rigsalbums
+   sudo systemctl is-active rigsalbums
+   ```
+
+4. Загрузить пару JPG в тестовый класс. Проверить миниатюру, крупное фото, выбор ученика и удаление. Проверить, что фото старого класса открывается по прежней ссылке. Новые загрузки теперь идут в S3. Локальный диск по-прежнему нужен базе и другим разделам сайта.
+
+5. Для переноса уже загруженных фото использовать команды из той же сессии, где объявлена функция `photo_s3`. Начать с одного класса, подставив его ID. Команда `copy` сверяет файлы после загрузки и оставляет копии на диске.
+
+   ```bash
+   photo_s3 copy ID_КЛАССА
+   ```
+
+   Проверить ссылки и выбор в перенесённом классе. После проверки и при наличии резервной копии снимков можно освободить место. Команда `prune` сверяет каждый файл с S3 ещё раз перед удалением с диска. Выполнять без параллельной перезагрузки папок в этих классах.
+
+   ```bash
+   photo_s3 prune ID_КЛАССА
+   ```
+
+   Без ID команды работают по всем классам. `npm run backup` сохраняет ссылки из SQLite. Для восстановления удалённых фотографий нужна отдельная резервная копия файлов или версионирование бакета. Если нужно остановить новые записи в S3, добавьте `PHOTO_S3_WRITE=0` в файл с настройками и перезапустите сервис. Параметры S3 должны остаться подключёнными для чтения перенесённых фото.

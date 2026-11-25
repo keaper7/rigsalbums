@@ -4,11 +4,12 @@
 // Браузер присылает готовые JPG и миниатюры. Раскладка файлов на компьютере
 // использует относительные пути из загруженной папки.
 //
-// Всё лежит в своих таблицах pk_* и своей папке data/photos/<класс>: голосование и
-// загрузки раздела «Сайт» это не задевает (уборка media.gc() сюда не заглядывает)
+// Данные отбора лежат в таблицах pk_*, копии фото — в data/photos/<класс> или S3.
+// Голосование и загрузки раздела «Сайт» используют своё хранилище.
 
 const fs = require('fs');
 const path = require('path');
+const { randomUUID } = require('node:crypto');
 const { newId, jpegSize } = require('./media');
 const { numbered } = require('./layout');
 
@@ -47,6 +48,22 @@ CREATE TABLE IF NOT EXISTS pk_photos (
   created_at INTEGER NOT NULL,
   UNIQUE (class_id, path)
 );
+CREATE TABLE IF NOT EXISTS pk_photo_objects (
+  photo_id TEXT NOT NULL REFERENCES pk_photos(id) ON DELETE CASCADE,
+  variant TEXT NOT NULL CHECK (variant IN ('full', 'small')),
+  object_key TEXT NOT NULL UNIQUE,
+  bytes INTEGER NOT NULL,
+  PRIMARY KEY (photo_id, variant)
+);
+CREATE TABLE IF NOT EXISTS pk_photo_cleanup (
+  object_key TEXT PRIMARY KEY,
+  after_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pk_photo_cleanup_due ON pk_photo_cleanup (after_at);
+CREATE TRIGGER IF NOT EXISTS pk_photo_object_delete AFTER DELETE ON pk_photo_objects
+BEGIN
+  INSERT OR REPLACE INTO pk_photo_cleanup VALUES (OLD.object_key, 0);
+END;
 CREATE TABLE IF NOT EXISTS pk_personal (
   student_id INTEGER NOT NULL REFERENCES pk_students(id) ON DELETE CASCADE,
   photo_id TEXT NOT NULL REFERENCES pk_photos(id) ON DELETE CASCADE,
@@ -192,11 +209,15 @@ function readAll(req, limit) {
 }
 
 class Photos {
-  constructor(store, dir) {
+  constructor(store, dir, cloud = null) {
     this.store = store;
     this.db = store.db;
     this.dir = dir;
+    this.cloud = cloud;
     this.db.exec(SCHEMA);
+    if (!this.cloud && this.db.prepare('SELECT 1 FROM pk_photo_objects LIMIT 1').get()) {
+      throw new Error('Часть фото уже в S3. Для запуска нужны настройки хранилища.');
+    }
     // Поля, добавленные после первой версии: дописываем в уже существующие таблицы,
     // ничего не удаляя и не пересоздавая
     COLUMNS.forEach(c => {
@@ -241,6 +262,78 @@ class Photos {
     return bytes;
   }
   file(classId, name) { return path.join(this.classDir(classId), name); }
+
+  cloudUsage(classId) {
+    return this.db.prepare(`SELECT COALESCE(SUM(o.bytes), 0) AS bytes
+      FROM pk_photo_objects o JOIN pk_photos p ON p.id = o.photo_id WHERE p.class_id = ?`).get(classId).bytes;
+  }
+
+  object(id, variant) {
+    return this.db.prepare('SELECT object_key, bytes FROM pk_photo_objects WHERE photo_id = ? AND variant = ?').get(id, variant);
+  }
+
+  unlink(classId, name) {
+    try { fs.unlinkSync(this.file(classId, name)); } catch (e) {
+      if (e.code !== 'ENOENT') throw e;
+    }
+  }
+
+  removeLocal(classId, name) {
+    try { this.unlink(classId, name); } catch (e) {
+      console.error('Удаление локальной копии фото:', e.code || e.name);
+    }
+  }
+
+  writeLocal(classId, name, buf) {
+    fs.mkdirSync(this.classDir(classId), { recursive: true });
+    const target = this.file(classId, name);
+    const temp = target + '.' + process.pid + '.' + Date.now() + '.part';
+    fs.writeFileSync(temp, buf);
+    fs.renameSync(temp, target);
+  }
+
+  async stageObject(classId, variant, buf) {
+    const key = 'photos/' + classId + '/' + randomUUID() + (variant === 'small' ? '-sm.jpg' : '.jpg');
+    // После сбоя между PUT и обновлением SQLite файл останется в очереди уборки.
+    this.db.prepare('INSERT INTO pk_photo_cleanup VALUES (?, ?)').run(key, Date.now() + 60 * 60 * 1000);
+    try {
+      await this.cloud.put(key, buf);
+    } catch (e) {
+      console.error('S3 PUT:', e.name, e.$metadata?.httpStatusCode || '');
+      throw fail(503, 'Не удалось сохранить фото в хранилище. Повторите загрузку.');
+    }
+    return key;
+  }
+
+  attachObject(id, variant, key, bytes) {
+    this.dropObject(id, variant);
+    this.db.prepare('INSERT INTO pk_photo_objects VALUES (?, ?, ?, ?)').run(id, variant, key, bytes);
+    this.db.prepare('DELETE FROM pk_photo_cleanup WHERE object_key = ?').run(key);
+  }
+
+  dropObject(id, variant) {
+    this.db.prepare('DELETE FROM pk_photo_objects WHERE photo_id = ? AND variant = ?').run(id, variant);
+  }
+
+  async cleanCloud(limit = 100) {
+    if (!this.cloud || this.cleaningCloud) return;
+    this.cleaningCloud = true;
+    try {
+      const rows = this.db.prepare('SELECT object_key FROM pk_photo_cleanup WHERE after_at <= ? ORDER BY after_at LIMIT ?').all(Date.now(), limit);
+      // Объекты неизменяемые, их ключи при замене фото не используются повторно.
+      for (const row of rows) {
+        try {
+          await this.cloud.remove(row.object_key);
+          this.db.prepare('DELETE FROM pk_photo_cleanup WHERE object_key = ?').run(row.object_key);
+        } catch (e) {
+          this.db.prepare('UPDATE pk_photo_cleanup SET after_at = ? WHERE object_key = ?').run(Date.now() + 5 * 60 * 1000, row.object_key);
+          console.error('S3 DELETE:', e.name, e.$metadata?.httpStatusCode || '');
+        }
+      }
+    } finally {
+      this.cleaningCloud = false;
+    }
+  }
 
   // ---------- альбом класса ----------
   album(classId) {
@@ -423,12 +516,25 @@ class Photos {
   // после восстановления базы из бэкапа копий на диске может не быть (в бэкап они не входят —
   // их всегда можно загрузить заново из папки с оригиналами), и тогда загрузка их догрузит
   ready(classId) {
+    const cloudFiles = new Set(this.db.prepare(`SELECT o.photo_id, o.variant FROM pk_photo_objects o
+      JOIN pk_photos p ON p.id = o.photo_id WHERE p.class_id = ?`).all(classId).map(r => r.photo_id + ':' + r.variant));
+    const exists = (p, variant, suffix) => cloudFiles.has(p.id + ':' + variant) || fs.existsSync(this.file(classId, p.id + suffix));
     return this.photos(classId).filter(p => p.has_sm &&
-      (p.slim || fs.existsSync(this.file(classId, p.id + '.jpg'))) && fs.existsSync(this.file(classId, p.id + '-sm.jpg')));
+      (p.slim || exists(p, 'full', '.jpg')) && exists(p, 'small', '-sm.jpg'));
   }
 
   paths(classId) {
     return this.ready(classId).map(p => p.path);
+  }
+
+  upsertPhoto(classId, relativePath, size) {
+    const now = Date.now();
+    return this.db.prepare(`INSERT INTO pk_photos
+      (id, class_id, section, path, w, h, has_sm, ver, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
+      ON CONFLICT (class_id, path) DO UPDATE SET w = excluded.w, h = excluded.h,
+        has_sm = 0, slim = 0, ver = MAX(pk_photos.ver + 1, excluded.ver)
+      RETURNING id, ver`).get(newId(), classId, sectionOf(relativePath), relativePath, size.w, size.h, now, now);
   }
 
   // Большая копия. Если такой путь уже был — заменяем файл, запись и выборы сохраняются
@@ -437,34 +543,103 @@ class Photos {
     if (!p) { req.resume(); throw fail(400, 'Нужен файл JPG из папки с фото'); }
     const d = this.reserve === undefined ? this.disk() : { free: this.reserve };
     if (d && d.free < DISK_RESERVE) { req.resume(); throw fail(507, 'На сервере заканчивается место. Загрузка остановлена, чтобы не сломать сайт — напишите Азрету'); }
+    const albumSlug = this.album(classId)?.slug;
     const buf = await readAll(req, IMAGE_MAX);
     const size = jpegSize(buf);
     if (!size) throw fail(415, 'Это не похоже на JPEG');
-    fs.mkdirSync(this.classDir(classId), { recursive: true });
-    // Сначала запись (тот же путь — та же запись, даже если два запроса пришли разом), потом файл.
-    // Маленькая копия до её загрузки считается неготовой: фото не покажется ученикам наполовину
-    const now = Date.now();
-    this.db.prepare(`INSERT INTO pk_photos (id, class_id, section, path, w, h, has_sm, ver, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
-      ON CONFLICT (class_id, path) DO UPDATE SET w = excluded.w, h = excluded.h, has_sm = 0, slim = 0, ver = excluded.ver`)
-      .run(newId(), classId, sectionOf(p), p, size.w, size.h, now, now);
-    const id = this.db.prepare('SELECT id FROM pk_photos WHERE class_id = ? AND path = ?').get(classId, p).id;
-    const tmp = this.file(classId, id + '.jpg.' + process.pid + '.' + now + '.part');
-    fs.writeFileSync(tmp, buf);
-    fs.renameSync(tmp, this.file(classId, id + '.jpg'));
-    return { id: id, path: p, section: sectionOf(p) };
+    const key = this.cloud?.writable ? await this.stageObject(classId, 'full', buf) : null;
+    const { id, ver } = this.store.tx(() => {
+      if (!albumSlug || this.album(classId)?.slug !== albumSlug) throw fail(404, 'Класс не найден');
+      const row = this.upsertPhoto(classId, p, size);
+      this.dropObject(row.id, 'small');
+      if (key) {
+        this.attachObject(row.id, 'full', key, buf.length);
+      } else {
+        this.writeLocal(classId, row.id + '.jpg', buf);
+        this.dropObject(row.id, 'full');
+      }
+      return row;
+    });
+    if (key) {
+      this.removeLocal(classId, id + '.jpg');
+      this.removeLocal(classId, id + '-sm.jpg');
+    }
+    return { id: id, path: p, section: sectionOf(p), ver: ver };
+  }
+
+  // Перенос уже загруженных копий. Привязываем только файл, который прочитали
+  // обратно из S3 и сверили. Локальную копию удаляем отдельным запуском.
+  async migrateCloud(prune = false, classId = null) {
+    if (!this.cloud) throw new Error('Сначала настройте S3');
+    const rows = classId === null
+      ? this.db.prepare('SELECT * FROM pk_photos ORDER BY class_id, id').all()
+      : this.db.prepare('SELECT * FROM pk_photos WHERE class_id = ? ORDER BY id').all(classId);
+    const report = { copied: 0, pruned: 0, skipped: 0, freedBytes: 0 };
+    for (const row of rows) {
+      const variants = [];
+      if (!row.slim) variants.push(['full', '.jpg']);
+      if (row.has_sm) variants.push(['small', '-sm.jpg']);
+      for (const [variant, suffix] of variants) {
+        const name = row.id + suffix;
+        const file = this.file(row.class_id, name);
+        if (!fs.existsSync(file)) continue;
+        const previous = this.object(row.id, variant);
+        if (prune && !previous) { report.skipped++; continue; }
+        if (!prune && previous) continue;
+        const data = fs.readFileSync(file);
+        const key = previous ? previous.object_key : await this.stageObject(row.class_id, variant, data);
+        const stored = await this.cloud.get(key);
+        const received = Buffer.from(await stored.Body.transformToByteArray());
+        if (!data.equals(received)) throw new Error('Копия не совпадает с файлом класса ' + row.class_id + ': ' + name);
+        this.store.tx(() => {
+          const current = this.photo(row.class_id, row.id);
+          const ref = this.object(row.id, variant);
+          if (!current || current.ver !== row.ver || current.slim !== row.slim ||
+              ref?.object_key !== previous?.object_key || !fs.existsSync(file) ||
+              !data.equals(fs.readFileSync(file))) {
+            report.skipped++;
+            return;
+          }
+          if (prune) {
+            this.unlink(row.class_id, name);
+            report.pruned++;
+            report.freedBytes += data.length;
+          } else {
+            this.attachObject(row.id, variant, key, data.length);
+            report.copied++;
+          }
+        });
+      }
+    }
+    return report;
   }
 
   // Маленькая копия для сетки
-  async saveSmall(classId, id, req) {
-    if (!this.photo(classId, id)) { req.resume(); throw fail(404, 'Фото не найдено'); }
+  async saveSmall(classId, id, req, version = null) {
+    const photo = this.photo(classId, id);
+    if (!photo) { req.resume(); throw fail(404, 'Фото не найдено'); }
+    if (version !== null && String(photo.ver) !== version) {
+      req.resume();
+      throw fail(409, 'Фото уже заменено. Загрузите его заново.');
+    }
     const buf = await readAll(req, IMAGE_MAX);
     if (!jpegSize(buf)) throw fail(415, 'Это не похоже на JPEG');
-    // Пока приходила миниатюра, фото могли удалить.
-    if (!this.photo(classId, id)) throw fail(404, 'Фото не найдено');
-    const tmp = this.file(classId, id + '-sm.jpg.' + process.pid + '.' + Date.now() + '.part');
-    fs.writeFileSync(tmp, buf);
-    fs.renameSync(tmp, this.file(classId, id + '-sm.jpg'));
-    this.db.prepare('UPDATE pk_photos SET has_sm = 1 WHERE id = ?').run(id);
+    const key = this.cloud?.writable ? await this.stageObject(classId, 'small', buf) : null;
+    const name = id + '-sm.jpg';
+    this.store.tx(() => {
+      // Пока приходила миниатюра, основную копию могли удалить или заменить.
+      const current = this.photo(classId, id);
+      if (!current) throw fail(404, 'Фото не найдено');
+      if (current.ver !== photo.ver || current.slim !== photo.slim) throw fail(409, 'Фото уже изменилось. Загрузите его заново.');
+      if (key) {
+        this.attachObject(id, 'small', key, buf.length);
+      } else {
+        this.writeLocal(classId, name, buf);
+        this.dropObject(id, 'small');
+      }
+      this.db.prepare('UPDATE pk_photos SET has_sm = 1 WHERE id = ?').run(id);
+    });
+    if (key) this.removeLocal(classId, name);
     return { id: id };
   }
 
@@ -515,7 +690,7 @@ class Photos {
         WHERE class_id = ?`).run(classId, classId, classId, classId);
       return removed;
     });
-    list.forEach(r => ['.jpg', '-sm.jpg'].forEach(s => { try { fs.unlinkSync(this.file(classId, r.id + s)); } catch (e) {} }));
+    list.forEach(r => ['.jpg', '-sm.jpg'].forEach(s => this.removeLocal(classId, r.id + s)));
     return list.length;
   }
 
@@ -534,12 +709,17 @@ class Photos {
     const kept = all.filter(r => keep.has(r.id));
     this.store.tx(() => {
       drop.forEach(r => this.db.prepare('DELETE FROM pk_photos WHERE id = ?').run(r.id));
-      kept.forEach(r => this.db.prepare('UPDATE pk_photos SET slim = 1 WHERE id = ?').run(r.id));
+      kept.forEach(r => {
+        this.db.prepare('UPDATE pk_photos SET slim = 1 WHERE id = ?').run(r.id);
+        this.dropObject(r.id, 'full');
+      });
       this.updateAlbum(classId, { slim_at: Date.now() });
     });
-    const rm = f => { try { fs.unlinkSync(this.file(classId, f)); } catch (e) {} };
-    drop.forEach(r => { rm(r.id + '.jpg'); rm(r.id + '-sm.jpg'); });
-    kept.forEach(r => rm(r.id + '.jpg'));
+    drop.forEach(r => {
+      this.removeLocal(classId, r.id + '.jpg');
+      this.removeLocal(classId, r.id + '-sm.jpg');
+    });
+    kept.forEach(r => this.removeLocal(classId, r.id + '.jpg'));
     return { removed: drop.length, kept: kept.length };
   }
 
